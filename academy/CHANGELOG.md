@@ -4,6 +4,16 @@ All notable changes to the Systems & AI Academy are listed here. The
 format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 versions follow [Semantic Versioning](https://semver.org/).
 
+## [1.0.1] - 2026-09-24
+
+### Fixed
+- Ctrl+D now also stops the live focus timer, so pressing Ctrl+D (twice at most) always saves and exits.
+- The downloads now include the MIT `LICENSE`.
+
+### Changed
+- CI: the random-input "monkey" test no longer reports false failures. It clears a half-typed line before ending a session, and it matches Go's real crash output instead of words the lessons teach, such as SIGSEGV.
+- CI and release workflows use `actions/checkout@v5` and `actions/setup-go@v6` (Node.js 24).
+
 ## [1.0.0] - 2026-09-24
 
 The first public release: a complete, offline study companion for

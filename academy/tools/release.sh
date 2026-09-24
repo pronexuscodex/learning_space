@@ -36,6 +36,10 @@ for target in $TARGETS; do
 	for f in README.md CHANGELOG.md LICENSE; do
 		[ -f "$f" ] && cp "$f" "$dir/"
 	done
+	# The license may live at the repository root instead.
+	if [ ! -f LICENSE ] && [ -f ../LICENSE ]; then
+		cp ../LICENSE "$dir/"
+	fi
 	if [ "$os" = windows ]; then
 		(cd "$OUT" && zip -qr "$name.zip" "$name")
 	else
