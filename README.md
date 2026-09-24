@@ -1,3 +1,5 @@
+<p align="center"><img src="academy/assets/icon.svg" width="112" alt="Systems & AI Academy icon"></p>
+
 # learning_space
 
 ## Systems & AI Academy

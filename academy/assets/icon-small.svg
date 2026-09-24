@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+  <!-- The small-size version: no pins, bolder strokes, so it stays crisp at 16–32 px. -->
+  <defs>
+    <linearGradient id="edge" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#94e2d5"/>
+      <stop offset="1" stop-color="#cba6f7"/>
+    </linearGradient>
+  </defs>
+  <rect x="1" y="1" width="30" height="30" rx="7" fill="#181825" stroke="url(#edge)" stroke-width="2"/>
+  <path d="M8.5 10.5l5 5.5-5 5.5" fill="none" stroke="#94e2d5" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M16 21.5h7" stroke="#f9e2af" stroke-width="2.8" stroke-linecap="round"/>
+</svg>

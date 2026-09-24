@@ -4,6 +4,11 @@ All notable changes to the Systems & AI Academy are listed here. The
 format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 versions follow [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+- An app icon: a CPU chip with a terminal prompt, in the app's colours. The Windows `academy.exe` now shows it in Explorer and the taskbar; the READMEs and a GitHub social-preview card use it too. `tools/icons.py` regenerates every size from the SVG.
+
 ## [1.0.1] - 2026-09-24
 
 ### Fixed
