@@ -578,6 +578,8 @@ The **Release** workflow (`.github/workflows/release.yml`) then:
 - builds all seven targets with `tools/release.sh`, stamping the version into the binary;
 - publishes a GitHub release with the archives, `SHA256SUMS`, and that version's changelog section as the release notes. A tag with a hyphen, such as `v1.1.0-rc.1`, is published as a pre-release.
 
+No terminal? Publish from the website instead: **Releases → Draft a new release**, type a new tag such as `v1.0.0`, paste the changelog section as the description, and click **Publish release**. The same workflow then builds the archives and attaches them to that release, usually within a few minutes.
+
 To try the same build locally, run `tools/release.sh v0.0.0` and look in `dist/`.
 
 Other tools in `tools/`:

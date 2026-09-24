@@ -2,9 +2,19 @@ name: Release
 
 # Push a tag such as v1.0.0 to build every platform and publish a GitHub
 # release with the archives, SHA256SUMS and the matching CHANGELOG section.
+# It also runs when a release is published from the GitHub website: then it
+# attaches the archives to that release and keeps the notes you wrote.
 on:
   push:
     tags: ["v*.*.*"]
+  release:
+    types: [published]
+
+# A release published on the website creates its tag too, so both events
+# can fire; run them one after the other (uploads replace, so it is safe).
+concurrency:
+  group: release-${{ github.ref_name }}
+  cancel-in-progress: false
 
 permissions:
   contents: write
@@ -40,8 +50,13 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          flags=""
-          case "$GITHUB_REF_NAME" in *-*) flags="--prerelease" ;; esac
-          gh release create "$GITHUB_REF_NAME" dist/* \
-            --title "Systems & AI Academy $GITHUB_REF_NAME" \
-            --notes-file notes.md $flags
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            # Published on the website (or re-run): just attach the files.
+            gh release upload "$GITHUB_REF_NAME" dist/* --clobber
+          else
+            flags=""
+            case "$GITHUB_REF_NAME" in *-*) flags="--prerelease" ;; esac
+            gh release create "$GITHUB_REF_NAME" dist/* \
+              --title "Systems & AI Academy $GITHUB_REF_NAME" \
+              --notes-file notes.md $flags
+          fi
