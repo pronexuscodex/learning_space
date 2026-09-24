@@ -17,6 +17,7 @@ out = {}
 for f in sorted(os.listdir(".")):
     if f.endswith(".py") and f[0] == "s":
         out[f] = run(f"python3 {f}")
+out["s01_collatz.c"] = run(f"gcc -Wall -Wextra -std=c17 -o {tb} s01_collatz.c && {tb}")
 out["s05_bits.c"] = run(f"gcc -Wall -o {tb} s05_bits.c && {tb}")
 fork = run(f"gcc -Wall -o {tf} s06_fork.c && {tf}").splitlines()
 out["s06_fork.c"] = "\n".join(f"hello from process {1234 + i}" for i in range(len(fork)))  # PIDs vary per run
@@ -25,7 +26,7 @@ out["s09_git.sh"] = run(f"sh {here}/s09_git.sh", cwd=d)
 
 # stage -> (file, saved name, run command, predict question, lesson)
 T = {
- 1: ("s01_collatz.py", "collatz.py", "python3 collatz.py", "How many steps does 27 take to reach 1, and what is the highest value it reaches on the way? Write your guesses down first.", "Tiny rules can produce surprisingly long journeys: 27 climbs past 9,000 before falling to 1. Nobody has proved that every starting number reaches 1 (the Collatz conjecture)."),
+ 1: ("s01_collatz.c", "collatz.c", "gcc -Wall -Wextra -std=c17 collatz.c -o collatz && ./collatz", "How many steps does 27 take to reach 1, and what is the highest value it reaches on the way? Write your guesses down first. Why is n a long rather than an int?", "Tiny rules can produce surprisingly long journeys: 27 climbs past 9,000 before falling to 1. Nobody has proved that every starting number reaches 1 (the Collatz conjecture). n is a long because some starting numbers climb far beyond what a 32-bit int can hold, and in C a signed overflow is undefined behaviour. The size line depends on your machine: 8 bytes on 64-bit Linux and macOS, 4 on Windows."),
  2: ("s02_bsearch.py", "bsearch.py", "python3 bsearch.py", "In a sorted list of one million numbers, how many guesses does binary search need to find 1? 500,000? A number that is not there?", "About log₂(1,000,000) ≈ 20 guesses at most, and the exact middle is found on the very first guess."),
  3: ("s03_sieve.py", "sieve.py", "python3 sieve.py", "Roughly how many primes are there below 10,000? (Hint: the prime number theorem says about n / ln n.)", "10,000 / ln 10,000 ≈ 1,086, a decent estimate of the true 1,229. The sieve was a favourite benchmark in early-1980s computer magazines."),
  4: ("s04_adder.py", "adder.py", "python3 adder.py", "What does an 8-bit adder give for 200 + 100, and for 255 + 1? What happens to the carry?", "300 doesn't fit in 8 bits: the adder keeps 300 − 256 = 44 and raises the carry flag. This is overflow, built from nothing but AND, OR and XOR."),

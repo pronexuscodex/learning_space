@@ -238,9 +238,13 @@ func sparkline(vals []float64) string {
 	return b.String()
 }
 
+// preMark starts a logical line that must be shown verbatim (code).
+const preMark = "\x00"
+
 // reflow turns authored text into logical lines. Blank lines separate
 // paragraphs, lines starting with "- " are bullets, ALL-CAPS lines are
-// headings, and other newlines are soft (joined with a space).
+// headings, lines indented by two or more spaces are code (kept exactly
+// as written), and other newlines are soft (joined with a space).
 func reflow(text string) []string {
 	var out []string
 	cur := ""
@@ -253,6 +257,9 @@ func reflow(text string) []string {
 	for _, raw := range strings.Split(text, "\n") {
 		line := strings.TrimSpace(raw)
 		switch {
+		case line != "" && strings.HasPrefix(raw, "  "):
+			flush()
+			out = append(out, preMark+strings.TrimRight(raw[2:], " "))
 		case line == "":
 			flush()
 			out = append(out, "")
@@ -285,6 +292,12 @@ func wrap(text string, width int, indent string) []string {
 	for _, logical := range reflow(text) {
 		if logical == "" {
 			lines = append(lines, "")
+			continue
+		}
+		if code, ok := strings.CutPrefix(logical, preMark); ok {
+			for _, part := range hardBreak(code, width-visibleLen(indent)-2) {
+				lines = append(lines, indent+"  "+part)
+			}
 			continue
 		}
 		first, rest := indent, indent

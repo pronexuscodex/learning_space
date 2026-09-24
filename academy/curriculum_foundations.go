@@ -1,224 +1,452 @@
 package main
 
 // Track F: Foundations of Computing (stages 1–4). The starting point for a
-// complete beginner: programming, data structures & algorithms, discrete
-// mathematics, and how the hardware itself works.
+// complete beginner: programming in C, data structures & algorithms,
+// discrete mathematics, and how the hardware itself works.
 
 var foundationsGuides = map[int]StageGuide{
 	// -----------------------------------------------------------------
 	1: {
 		Overview: `Programming is telling a very fast, very literal machine exactly what to
-do. This stage teaches the handful of building blocks every language
-shares (values, variables, decisions, loops, functions and collections)
-and, just as importantly, how to break a problem into steps and how to
-fix code when it does not work. Any language will do; the examples use
-Python because it reads almost like English.`,
+do. This stage teaches the building blocks every language shares
+(values, variables, decisions, loops, functions and collections) in C,
+the language that lets you see what is really happening underneath:
+every variable has a size and an address, nothing is hidden, and the
+compiler turns your text into real machine instructions you can run.
+
+Why start with C? It is small (you can learn the whole language), it is
+where operating systems, databases, language runtimes and embedded
+devices are written, and every idea you learn in it (memory, pointers,
+the stack) explains what Python, Go or JavaScript do for you behind the
+scenes. Harvard's CS50 moves to C in its first week, and Stanford's
+CS107, Berkeley's CS61C and CMU's 15-213 teach systems in C. C also lets
+you make mistakes other languages hide, so this stage teaches you to
+write it defensively from day one: that is what makes you solid, not
+the language itself.`,
 		Outcomes: []string{
-			"Write small, useful programs from scratch in any mainstream language",
-			"Break a vague problem into clear steps and functions",
-			"Read error messages calmly and debug methodically",
+			"Write, compile, run and debug small C programs from scratch",
+			"Explain what a variable, an array, a string and a pointer are in memory",
+			"Break a problem into functions and read compiler errors and warnings calmly",
+			"Recognise undefined behaviour and use the compiler's warnings and sanitizers to catch it",
 		},
 		Glossary: []Term{
-			{"Program", "A list of instructions a computer follows exactly, in order."},
-			{"Variable", "A name that refers to a value, such as total = 42."},
-			{"Type", "The kind of a value (number, text, true/false, list), which decides what you can do with it."},
-			{"String", "A piece of text, such as \"hello\"."},
-			{"Boolean", "A value that is either true or false."},
-			{"Loop", "Code that repeats, either for each item in a collection or while a condition holds."},
+			{"Source file", "The text file you write (hello.c) before the compiler turns it into a program."},
+			{"Compiler", "The program (gcc or clang) that translates C source code into machine code the CPU can run."},
+			{"Executable", "The runnable file the compiler produces, such as ./hello."},
+			{"Variable", "A named piece of memory holding a value of a fixed type, such as int total = 42;."},
+			{"Type", "The kind and size of a value (int, double, char), which decides what you can do with it."},
+			{"printf", "C's standard function for printing formatted text, such as printf(\"%d\\n\", total);."},
 			{"Function", "A named, reusable piece of code that takes inputs and returns an output."},
-			{"Bug", "A mistake that makes a program behave differently from what you intended."},
-			{"Traceback", "The error report listing which functions were running, and on which lines, when a crash happened."},
+			{"Array", "A fixed-size row of values of the same type, stored side by side in memory."},
+			{"Pointer", "A variable that holds the memory address of another value."},
+			{"Undefined behaviour", "An operation C gives no meaning to (such as reading past an array); anything may happen."},
+			{"Warning", "A message from the compiler about code that is legal but probably wrong. Treat it as an error."},
+			{"Segfault", "The crash you get when a program touches memory it is not allowed to."},
 		},
 		Concepts: []Concept{
 			{
-				Name:    "Values, Types & Variables",
-				Summary: "A variable is a named box that holds a value of some type.",
-				Body: `Programs work with values: numbers (42, 3.14), text ("hello"),
-booleans (true/false) and collections. A value's type says what you can
-do with it. You can add numbers and join strings, but "5" + 3 means
-different things in different languages: Python raises an error,
-JavaScript gives "53".
+				Name:    "Your First C Program: Source, Compiler, Executable",
+				Summary: "You write text, the compiler turns it into machine code, and the operating system runs it.",
+				Body: `A C program starts as a plain text file, such as hello.c. It cannot run
+yet: the CPU understands only machine code. A compiler (gcc or clang)
+reads your source file, checks it, and translates it into an
+executable, a file of machine instructions the operating system can
+load and run.
 
-A variable is a name bound to a value. Assignment (x = x + 1) means
-"work out the right-hand side, then store it under the name on the left".
-It is an instruction, not a mathematical equation. Statically typed
-languages (Go, Rust, Java) check types before the program runs;
-dynamically typed ones (Python, JavaScript) check while it runs.`,
-				MentalModel: "A variable is a label on a box, and the type says what may go in the box.",
-				TryIt:       `In Python, run type(42), type("42"), int("42") + 1 and "42" * 2, and explain each result.`,
-				Analogy: `Labelled jars in a kitchen: the "sugar" jar holds sugar. You can empty
-it and refill it, but pour flour into the sugar jar and the next cake
-goes wrong. Types are like units: adding 3 metres to 2 seconds makes no
-sense, and a good type system refuses to let you try.`,
+Every C program starts at a function called main. #include <stdio.h>
+brings in the declarations for standard input and output, including
+printf. main returns an int to the operating system: 0 means success.
+
+Get a compiler first. On Linux, install gcc (sudo apt install
+build-essential, or your distribution's equivalent). On macOS, run
+xcode-select --install to get clang. On Windows, install WSL (the
+Windows Subsystem for Linux) and use Linux's gcc, or MSYS2. Then compile
+with warnings turned on, every time:
+
+  gcc -Wall -Wextra -std=c17 -g hello.c -o hello
+  ./hello
+
+-Wall -Wextra turns on warnings, -std=c17 picks the language standard,
+-g adds debugging information, and -o names the output file.`,
+				Diagram: `  hello.c          your source text
+     │ preprocessor  pastes in #include files
+     ▼ compiler      C → assembly
+     │ assembler     assembly → machine code
+     ▼ linker        + the C library (printf…)
+  ./hello          the executable you run`,
+				MentalModel: "Source is a recipe; the compiler cooks it into a program; you run the program, not the recipe.",
+				TryIt: `Save this as hello.c, compile it with gcc -Wall -Wextra -std=c17 -g hello.c -o hello, run ./hello, then remove the semicolon and read the error.
+
+  #include <stdio.h>
+
+  int main(void) {
+      printf("Hello, world!\n");
+      return 0;
+  }`,
+				Analogy: `Writing a letter in English to someone who reads only Morse code. You
+write the letter (source code), a translator converts it into dots and
+dashes (the compiler), and only the Morse version is delivered (the
+executable). If your English has a grammar mistake, the translator
+refuses and tells you the line (a compile error).`,
+				Example: `Every app on your phone started as source code that a compiler turned
+into machine code for its processor. The Linux kernel, Git, SQLite,
+Python's own interpreter (CPython) and the firmware in your car and
+washing machine are all C programs, compiled exactly like hello.c.`,
+				Exercises: trio(
+					`Label each part of hello.c: the #include line, main, the printf call, the \n, and return 0. Then explain what "gcc hello.c -o hello" produces, and why you type ./hello rather than hello.c to run it.`,
+					`\n is the newline character. The compiler's output is a new file: the executable.`,
+					`Write a program that prints your name, your age next year, and a 5-line triangle of stars. Compile it with -Wall -Wextra, and fix every warning until there are none.`,
+					`printf("%d\n", age + 1); prints a number. Warnings are the compiler pointing at likely bugs.`,
+					`Install a compiler on your own machine (gcc, clang, or WSL on Windows), then write a two-file program: greet.c with a function greet(), and main.c that calls it. Compile both into one executable and explain what each step of the build did.`,
+					`gcc -Wall -Wextra main.c greet.c -o greet. Put the declaration void greet(void); in a header greet.h and #include it from both files.`,
+				),
+			},
+			{
+				Name:    "Values, Types & Variables",
+				Summary: "A variable is a named piece of memory with a fixed type and size.",
+				Body: `In C, every variable is declared with a type before it is used, and the
+type fixes its size in memory:
+
+  int count = 3;         // a whole number, usually 4 bytes
+  double price = 9.99;   // a floating-point number, usually 8 bytes
+  char grade = 'A';      // one byte; 'A' is stored as the number 65
+
+sizeof(int) tells you the size on your machine. Assignment (count =
+count + 1) means "work out the right-hand side, then store it in the
+variable on the left": an instruction, not an equation.
+
+Types matter for every operation. 7 / 2 is 3 in C, because both are
+ints and integer division throws the fraction away; 7.0 / 2 is 3.5. A
+cast converts explicitly: (double)7 / 2 is 3.5, and (int)3.99 is 3
+(the fraction is cut off, not rounded). printf needs the matching
+format: %d for int, %f for double, %c for char, %s for strings.
+
+A local variable that you never assigned holds leftover garbage, not 0.
+Always initialise your variables.`,
+				Diagram: `  memory (one byte per box)
+  address:  1000 1001 1002 1003   1004 ...
+            [    int count = 3   ][ char grade = 'A' (65) ]
+            └──── 4 bytes ──────┘ └─ 1 byte ─┘`,
+				MentalModel: "A variable is a labelled box of a fixed size; the type says how to read the bits inside.",
+				TryIt:       `Print sizeof(char), sizeof(int), sizeof(long), sizeof(double), then 7 / 2, 7.0 / 2, (int)3.99 and 'A' + 1 (with %d), and explain each result.`,
+				Analogy: `Labelled jars of fixed sizes in a kitchen: a small jar for salt (a
+char), a bigger one for flour (a double). Pour a litre into the small
+jar and it overflows. Types are like units, too: adding 3 metres to 2
+seconds makes no sense, and C's type checks stop many such mistakes
+before the program ever runs.`,
 				Example: `In 2020 scientists officially renamed several human genes, such as SEPT1
 and MARCH1, because Excel kept silently converting their names into
-dates. That is a type problem. Spreadsheets that strip the leading zero
-from phone numbers and postcodes make the same mistake: they treat text
-as a number.`,
+dates: a type problem. In 1996 the Ariane 5 rocket destroyed itself 37
+seconds after launch because a 64-bit floating-point value was
+converted into a 16-bit integer that could not hold it.`,
 				Exercises: trio(
-					`Without running anything, predict x after: x = 5, then x = x * 2, then x = x - 3. Then name the type of each of: 7, 7.0, "7", True.`,
-					"Assignment works right to left: compute first, then store.",
-					`Write a tip calculator: ask for the bill and the tip percentage, print the tip and the total rounded to 2 decimal places, and reply politely if someone types "twelve" instead of a number.`,
-					"Convert the text input with float() inside try/except ValueError.",
-					`A shop's spreadsheet export has prices such as "$1,299.00", "15" and "N/A". Write a function that converts each one to a whole number of cents, or reports it as missing, and test it on ten messy values.`,
-					`Strip "$" and ",", multiply by 100 and round to an int. Never keep money in floats.`,
+					`Without running anything, predict the values: int x = 5; x = x * 2; x = x - 3; then 17 / 5, 17 % 5, 17.0 / 5 and (int)2.9. Then check with printf.`,
+					"Integer division drops the fraction; % gives the remainder; a cast to int cuts off the fraction.",
+					`Write a temperature converter: read a Celsius value with scanf("%lf", &c), print the Fahrenheit value to one decimal place (%.1f), and check scanf's return value so typing "hot" prints a polite error instead of garbage.`,
+					`scanf returns how many values it read: if (scanf("%lf", &c) != 1) { ... }. F = C × 9 / 5 + 32; watch out for integer division.`,
+					`Prices in a shop's system must never be stored as double. Write functions that parse "12.34" into 1234 cents (a long) and print 1234 back as "12.34", and test them on 0.10, 19.99, 1000.00 and 0.05.`,
+					`Split at the dot yourself or read two integers with sscanf(text, "%ld.%2ld", &euros, &cents). Printing: printf("%ld.%02ld", c / 100, c % 100).`,
 				),
 			},
 			{
 				Name:    "Control Flow: Decisions & Loops",
 				Summary: "if chooses, loops repeat, and together they can express any procedure.",
-				Body: `Code normally runs top to bottom. An if statement runs a block only when a
-condition is true, with else/elif for the alternatives. Conditions
-combine with and, or and not.
+				Body: `Code normally runs top to bottom. if runs a block only when a condition
+is true (non-zero, in C), with else if and else for the alternatives.
+Conditions combine with && (and), || (or) and ! (not). switch picks
+between many constant cases; remember each case needs a break.
 
-A loop repeats a block. A for loop visits each item in a collection or a
-range; a while loop repeats until its condition becomes false. The
-classic bugs are off-by-one errors (one iteration too many or too few)
-and infinite loops, where the condition never changes. With just
-sequence, choice and repetition you can express any algorithm.`,
+A loop repeats a block. for (int i = 0; i < n; i++) runs n times, with
+i from 0 to n − 1; while (condition) repeats until the condition becomes
+false; do { } while (condition) always runs at least once. break leaves
+a loop early; continue skips to the next iteration.
+
+The classic bugs are off-by-one errors (i <= n instead of i < n),
+infinite loops whose condition never changes, and if (x = 5), which
+assigns instead of comparing. Always use braces, even for one line, and
+let -Wall warn you about the rest.`,
 				Diagram: `            ┌─────────────────────────────┐
             ▼                             │
- start ─▶ [ i < 10 ? ] ──yes──▶ [ work; i = i + 1 ]
+ start ─▶ [ i < 10 ? ] ──yes──▶ [ work; i++ ]
               │
               no
               ▼
             done`,
 				MentalModel: "Sequence, choice and repetition: the three moves that build every program.",
-				TryIt:       `Write FizzBuzz: print 1 to 100, but "Fizz" for multiples of 3, "Buzz" for multiples of 5 and "FizzBuzz" for both.`,
+				TryIt:       `Write FizzBuzz in C: print 1 to 100, but "Fizz" for multiples of 3, "Buzz" for multiples of 5 and "FizzBuzz" for both. Use % and a for loop.`,
 				Analogy: `A recipe: "if the dough is sticky, add flour" is a decision, and "stir
 until smooth" is a loop. A recipe that said "stir until the cake is
 baked", without ever putting it in the oven, would have you stirring
 forever. That is an infinite loop.`,
-				Example: `A thermostat is a loop with a decision inside: every minute, if the room
-is colder than the target, turn the heating on, otherwise turn it off.
-Traffic lights, washing-machine programs and your phone's "retry three
-times" when joining Wi-Fi are all loops and conditions.`,
+				Example: `A thermostat's firmware (very often written in C) is a loop with a
+decision inside: every few seconds, if the room is colder than the
+target, turn the heating on, otherwise turn it off. Traffic lights,
+washing-machine programs and your router's "retry three times" are all
+loops and conditions.`,
 				Exercises: trio(
-					"How many times does for i in range(2, 10, 3) run, and with which values of i?",
-					"range(start, stop, step) stops before reaching stop: 2, 5, 8.",
-					`Write a number-guessing game: pick a random number from 1 to 100, let the user guess, reply "higher" or "lower", and count the attempts.`,
-					"A while loop that ends when the guess is right; random.randint(1, 100).",
-					`A gym charges €30 a month. Students get 20% off, and members of more than 2 years get another €5 off, but the price never drops below €15. Write the price function and test it on five different people.`,
-					"Write each rule as an if, then apply the floor with max(price, 15).",
+					"How many times does for (int i = 2; i < 10; i += 3) run, and with which values of i? And for (int i = 10; i > 0; i /= 2)?",
+					"Trace it on paper: 2, 5, 8 for the first; 10, 5, 2, 1 for the second (integer division).",
+					`Write a number-guessing game in C: pick a random number from 1 to 100 with srand(time(NULL)) and rand() % 100 + 1, let the user guess, reply "higher" or "lower", and count the attempts.`,
+					"A while loop that ends when the guess is right. Include <stdlib.h> for rand and <time.h> for time.",
+					`A gym charges €30 a month. Students get 20% off, and members of more than 2 years get another €5 off, but the price never drops below €15. Write int price_cents(int is_student, int years) and test it on five different people with assert.`,
+					"Work in cents so there are no floating-point errors. Apply each rule with an if, then the floor: if (p < 1500) p = 1500;. #include <assert.h>.",
 				),
 			},
 			{
 				Name:    "Functions & Decomposition",
 				Summary: "Name a piece of work once, reuse it everywhere, and break big problems into small ones.",
 				Body: `A function takes inputs (parameters), does some work and returns an
-output. Good functions do one thing, have a clear name and do not
-secretly change things outside themselves (side effects). That makes
-them easy to test and reuse.
+output:
+
+  double area(double width, double height) {
+      return width * height;
+  }
+
+C needs to know a function's signature before it is called, so either
+define it above main or declare a prototype first (double area(double,
+double);). In bigger programs, prototypes go in a header file (.h) and
+the code in a .c file.
+
+C passes arguments by value: the function gets a copy. Changing a
+parameter inside the function does not change the caller's variable
+(to do that, you pass its address, as you will see with pointers). Each
+call gets its own local variables on the stack, which disappear when
+the function returns.
 
 Decomposition is the core skill of programming. Split "build a to-do
 app" into "load tasks", "add a task" and "save tasks", then split those
-again until every piece is obvious. Each call gets its own local
-variables. A function that calls itself (recursion) is solving a smaller
-copy of the same problem.`,
+again until every piece is obvious. A function that calls itself
+(recursion) is solving a smaller copy of the same problem.`,
+				Diagram: `  stack (grows down)
+  ┌────────────────────────┐
+  │ main:  w = 3, h = 4    │
+  ├────────────────────────┤
+  │ area:  width = 3 (copy)│  ← gone when area returns
+  │        height = 4      │
+  └────────────────────────┘`,
 				MentalModel: "If you cannot name it, you have not understood it; if it is long, split it.",
-				TryIt:       "Write celsius_to_fahrenheit(c) and fahrenheit_to_celsius(f), and check that converting there and back returns the original value.",
+				TryIt:       "Write double c_to_f(double c) and double f_to_c(double f), and check with assert that converting there and back returns the original value (within 1e-9).",
 				Analogy: `A coffee machine: water and beans go in (inputs), you press one button,
 and coffee comes out (the output). You do not need to know how the pump
-works. And nobody opens a café in one step: you set up the machine, the
-till and the menu separately, then put them together.`,
-				Example: `Every "Log in with Google" button calls the same small set of functions,
-shared by millions of websites. App developers build big features by
-combining small functions such as validate_email(), hash_password() and
-send_email().`,
+works. And C's pass-by-value is like handing someone a photocopy: they
+can scribble on it, but your original stays clean.`,
+				Example: `The C standard library is a set of functions like this: strlen, qsort,
+fopen. Every "Log in with Google" button calls a small set of shared
+functions, and large programs such as SQLite are built from thousands
+of small, well-named C functions.`,
 				Exercises: trio(
-					"List the inputs and the output of these real-world 'functions': a vending machine, a calculator's √ button and a translation app.",
-					"Ask what goes in, what comes out, and whether anything else in the world changes.",
-					`Write is_palindrome(text), ignoring spaces, punctuation and capital letters, and test it on "A man, a plan, a canal: Panama".`,
-					"Clean the text first, then compare it with its reverse.",
-					`Decompose a "split the restaurant bill" app into functions (parse the items, assign items to people, add tax and tip, round to cents so the shares still add up to the total), then implement it.`,
-					"Rounding each share can lose a cent, so give leftover cents to someone explicitly.",
+					`Predict the output, then run it: void bump(int n) { n = n + 1; } then in main: int x = 5; bump(x); printf("%d\n", x);. Explain why.`,
+					"C passes a copy. bump changes its own n, not main's x.",
+					`Write int is_palindrome(const char *s), ignoring spaces, punctuation and capital letters (use isalnum and tolower from <ctype.h>), and test it on "A man, a plan, a canal: Panama".`,
+					"Two indexes, one from each end, skipping characters that are not letters or digits, moving towards the middle.",
+					`Decompose a "split the restaurant bill" program into functions (read the items, assign items to people, add tax and tip, round to cents so the shares still add up to the total), with prototypes in bill.h and code in bill.c, then implement it.`,
+					"Work in integer cents. Rounding each share can lose a cent, so give leftover cents to someone explicitly.",
+				),
+			},
+			{
+				Name:    "Memory, Addresses & Pointers",
+				Summary: "Every value lives at an address; a pointer is a variable that holds one.",
+				Body: `Memory is one long row of numbered bytes. Every variable lives at some
+address. The & operator gives a variable's address, and a pointer is a
+variable that stores an address:
+
+  int x = 5;
+  int *p = &x;    // p holds the address of x
+  *p = 7;         // follow the pointer: x is now 7
+
+The * in a declaration (int *p) says "p is a pointer to an int"; the *
+in an expression (*p) means "go to that address" (dereferencing).
+
+Pointers let a function change the caller's variables, which is why
+scanf needs &: void swap(int *a, int *b) swaps two ints in place. They
+also let you pass large data without copying it, and they are how
+arrays, strings and dynamic memory work.
+
+NULL is a pointer that points nowhere; dereferencing it crashes the
+program (a segfault). Never return the address of a local variable: it
+lives on the stack and disappears when the function returns.`,
+				Diagram: `  address   1000          1008
+           ┌──────────┐  ┌──────────┐
+           │ x = 7    │◀─│ p = 1000 │
+           └──────────┘  └──────────┘
+            int x         int *p  (p points to x)`,
+				MentalModel: "A pointer is a street address: & asks where something lives, * goes there.",
+				TryIt:       `Print a variable's address with printf("%p\n", (void *)&x), then write swap(int *a, int *b), and watch both in Python Tutor's C mode (pythontutor.com/c.html), which draws pointers as arrows.`,
+				Analogy: `A house and its address. The house (the value) stays where it is; you
+can write its address on a card (a pointer) and give the card to
+anyone, and they can go and repaint the house. Copying the card is
+cheap; copying the house is not. A card with no address on it (NULL)
+leads nowhere, and trying to visit it ends badly.`,
+				Example: `When you pass a 4 GB video to an editing program's functions, they pass
+a pointer to it (8 bytes), never the video itself. Linked lists, trees,
+your browser's DOM and the operating system's process table are all
+built from pointers linking pieces of memory together.`,
+				Exercises: trio(
+					`Given int a = 3; int *p = &a; *p = *p + 1; int b = *p * 2;, what are a and b? Draw the boxes and the arrow.`,
+					"*p is a, so a becomes 4, and b is 8.",
+					`Write void min_max(const int *arr, int n, int *min, int *max) that finds both the smallest and largest value in one pass and "returns" them through the two pointers. Test it on an array with negative numbers.`,
+					"Start both at arr[0], then loop from index 1. Write the results with *min = ...; *max = ...;.",
+					`Write a function that splits "2026-09-24" into three ints through pointers (int parse_date(const char *s, int *y, int *m, int *d)), returning 0 on success and -1 on malformed input, and test it on five good and five bad dates.`,
+					`sscanf(s, "%d-%d-%d", y, m, d) == 3, then check the ranges yourself (month 1–12, day 1–31). Note there is no & here: y is already a pointer.`,
 				),
 			},
 			{
 				Name:    "Collections: Lists, Dictionaries & Strings",
-				Summary: "Real programs work on many values at once.",
-				Body: `A list (array) keeps items in order and gives access by position,
-counting from 0. A dictionary (map, hash table) looks values up by key,
-as in phone_book["Ana"]. A set holds unique items and answers "is x in
-here?" quickly. Strings are sequences of characters, with methods to
-split, search and replace.
+				Summary: "Arrays, strings and structs are C's building blocks; lists and dictionaries are built from them.",
+				Body: `An array is a fixed-size row of values of the same type, side by side in
+memory, indexed from 0:
 
-Most everyday programs follow the same shape: loop over a collection,
-filter some items, transform them and summarise them (count, sum, group
-by). Choosing the right collection often matters more than clever code.`,
-				MentalModel: "Order matters? Use a list. Look up by name? Use a dictionary. Must be unique? Use a set.",
-				TryIt:       "Count how often each word appears in a paragraph and print the 5 most common words.",
-				Analogy: `A list is the numbered queue at a bakery. A dictionary is a coat check:
-your ticket (the key) gets your coat (the value) back instantly. A set
-is a guest list where each name appears once.`,
-				Example: `Your phone's contacts app is a dictionary from names to numbers. A
-Spotify playlist is a list, because order matters. "People who liked
-this post" is a set, because nobody can like a post twice.`,
+  int scores[5] = {90, 72, 85, 60, 99};
+  scores[0]                 // 90; the last valid index is 4
+
+C does not check bounds: scores[5] reads whatever memory comes next.
+Always carry the length with the array (arrays passed to functions
+decay into a pointer to their first element, so the function cannot
+know the length unless you pass it).
+
+A string in C is an array of char ending in a zero byte ('\0'), which
+marks the end. "hi" takes 3 bytes: 'h', 'i', '\0'. strlen counts up to
+the zero; strcmp compares; snprintf builds strings safely within a
+size. Forgetting room for the '\0' is a classic bug.
+
+A struct groups named fields into one value (struct point { int x; int
+y; };). The flexible collections of other languages are built from
+these parts: a dynamic list is an array that is reallocated when full,
+and a dictionary is a hash table of structs, which you will build
+yourself in Stage 2.`,
+				Diagram: `  char name[6] = "Ada";
+  ┌─────┬─────┬─────┬─────┬─────┬─────┐
+  │ 'A' │ 'd' │ 'a' │ \0  │  ?  │  ?  │
+  └─────┴─────┴─────┴─────┴─────┴─────┘
+    [0]   [1]   [2]   [3]   [4]   [5]    strlen = 3, size = 6`,
+				MentalModel: "An array is numbered lockers in a row; a string is the same, ending with an empty locker marked \\0.",
+				TryIt:       "Count how often each letter a–z appears in a line of text, using an int counts[26] array indexed by c - 'a', then print the five most common letters.",
+				Analogy: `A row of numbered lockers: you go straight to locker 7, but if you ask
+for locker 100 in a row of 10, C will open whatever is behind the wall.
+A string is a sentence written on a strip of paper with a full stop
+('\0') marking where it ends; lose the full stop and the reader carries
+on into whatever is written next.`,
+				Example: `The 2014 Heartbleed bug in OpenSSL let attackers read up to 64 KB of a
+server's memory, including passwords and private keys, because the code
+trusted a length the attacker sent and copied that many bytes from a
+buffer without checking its real size. The same arrays and lengths you
+use here, with one missing check.`,
 				Exercises: trio(
-					"Choose a list, dictionary or set for each: a shopping list, word definitions, today's unique website visitors, and the pages of a book.",
-					"Ask: does order matter? Do I look things up by name? Must items be unique?",
-					"Given a list of (student, score) pairs, compute each student's average and print the students from highest to lowest average.",
-					"A dictionary from each name to a list of that student's scores.",
-					"Export (or invent) a CSV of your bank transactions, total the spending per category per month, and print the three biggest categories.",
-					"Use the csv module and key a dictionary by (month, category).",
+					`How many bytes does char word[] = "hello"; take, and what is strlen(word)? What is wrong with char s[5] = "hello";?`,
+					"6 bytes (5 letters plus '\\0'); strlen is 5. s[5] has no room for the terminating zero.",
+					`Define struct student { char name[32]; int scores[5]; int n; }, fill an array of five students, compute each one's average, and print them sorted from highest to lowest average with qsort.`,
+					"qsort needs a comparison function: int cmp(const void *a, const void *b) that casts to const struct student *.",
+					`Read a CSV of bank transactions (date,category,amount) line by line with fgets, total the spending per category in a fixed array of structs (at most 32 categories), and print the three largest categories. Reject lines that are too long or malformed instead of crashing.`,
+					"strchr or strtok to split at commas; strcmp to find the category; check that each line ends with '\\n' to detect lines longer than your buffer.",
+				),
+			},
+			{
+				Name:    "Safe Input & Undefined Behavior",
+				Summary: "C trusts you completely, so check every input, every size and every return value.",
+				Body: `C gives you power, not protection. Many mistakes are undefined
+behaviour: the C standard says nothing about what happens, so the
+program may crash, seem to work, or corrupt data silently, and the
+compiler is allowed to assume they never happen. The usual suspects:
+- reading or writing outside an array;
+- using an uninitialised variable;
+- dereferencing NULL, or memory that has been freed;
+- signed integer overflow (INT_MAX + 1);
+- writing a string without room for its '\0'.
+
+Being "bulletproof" in C is a discipline, not a feature:
+- read input with fgets into a buffer of known size, then convert it with strtol or strtod and check that the whole input was used;
+- never use gets (removed from the language) and avoid scanf("%s") without a width;
+- check every return value (fopen can return NULL, malloc can fail);
+- pass sizes with arrays, and prefer bounded functions such as snprintf;
+- compile with -Wall -Wextra, and while developing add -fsanitize=address,undefined, which makes most of these bugs crash loudly at the exact line.`,
+				Diagram: `  input ──▶ [ fgets into buf[64] ] ──▶ [ strtol: whole number? in range? ] ──▶ use it
+                  │ too long?                    │ no
+                  ▼                              ▼
+              reject, ask again            reject, ask again`,
+				MentalModel: "Never trust input, never assume a size, never ignore a return value.",
+				TryIt:       `Compile int a[3] = {0}; a[3] = 1; first normally, then with gcc -g -fsanitize=address,undefined, and compare what each run tells you.`,
+				Analogy: `A kitchen knife with no guard: in skilled hands it is the best tool
+there is, and careless hands get cut. Professional chefs do not use
+blunt knives; they use habits (cut away from yourself, keep it clean,
+put it down flat). Defensive C is those habits for code.`,
+				Example: `The 1988 Morris worm, one of the first internet worms, spread partly
+through a buffer overflow in the fingerd server, which read input with
+gets. Decades later, Microsoft and Google have each reported that about
+70% of their serious security bugs are memory-safety problems of
+exactly these kinds, which is why the habits in this concept matter.`,
+				Exercises: trio(
+					`For each line, say whether it is undefined behaviour and why: int x; printf("%d", x);   char s[4]; strcpy(s, "four");   int *p = NULL; *p = 1;   unsigned char c = 255; c++;`,
+					"The last one is fine: unsigned arithmetic wraps around by definition. The first three are undefined.",
+					`Write int read_int(const char *prompt, int min, int max) that uses fgets and strtol, rejects empty input, trailing junk ("12abc"), out-of-range numbers and overlong lines, and asks again until the input is valid.`,
+					"strtol sets an end pointer: after skipping trailing whitespace it must point at '\\0'. Check errno == ERANGE and the min/max range.",
+					`Take one of your earlier programs (the bill splitter or the CSV reader), compile it with -fsanitize=address,undefined, and feed it hostile input: empty lines, 10,000-character lines, negative numbers, missing fields. Fix every crash the sanitizers find, and write down each bug you found.`,
+					`Generate hostile input with python3 -c "print('A' * 10000)" | ./program. Each sanitizer report names the line and the kind of bug.`,
 				),
 			},
 			{
 				Name:    "Debugging & Reading Errors",
 				Summary: "Bugs are normal; finding them is a skill you can learn.",
-				Body: `An error message is a clue, not an insult. Read the last line first (what
-went wrong), then the traceback (where it went wrong: file and line,
-with the innermost call last). Syntax errors stop a program from
-starting. Runtime errors, such as dividing by zero or a missing key,
-crash it midway. Logic errors silently give wrong answers, and they are
-the hardest to find.
+				Body: `There are three kinds of problems. Compile errors stop the program from
+being built: read the first error first (later ones are often caused by
+it), and look at the line it names and the line before. Warnings are
+legal code that is probably wrong: treat every warning as an error.
+Runtime problems happen while it runs: a segfault, a sanitizer report,
+or, worst of all, a silently wrong answer.
 
 Use the scientific method: reproduce the bug reliably, form a
-hypothesis, test it by printing values or stepping through with a
-debugger, fix it, then add a test so it never comes back. Explaining
-your code line by line out loud ("rubber-duck debugging") finds a
-surprising number of bugs.`,
+hypothesis, test it, fix it, then add a test so it never comes back.
+Your tools:
+- printf debugging: print the values you think you know, to stderr with fprintf(stderr, ...);
+- gdb (or lldb on macOS): run the program under a debugger, stop at a line (break), step through it (next, step), print variables (print x), and see the call stack after a crash (bt, for backtrace);
+- sanitizers (-fsanitize=address,undefined) to catch memory and undefined-behaviour bugs at the exact line;
+- explaining your code line by line out loud (rubber-duck debugging), which finds a surprising number of bugs.`,
 				MentalModel: "The computer did exactly what you said; find where that differs from what you meant.",
-				TryIt:       "Paste a buggy loop into pythontutor.com and watch every variable change, step by step.",
+				TryIt:       "Compile a program that crashes with -g, run it under gdb (gdb ./program, then run), and after the crash type bt to see exactly which function and line it died in.",
 				Analogy: `A doctor diagnosing symptoms: gather evidence, form a hypothesis, test
 one idea at a time, and do not prescribe before you have found the
-cause.`,
+cause. The compiler's warnings are the routine check-up that catches
+problems before they hurt.`,
 				Example: `In 1947, engineers on the Harvard Mark II computer found a real moth
 stuck in a relay and taped it into their logbook as the "first actual
 case of bug being found". Grace Hopper helped make the story famous.
-Today, large companies collect crash reports from millions of users to
-find and fix bugs.`,
+Today, the Linux kernel and Chrome run sanitizers and fuzzers
+continuously, around the clock, to find memory bugs before attackers
+do.`,
 				Exercises: trio(
-					`Read this error: "IndexError: list index out of range", raised on line 12 inside a loop over range(len(items) + 1). Explain in one sentence what went wrong.`,
-					"A list of length n has indexes 0 to n − 1.",
-					"Take a working program of yours and plant three bugs (a typo, an off-by-one and a wrong operator). Wait a day, then find and fix them using only error messages and print statements.",
-					"Change one thing at a time and re-run after each change.",
-					`A user reports "the app crashes when I leave the age field empty". Reproduce this in your tip calculator or guessing game, write a test that fails because of it, fix the bug, and confirm the test passes.`,
-					`Empty input is "", and int("") raises ValueError.`,
+					`Read this compiler output and explain it in one sentence each: "error: expected ';' before 'return'", "warning: unused variable 'total'", and "warning: format '%d' expects argument of type 'int', but argument 2 has type 'double'".`,
+					"The first names the line after the missing semicolon; the third means printf will print garbage.",
+					"Take a working program of yours and plant three bugs (a missing semicolon, an off-by-one in a loop, and a wrong printf format). Wait a day, then find and fix them using only the compiler's messages, gdb and printf.",
+					"Fix the first compile error, rebuild, and repeat. For runtime bugs, set a breakpoint before the loop and step.",
+					`A user reports "the program crashes when I type a very long name". Reproduce the crash in your own code with a 1,000-character input, find the exact line with the address sanitizer and gdb, fix it with a bounded read, and add a test that proves it stays fixed.`,
+					`python3 -c "print('x' * 1000)" | ./program reproduces it. The fix is usually fgets with sizeof buf, plus a check for lines that did not fit.`,
 				),
 			},
 		},
 		Resources: []Resource{
-			{"Course", "CS50: Introduction to Computer Science (Harvard, free)", "https://cs50.harvard.edu/x/", "The best-known beginner course; excellent lectures and problem sets."},
-			{"Tool", "Python Tutor", "https://pythontutor.com/", "Visualises your code running step by step. Ideal for beginners."},
-			{"Book", "How to Design Programs (free online)", "https://htdp.org/", "A systematic recipe for designing programs, not just typing them."},
-			{"Book", "Structure and Interpretation of Computer Programs (free)", "https://sarabander.github.io/sicp/", "A classic; deep ideas about abstraction."},
-			{"Site", "Exercism", "https://exercism.org/", "Free coding exercises in 70+ languages, with mentor feedback."},
-			{"Site", "Advent of Code", "https://adventofcode.com/", "Yearly puzzles that are great for practising loops, collections and parsing."},
+			{"Course", "CS50: Introduction to Computer Science (Harvard, free)", "https://cs50.harvard.edu/x/", "Weeks 1–5 teach C, memory and pointers, with excellent lectures and problem sets."},
+			{"Book", "Beej's Guide to C Programming (free)", "https://beej.us/guide/bgc/", "A friendly, complete, free tour of C for people who can already code a little. The PDF is in the Library [l]."},
+			{"Book", "Modern C (free, Jens Gustedt)", "https://gustedt.gitlabpages.inria.fr/modern-c/", "A rigorous, up-to-date book on C as it is written today, including the C23 standard."},
+			{"Tool", "Python Tutor in C mode (C Tutor)", "https://pythontutor.com/c.html", "Runs your C code step by step and draws memory, arrays and pointers as boxes and arrows."},
+			{"Tool", "Compiler Explorer", "https://godbolt.org/", "Shows the machine code your C compiles into, line by line."},
+			{"Site", "cppreference: C reference", "https://en.cppreference.com/w/c", "Precise, searchable documentation for the C language and its standard library."},
+			{"Site", "Exercism: C track", "https://exercism.org/tracks/c", "Free C exercises with automatic tests and optional mentor feedback."},
+			{"Site", "Advent of Code", "https://adventofcode.com/", "Yearly puzzles that are great for practising loops, arrays and parsing in C."},
 		},
 		Blueprints: []Blueprint{
-			{"Personal Budget Tracker", "A command-line tool that records income and spending, stores it in a file, and prints monthly summaries by category.",
-				[]string{"Add and list transactions", "Save to and load from a file", "Monthly totals by category", "Import a bank CSV", "Tests for the calculations"}},
-			{"Text Adventure Game", "A small interactive story with rooms, items and choices, driven by loops, conditions and dictionaries.",
-				[]string{"Rooms as a dictionary", "Move between rooms", "Pick up and use items", "Win and lose conditions", "Save the game"}},
-			{"Quiz App", "A flashcard quiz that loads questions from a file, shuffles them, keeps score and remembers your weak spots.",
-				[]string{"Load questions", "Ask and check answers", "Score and summary", "Repeat missed questions", "Store history between runs"}},
+			{"Personal Budget Tracker (in C)", "A command-line tool that records income and spending in a file, and prints monthly summaries by category, using structs, arrays and careful file I/O.",
+				[]string{"Add and list transactions (a struct per entry)", "Save to and load from a text file with fopen and fgets", "Monthly totals by category", "Import a bank CSV, rejecting malformed lines", "Clean under -Wall -Wextra and -fsanitize=address,undefined"}},
+			{"Text Adventure Game (in C)", "A small interactive story with rooms, items and choices, driven by loops, conditions, structs and arrays.",
+				[]string{"Rooms as an array of structs with exits", "Move between rooms with safe input", "Pick up and use items", "Win and lose conditions", "Save and load the game"}},
+			{"Quiz App (in C)", "A flashcard quiz that loads questions from a file, shuffles them, keeps score and remembers your weak spots.",
+				[]string{"Load questions into an array of structs", "Ask and check answers (case-insensitive)", "Shuffle with a Fisher–Yates loop", "Repeat missed questions", "Store history between runs"}},
 		},
 		Quiz: []Question{
-			{"What does x = x + 1 mean in most programming languages?", "Compute x + 1 using the current value of x, then store the result back in x. It is an instruction, not an equation."},
-			{"What is the difference between a for loop and a while loop?", "A for loop visits each item of a known collection or range; a while loop repeats until its condition becomes false."},
-			{"Why split code into functions?", "To name ideas, reuse them, test them separately, and make big problems manageable."},
-			{"When should you use a dictionary instead of a list?", "When you look values up by a key (such as a name or ID) rather than by position."},
+			{"What does the compiler do, and why can't you run hello.c directly?", "It translates C source text into machine code and produces an executable. The CPU runs only machine code, never source text."},
+			{"What is 7 / 2 in C, and how do you get 3.5?", "3, because both are ints and integer division drops the fraction. Use 7.0 / 2 or (double)7 / 2."},
+			{"Why does scanf need &x instead of x?", "C passes arguments by value; scanf needs x's address (a pointer) so that it can write the value into x."},
+			{"How many bytes does the string \"cat\" take in C, and why?", "4: three characters plus the terminating '\\0' that marks the end of the string."},
+			{"What is undefined behaviour, and name two causes.", "An operation the C standard gives no meaning to, so anything may happen. For example: reading past the end of an array, dereferencing NULL, signed overflow, using an uninitialised variable."},
+			{"Which compiler flags should you use while learning, and why?", "-Wall -Wextra for warnings, -g for debugging information, and -fsanitize=address,undefined to catch memory and undefined-behaviour bugs at the exact line."},
 		},
 	},
 

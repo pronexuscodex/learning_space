@@ -10,7 +10,7 @@ New here? Run the app and press **`0`** for the *Start Here* guide.
 
 | Track | Stage | Topic |
 |-------|-------|-------|
-| **F · Foundations** | 1 | Programming Fundamentals |
+| **F · Foundations** | 1 | Programming Fundamentals **in C** |
 | | 2 | Data Structures & Algorithms |
 | | 3 | Discrete Mathematics, Logic & Probability |
 | | 4 | Digital Logic & Computer Architecture |
@@ -27,7 +27,26 @@ New here? Run the app and press **`0`** for the *Start Here* guide.
 | | 15 | Neural Networks & Autograd from Scratch |
 | | 16 | AI Infrastructure, CUDA & Inference |
 
-That is **82 concepts** and **246 exercises**, plus a glossary, a resource library, lab blueprints, a quiz and a mastery check for every stage. Start Here also lists electives for afterwards: graphics, quantum computing, embedded systems and bioinformatics.
+That is **85 concepts** and **255 exercises**, plus a glossary, a resource library, lab blueprints, a quiz and a mastery check for every stage. Start Here also lists electives for afterwards: graphics, quantum computing, embedded systems and bioinformatics.
+
+## C first: see what is under the hood
+
+Stage 1 teaches programming **in C**. In C, every value has a size and an address, and the compiler turns your text into real machine instructions, so from the first week you see what other languages do for you behind the scenes. Stage 1 has eight concepts:
+
+1. Your First C Program: Source, Compiler, Executable (including installing gcc or clang, on Linux, macOS, or Windows via WSL)
+2. Values, Types & Variables (sizes, integer division, casts, printf formats)
+3. Control Flow: Decisions & Loops
+4. Functions & Decomposition (prototypes, headers, pass-by-value, the stack)
+5. Memory, Addresses & Pointers
+6. Collections: arrays, strings with their '\0', and structs
+7. Safe Input & Undefined Behavior: fgets and strtol, checking return values, and -fsanitize=address,undefined
+8. Debugging & Reading Errors: compiler warnings, gdb, sanitizers
+
+Every exercise is in C. The reading list is K&R, King's *C Programming: A Modern Approach* and Gustedt's free *Modern C*, with *Beej's Guide to C* downloadable in the Library. The Classic corner pairs K&R with antirez's kilo editor and a C type-in.
+
+Why C: it is small, it is what the operating system, databases, language runtimes and firmware underneath everything are written in, and strong universities teach systems in it. Harvard's CS50 switches to C in its first week, and Stanford's CS107, Berkeley's CS61C and CMU's 15-213 teach systems in C. (Many universities start with Python for the very first course and then move to C; the academy goes straight to C for understanding.) C also lets you make mistakes other languages hide, so Stage 1 teaches the defensive habits from day one.
+
+**Existing registries** are updated on load: Stage 1's title changes, the C books are added to its reading list (books you already marked read are kept), and all concept progress, notes and reviews stay as they were. The five original concept names are unchanged, so nothing is lost.
 
 ## Built to be remembered, not just read
 
@@ -219,7 +238,7 @@ Concepts link across stages. For example, logic gates (Stage 4) become the CPU; 
 
 Press **`l`** on the main menu (or open a stage's **PDF library** in the Study Hall). The Library lists every free, legally hosted PDF in the curriculum, by stage:
 
-- **Whole textbooks whose authors publish the PDF:** *Think Python*, Jeff Erickson's *Algorithms*, *Mathematics for Computer Science* (MIT), *Beej's Guide to Network Programming*, *Mathematics for Machine Learning*, *Linear Algebra Done Right* (4th ed., open access) and *An Introduction to Statistical Learning* (Python edition).
+- **Whole textbooks whose authors publish the PDF:** *Beej's Guide to C Programming*, Jeff Erickson's *Algorithms*, *Mathematics for Computer Science* (MIT), *Beej's Guide to Network Programming*, *Mathematics for Machine Learning*, *Linear Algebra Done Right* (4th ed., open access) and *An Introduction to Statistical Learning* (Python edition).
 - **Papers:** arXiv papers (the `arxiv.org/abs/…` page becomes its PDF), such as *Attention Is All You Need*, FlashAttention and PagedAttention.
 - **Classic texts:** Dijkstra, Thompson, Ritchie & Thompson, Codd, Saltzer–Reed–Clark, Brooks, LeCun et al., and more.
 

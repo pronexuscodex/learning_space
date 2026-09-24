@@ -7,30 +7,40 @@ package main
 // typeIns holds one magazine-style listing per stage.
 var typeIns = map[int]TypeIn{
 	1: {
-		File:    "collatz.py",
-		Lang:    "Python",
-		Run:     "python3 collatz.py",
-		Predict: "How many steps does 27 take to reach 1, and what is the highest value it reaches on the way? Write your guesses down first.",
-		Lesson:  "Tiny rules can produce surprisingly long journeys: 27 climbs past 9,000 before falling to 1. Nobody has proved that every starting number reaches 1 (the Collatz conjecture).",
-		Code: `# COLLATZ -- a type-in in the spirit of 1980s magazine listings.
-# Start with n. If n is even, halve it; if odd, make it 3n + 1.
-# Count the steps until n reaches 1.
+		File:    "collatz.c",
+		Lang:    "C",
+		Run:     "gcc -Wall -Wextra -std=c17 collatz.c -o collatz && ./collatz",
+		Predict: "How many steps does 27 take to reach 1, and what is the highest value it reaches on the way? Write your guesses down first. Why is n a long rather than an int?",
+		Lesson:  "Tiny rules can produce surprisingly long journeys: 27 climbs past 9,000 before falling to 1. Nobody has proved that every starting number reaches 1 (the Collatz conjecture). n is a long because some starting numbers climb far beyond what a 32-bit int can hold, and in C a signed overflow is undefined behaviour. The size line depends on your machine: 8 bytes on 64-bit Linux and macOS, 4 on Windows.",
+		Code: `/* COLLATZ -- a type-in in the spirit of 1980s magazine listings.
+ * Start with n. If n is even, halve it; if odd, make it 3n + 1.
+ * Count the steps until n reaches 1. */
+#include <stdio.h>
 
-n = 27
-steps = 0
-peak = n
-while n != 1:
-    if n % 2 == 0:
-        n = n // 2
-    else:
-        n = 3 * n + 1
-    steps = steps + 1
-    if n > peak:
-        peak = n
-print("steps:", steps)
-print("highest value:", peak)`,
+int main(void) {
+    long n = 27;
+    int steps = 0;
+    long peak = n;
+
+    while (n != 1) {
+        if (n % 2 == 0) {
+            n = n / 2;
+        } else {
+            n = 3 * n + 1;
+        }
+        steps++;
+        if (n > peak) {
+            peak = n;
+        }
+    }
+    printf("steps: %d\n", steps);
+    printf("highest value: %ld\n", peak);
+    printf("sizeof(long) on this machine: %zu bytes\n", sizeof n);
+    return 0;
+}`,
 		Expected: `steps: 111
-highest value: 9232`,
+highest value: 9232
+sizeof(long) on this machine: 8 bytes`,
 	},
 	2: {
 		File:    "bsearch.py",

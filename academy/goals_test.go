@@ -140,3 +140,28 @@ func TestBackupsRotateAndRestore(t *testing.T) {
 		t.Fatal("a refused restore must not change the registry")
 	}
 }
+
+func TestRefreshFromSeedKeepsProgress(t *testing.T) {
+	reg := seedRegistry()
+	_, s := reg.findStage(1)
+	// An older registry: the Python-era title and reading list, one book read.
+	s.Title = "Programming Fundamentals"
+	s.Literature = []Literature{{Title: "Think Python", Author: "Allen B. Downey", Kind: "Book", Read: true}}
+	s.setStudied("Values, Types & Variables", true)
+
+	if n := reg.refreshFromSeed(seedRegistry()); n != 1 {
+		t.Fatalf("refreshed %d stages, want 1", n)
+	}
+	if s.Title != "Programming Fundamentals in C" {
+		t.Fatalf("title = %q", s.Title)
+	}
+	if len(s.Literature) != 4 || !s.Literature[0].Read || s.Literature[0].Title != "Think Python" {
+		t.Fatalf("literature = %+v", s.Literature)
+	}
+	if !s.hasStudied("Values, Types & Variables") {
+		t.Fatal("progress lost")
+	}
+	if n := reg.refreshFromSeed(seedRegistry()); n != 0 {
+		t.Fatal("a second refresh should change nothing")
+	}
+}

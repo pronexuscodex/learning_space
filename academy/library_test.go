@@ -3,6 +3,8 @@ package main
 import (
 	"context"
 	"errors"
+	"io"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -77,7 +79,9 @@ func TestDownloadPDF(t *testing.T) {
 	mux.HandleFunc("/insecure.pdf", func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "http://example.invalid/x.pdf", http.StatusFound)
 	})
-	srv := httptest.NewTLSServer(mux)
+	srv := httptest.NewUnstartedServer(mux)
+	srv.Config.ErrorLog = log.New(io.Discard, "", 0) // closed-connection noise
+	srv.StartTLS()
 	defer srv.Close()
 	client := srv.Client()
 	client.CheckRedirect = newDownloadClient().CheckRedirect

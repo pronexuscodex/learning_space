@@ -23,16 +23,22 @@ var stagePrereqs = map[int][]int{
 // conceptLinks is keyed by Concept.Name.
 var conceptLinks = map[string]links{
 	// ---- Stage 1
+	"Your First C Program: Source, Compiler, Executable": {[]string{"The Compilation Pipeline", "The Command Line & Your Environment"},
+		"CS50: week 1 (C). Beej's Guide to C, chapters 1–2. Paste hello.c into Compiler Explorer (godbolt.org) to see the machine code it becomes."},
 	"Values, Types & Variables": {[]string{"Integers & Floating Point in Bits", "Type Systems"},
-		"CS50: the first weeks on data types and variables. Step through assignments in Python Tutor to watch each variable change."},
+		"CS50: week 1 on types and printf. Beej's Guide to C, the chapters on variables and types. Step through assignments in C Tutor (pythontutor.com/c.html)."},
 	"Control Flow: Decisions & Loops": {[]string{"Logic & Boolean Algebra", "The CPU: Datapath & Instruction Cycle"},
-		"CS50: the lectures on conditions and loops. Trace your own loops in Python Tutor."},
+		"CS50: week 1 on conditions and loops. K&R chapter 3 (Control Flow). Trace your own loops in C Tutor."},
 	"Functions & Decomposition": {[]string{"Registers, the Stack & Calling Conventions", "Software Design & Abstraction", "Proof & Induction"},
-		"How to Design Programs: the design recipe for functions. SICP chapter 1, Building Abstractions with Procedures."},
+		"K&R chapter 4 (Functions and Program Structure). Beej's Guide to C, the chapters on functions and multi-file projects."},
+	"Memory, Addresses & Pointers": {[]string{"Processes & the Address Space", "Registers, the Stack & Calling Conventions", "Arrays, Linked Lists, Stacks & Queues"},
+		"CS50: week 4 (Memory). K&R chapter 5 (Pointers and Arrays). Draw every pointer as an arrow in C Tutor until it feels obvious."},
 	"Collections: Lists, Dictionaries & Strings": {[]string{"Arrays, Linked Lists, Stacks & Queues", "Hash Tables"},
-		"CS50: the lectures on arrays and data structures. Exercism's exercises on lists and maps."},
+		"CS50: weeks 2 (Arrays) and 5 (Data Structures). K&R chapter 6 (Structures). Exercism's C track."},
+	"Safe Input & Undefined Behavior": {[]string{"Web Vulnerabilities: Injection & XSS", "Integers & Floating Point in Bits", "Testing & Reliability"},
+		"Modern C, the chapters on undefined behaviour. Read the SEI CERT C Coding Standard's rules on strings and memory, and your compiler's documentation for -fsanitize."},
 	"Debugging & Reading Errors": {[]string{"Testing & Reliability", "The Command Line & Your Environment"},
-		"CS50: its debugging sections. Step through failing code in Python Tutor."},
+		"CS50: its debugging sections (debug50, printf, rubber duck). Beej's Quick Guide to GDB. Run everything under -fsanitize=address,undefined while learning."},
 
 	// ---- Stage 2
 	"Big-O: Measuring Growth": {[]string{"Counting & Combinatorics", "Complexity Classes: P, NP & Hard Problems"},

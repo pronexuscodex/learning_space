@@ -63,3 +63,17 @@ func TestPromptLabelWrapsLongQuestions(t *testing.T) {
 		t.Error("the input must stay on the prompt's last line")
 	}
 }
+
+func TestWrapKeepsCodeVerbatim(t *testing.T) {
+	text := "Declare it first:\n\n  int count = 3;   // a comment\n  double x;\n\nThen use it\nin a sentence."
+	got := wrap(text, 40, "  ")
+	want := []string{"  Declare it first:", "", "    int count = 3;   // a comment", "    double x;", "", "  Then use it in a sentence."}
+	if strings.Join(got, "|") != strings.Join(want, "|") {
+		t.Fatalf("wrap =\n%q\nwant\n%q", got, want)
+	}
+	for _, l := range wrap("  "+strings.Repeat("x", 100), 40, "") {
+		if visibleLen(l) > 40 {
+			t.Fatalf("long code line not broken: %q", l)
+		}
+	}
+}

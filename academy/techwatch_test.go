@@ -1,6 +1,8 @@
 package main
 
 import (
+	"io"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -89,7 +91,9 @@ func TestFetchFeedsAndHeadlines(t *testing.T) {
 	mux.HandleFunc("/rss", func(w http.ResponseWriter, r *http.Request) { w.Write([]byte(sampleRSS)) })
 	mux.HandleFunc("/atom", func(w http.ResponseWriter, r *http.Request) { w.Write([]byte(sampleAtom)) })
 	mux.HandleFunc("/gone", func(w http.ResponseWriter, r *http.Request) { http.NotFound(w, r) })
-	srv := httptest.NewTLSServer(mux)
+	srv := httptest.NewUnstartedServer(mux)
+	srv.Config.ErrorLog = log.New(io.Discard, "", 0) // closed-connection noise
+	srv.StartTLS()
 	defer srv.Close()
 	feeds := []Feed{
 		{Title: "R", URL: srv.URL + "/rss", Topic: "Languages"},

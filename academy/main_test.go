@@ -123,7 +123,8 @@ func TestAtomicWriteRoundTripAndLegacyLoad(t *testing.T) {
 	if !res.Migrated || res.NewStages != 14 {
 		t.Fatalf("result = %+v, want migrated with 14 new stages", res)
 	}
-	if _, s := old.findStage(5); s == nil || s.Title != "Iron" || s.Status != StatusGraduated || len(s.Labs) != 1 {
+	// Titles follow the curriculum; status and labs are the learner's own.
+	if _, s := old.findStage(5); s == nil || s.Title != "The Iron Layer (Low-Level Systems & Compilers)" || s.Status != StatusGraduated || len(s.Labs) != 1 || len(s.Literature) != 3 {
 		t.Fatalf("stage 1 did not become stage 5 with its progress: %+v", s)
 	}
 	if _, s := old.findStage(15); s == nil || !s.hasStudied("Attention & the Transformer") || s.Labs == nil {
@@ -144,7 +145,7 @@ func TestAtomicWriteRoundTripAndLegacyLoad(t *testing.T) {
 			t.Errorf("stage %d missing after reconcile", id)
 		}
 	}
-	if _, s := old.findStage(5); !strings.HasPrefix(old.Tracks[1].Stages[0].Title, "Iron") || s == nil {
+	if _, s := old.findStage(5); old.Tracks[1].Stages[0].ID != 5 || s == nil {
 		t.Error("existing stage should come first in its track")
 	}
 

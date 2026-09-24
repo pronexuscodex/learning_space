@@ -628,8 +628,22 @@ Every concept has three exercises, and each has a hint:
 Open the Exercise Gym in any stage's Study Hall to see hints and tick
 exercises off. Try each one before you peek at the hint.
 
+WHY WE START WITH C
+C shows you what is really going on under the hood. In C every value has a size and an address, you decide where memory comes from, and a compiler turns your text into instructions for the actual processor. Once you have seen that, every other language makes sense: Python's lists, Go's slices and Java's objects are the same arrays, pointers and memory with the dangerous parts managed for you.
+- C is small: the whole language fits in K&R's 270 pages.
+- C is everywhere underneath: the Linux kernel, Git, SQLite, CPython, the firmware in cars and routers, and the libraries your AI models call are written in C.
+- Top universities use C for exactly this. Harvard's CS50 switches to C in its first week; Stanford's CS107, Berkeley's CS61C and Carnegie Mellon's 15-213 teach how computers really work in C. (Honest note: many universities, including MIT, Stanford and Berkeley, use Python for the very first course, then move to C as soon as students study systems. This academy goes to C straight away because it is built for understanding, not just for getting started.)
+- C does not protect you, so Stage 1 teaches the habits that make you solid: compile with -Wall -Wextra, check every input and return value, and run with -fsanitize=address,undefined while learning.
+
+GET A C COMPILER (ONE TIME, ABOUT 10 MINUTES)
+- Linux: install gcc and make (on Debian or Ubuntu: sudo apt install build-essential).
+- macOS: run xcode-select --install in the Terminal, which installs clang (the gcc command works too).
+- Windows: install WSL (wsl --install in PowerShell as administrator), then follow the Linux line inside it. MSYS2 is an alternative.
+- Check it works: gcc --version, then compile and run hello.c from Stage 1's first concept.
+- No computer of your own? C Tutor (pythontutor.com/c.html) and Compiler Explorer (godbolt.org) run C in the browser.
+
 WHERE TO START
-- Complete beginner? Start at Stage 1, Programming Fundamentals, and follow Track F in order.
+- Complete beginner? Start at Stage 1, Programming Fundamentals in C, and follow Track F in order.
 - After Track F, take Tracks A and S in either order.
 - For AI, Stages 1 to 3 are enough preparation for Stage 13.
 - Each stage shows what it builds on. If those stages feel shaky, a quick visit back first pays off.

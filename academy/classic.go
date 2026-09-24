@@ -112,15 +112,15 @@ func (r *Registry) stuckLogged(ref string) bool {
 
 var classicGuides = map[int]ClassicGuide{
 	1: {
-		Anchor: ClassicRead{"How to Design Programs", "Felleisen, Findler, Flatt & Krishnamurthi", 2001, "https://htdp.org/",
-			"A complete, systematic method for turning a problem statement into a working program: the closest thing to a programming apprenticeship in a book.",
-			"One section per session, in order. Do every exercise before turning the page; that is where the learning happens."},
+		Anchor: ClassicRead{"The C Programming Language (2nd edition)", "Brian W. Kernighan & Dennis M. Ritchie", 1988, "",
+			"\"K&R\": 270 pages by the language's own designers, and still the model of how a programming book should be written. Every example is small, complete and real.",
+			"One section per session, in order. Type every example in, and do every exercise before turning the page; that is where the learning happens. Keep Beej's Guide next to it for modern details."},
 		Classic: ClassicRead{"Go To Statement Considered Harmful", "Edsger W. Dijkstra", 1968, "https://homepages.cwi.nl/~storm/teaching/reader/Dijkstra68.pdf",
 			"A short letter that helped launch structured programming, which is why your loops and ifs look the way they do.",
 			"Read it twice: once for the argument, once asking how it applies to the loops you wrote this week."},
-		Source: ClassicRead{"How to Write a Spelling Corrector", "Peter Norvig", 2007, "https://www.norvig.com/spell-correct.html",
-			"A genuinely useful program in about 21 lines of Python, explained line by line by one of the field's best writers.",
-			"Type the program in yourself, run it on a big text file, then read the essay's explanation of every line."},
+		Source: ClassicRead{"kilo: a text editor in under 1,000 lines of C", "Salvatore Sanfilippo (antirez)", 2016, "https://github.com/antirez/kilo",
+			"A real, working terminal text editor in one small C file, by the author of Redis: raw terminal mode, a line buffer, search and syntax highlighting.",
+			"Read kilo.c top to bottom once for the shape, then follow the step-by-step \"Build Your Own Text Editor\" tutorial based on it and type it in yourself."},
 	},
 	2: {
 		Anchor: ClassicRead{"Algorithms", "Jeff Erickson", 2019, "https://jeffe.cs.illinois.edu/teaching/algorithms/",

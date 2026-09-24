@@ -42,7 +42,7 @@ type LibraryDoc struct {
 // away at an official address (checked 2026-09-24). Page is the book's
 // home page as listed in the stage's resources, when it is listed.
 var freeBooks = []LibraryDoc{
-	{1, "Book", "Think Python (2nd edition)", "https://greenteapress.com/wp/think-python-2e/", "https://greenteapress.com/thinkpython2/thinkpython2.pdf"},
+	{1, "Book", "Beej's Guide to C Programming", "https://beej.us/guide/bgc/", "https://beej.us/guide/bgc/pdf/bgc_usl_c_1.pdf"},
 	{2, "Book", "Algorithms by Jeff Erickson", "https://jeffe.cs.illinois.edu/teaching/algorithms/", "https://jeffe.cs.illinois.edu/teaching/algorithms/book/Algorithms-JeffE.pdf"},
 	{3, "Book", "Mathematics for Computer Science", "https://courses.csail.mit.edu/6.042/spring18/", "https://courses.csail.mit.edu/6.042/spring18/mcs.pdf"},
 	{8, "Book", "Beej's Guide to Network Programming", "https://beej.us/guide/bgnet/", "https://beej.us/guide/bgnet/pdf/bgnet_usl_c_1.pdf"},

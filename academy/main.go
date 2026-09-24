@@ -501,10 +501,10 @@ func seedRegistry() *Registry {
 				ID:   "F",
 				Name: "Foundations of Computing",
 				Stages: []Stage{
-					stage(1, "Programming Fundamentals",
-						book("How to Design Programs", "Felleisen, Findler, Flatt & Krishnamurthi"),
-						book("Structure and Interpretation of Computer Programs", "Abelson & Sussman"),
-						book("Think Python", "Allen B. Downey"),
+					stage(1, "Programming Fundamentals in C",
+						book("The C Programming Language (K&R)", "Brian W. Kernighan & Dennis M. Ritchie"),
+						book("C Programming: A Modern Approach", "K. N. King"),
+						book("Modern C", "Jens Gustedt"),
 					),
 					stage(2, "Data Structures & Algorithms",
 						book("Introduction to Algorithms (CLRS)", "Cormen, Leiserson, Rivest & Stein"),
@@ -635,6 +635,7 @@ type loadResult struct {
 	Seeded    bool // no file existed; a fresh campus was created
 	Migrated  bool // the file used an older schema and was upgraded
 	NewStages int  // stages added from the current curriculum
+	Refreshed int  // existing stages whose title or reading list was updated
 }
 
 // loadRegistry reads the registry from path. If the file does not exist, a
@@ -658,7 +659,9 @@ func loadRegistry(path string) (*Registry, loadResult, error) {
 	if res.Migrated, err = reg.migrate(); err != nil {
 		return nil, res, fmt.Errorf("migrate %s: %w", path, err)
 	}
-	res.NewStages = reg.reconcile(seedRegistry())
+	seed := seedRegistry()
+	res.NewStages = reg.reconcile(seed)
+	res.Refreshed = reg.refreshFromSeed(seed)
 	if err := reg.validate(); err != nil {
 		return nil, res, fmt.Errorf("validate %s: %w", path, err)
 	}
@@ -686,6 +689,41 @@ func (r *Registry) migrate() (bool, error) {
 	default:
 		return false, fmt.Errorf("unsupported schema_version %d (this build understands up to %d)", r.SchemaVersion, schemaVersion)
 	}
+}
+
+// refreshFromSeed brings existing stages up to date with the curriculum:
+// titles follow the seed, and required literature the stage lacks is
+// added (unread). Nothing is removed, so texts already marked as read and
+// all progress are kept. It returns the number of stages changed.
+func (r *Registry) refreshFromSeed(seed *Registry) int {
+	changed := 0
+	for _, st := range seed.Tracks {
+		for _, ss := range st.Stages {
+			_, s := r.findStage(ss.ID)
+			if s == nil {
+				continue
+			}
+			touched := false
+			if s.Title != ss.Title {
+				s.Title = ss.Title
+				touched = true
+			}
+			for _, lit := range ss.Literature {
+				have := false
+				for _, l := range s.Literature {
+					have = have || strings.EqualFold(l.Title, lit.Title)
+				}
+				if !have {
+					s.Literature = append(s.Literature, lit)
+					touched = true
+				}
+			}
+			if touched {
+				changed++
+			}
+		}
+	}
+	return changed
 }
 
 // reconcile merges in any tracks and stages from seed that r lacks, then
@@ -846,7 +884,7 @@ func main() {
 	app := &App{
 		reg:   reg,
 		path:  path,
-		dirty: loaded.Seeded || loaded.Migrated || loaded.NewStages > 0,
+		dirty: loaded.Seeded || loaded.Migrated || loaded.NewStages > 0 || loaded.Refreshed > 0,
 		con: &console{
 			in:     bufio.NewReader(os.Stdin),
 			out:    os.Stdout,
@@ -888,6 +926,9 @@ func main() {
 		}
 		if loaded.NewStages > 0 {
 			app.con.ok("%d new stage(s) added to your campus. Commit (5 or 7) to save them.", loaded.NewStages)
+		}
+		if loaded.Refreshed > 0 {
+			app.con.ok("The curriculum was updated (Stage 1 now teaches C): new titles and reading were added, and all your progress is kept. Commit to save.")
 		}
 	}
 
