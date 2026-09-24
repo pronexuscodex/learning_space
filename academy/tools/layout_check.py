@@ -28,6 +28,11 @@ KEYS = [
   "5\r", "n\r",             # blueprints
   "8\r", "1\r", "\r", "n\r", "3\r",  # classic corner → type-in lab listing → skip prediction → not run → back
   "9\r",                    # back to main
+  "n\r", "q\r",             # what's next, then cancel
+  "/\r", "memory cache\r", "1\r", "\r"*3, "n\r",  # search → open first hit (a concept) → don't mark
+  "f\r", "\r", "1\r", "a goal that is rather long for a narrow terminal\r", "p", "p", "s", # focus timer, stop at once
+  "p\r", "\r"*3,            # progress report (paged)
+  "x\r",                    # export notes
   "5\r",                    # commit & exit
 ]
 
@@ -51,7 +56,11 @@ def run(cols, rows=60):
     for k in KEYS:
         os.write(fd, k.encode()); read(0.25)
     read(1.0)
-    text = ANSI.sub("", out.decode("utf-8", "replace")).replace("\r", "")
+    text = ANSI.sub("", out.decode("utf-8", "replace")).replace("\r\n", "\n")
+    # A bare \r redraws the line in place (live timer): keep what is left.
+    text = "\n".join(l.split("\r")[-1] for l in text.split("\n"))
+    if os.environ.get("LAYOUT_DUMP"):
+        with open(os.environ["LAYOUT_DUMP"] + f".{cols}.txt", "w") as f: f.write(text)
     bad = []
     for line in text.split("\n"):
         if "http" in line:   # long URLs are left for the terminal to wrap

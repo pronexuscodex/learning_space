@@ -127,6 +127,11 @@ On first run, the program creates `academy_campus_registry.json` next to the bin
 |---|--------|
 | 0 | **Start Here**: what the academy covers, how memory works, how to practise, where to begin and a study rhythm |
 | 9 | **Daily Review**: your due spaced-repetition cards, interleaved across stages (`r` works too) |
+| n | **What's next**: up to four recommended steps (due reviews, next concept, an open exercise, a ready mastery check or type-in, a focus session) and one key to start any of them |
+| / | **Search** (also `s`): every concept, glossary term, resource, blueprint and classic; all words must match, titles rank first; open a hit directly |
+| f | **Focus timer**: a live countdown (`p` pause, `s` stop, bell when done) logged as a study session under a stage |
+| p | **Progress report**: a GitHub-style activity calendar, the last 7 days against the 7 before, time and mastery per track, deck health and your most-forgotten cards |
+| x | **Export notes**: writes `academy_notes.md` next to the registry with your progress, own-words explanations, notebook and labs |
 | c | **Classic Mode** on/off: struggle clock, lab notebook, classic corners and type-ins |
 | t | **Tidy screen** on/off: every action starts on a clean screen |
 | ? | **Keys & shortcuts** (also `h` or `help`) · `clear` / `cls` clears the screen |
@@ -139,7 +144,7 @@ On first run, the program creates `academy_campus_registry.json` next to the bin
 | 7 | Checkpoint: commit and keep working |
 | 8 | Exit without saving (asks for confirmation) |
 
-Above the menu, a dashboard shows hours, labs, stages, texts, concepts, exercises, **mastered concepts** and **cards due for review**, plus mastery-weighted campus progress, a 14-day activity sparkline, and a study streak (logged hours and review days both count).
+Above the menu, a dashboard shows hours, labs, stages, texts, concepts, exercises, **mastered concepts** and **cards due for review**, plus mastery-weighted campus progress, a 14-day activity sparkline, and a study streak (logged hours, focus sessions and review days all count). Below it, a **➜ Next** line names your best next step; press `n` to start it.
 
 Long screens (the ledger, Start Here, glossaries, resources, concept cards, the notebook) are shown one terminal page at a time: press **Enter** for the next page or **q** to return to the menu. Paging switches on only when you are typing at a real terminal (it uses `$LINES` if set, else 24 rows); piped or scripted input is unaffected.
 
@@ -202,7 +207,7 @@ Concepts link across stages. For example, logic gates (Stage 4) become the CPU; 
 
 ## Colours
 
-Colour is turned on automatically when output goes to a terminal. It is turned off by `-no-color`, by setting `NO_COLOR`, by `TERM=dumb`, or when output is piped. Text wraps to `$COLUMNS` (60–110 columns, default 80).
+Colour is turned on automatically when output goes to a terminal. It is turned off by `-no-color`, by setting `NO_COLOR`, by `TERM=dumb`, or when output is piped. Text follows the live terminal width (40–110 columns; `$COLUMNS` or 80 when it cannot be read).
 
 ## Tests
 
@@ -217,6 +222,7 @@ The tests check:
 - **Classic Mode:** every stage has a complete classic corner with HTTPS links; the struggle clock's thresholds and early unlock; notebook and type-in progress survive a save round trip.
 - **Connections:** globally unique concept names; every concept has valid cross-links and a go-deeper pointer; prerequisites only point backwards; every resource uses HTTPS.
 - **Layout:** display widths (emoji, CJK and combining marks), wrap and flow never exceed the width, and long prompts wrap.
+- **Guidance:** What's next ordering and its four-step limit, prerequisites, search AND semantics and ranking, snippets, daily minutes and the weekly comparison, focus sessions in stats, and the Markdown export.
 - **Mechanics:** text wrapping, hour parsing, the atomic-write round trip and the activity streak.
 
 ## Source layout
@@ -241,6 +247,8 @@ One package, one build target:
 | `tools/layout_check.py` | overflow checker: renders every screen at chosen widths in a pseudo-terminal |
 | `classic.go` | Classic Mode: classic corners, struggle clock, notebook |
 | `classicui.go` | Classic Mode screens: toggle, classic corner, type-in lab, notebook |
+| `insights.go` | What's next, search, study sessions, activity history, Markdown export |
+| `insightsui.go` | screens for the above, including the live focus timer and progress report |
 | `typeins.go` | generated type-in listings with their real output (see `typeins/`) |
 | `curriculum.go` | types, plus Tracks A and B (stages 5–8, 13, 15, 16) |
 | `curriculum_foundations.go` | Track F (stages 1–4) |
@@ -286,7 +294,8 @@ One package, one build target:
   "reviews": {
     "Hash Tables :: key idea": { "due": "2026-09-27T00:00:00+02:00", "interval_days": 3, "ease": 2.5, "reps": 2, "lapses": 0, "last_reviewed": "2026-09-24T14:48:41+02:00" }
   },
-  "review_history": { "2026-09-24": 4 }
+  "review_history": { "2026-09-24": 4 },
+  "study_sessions": [{ "start": "2026-09-24T14:00:00Z", "minutes": 25, "stage": 2, "note": "hash table exercise" }]
 }
 ```
 

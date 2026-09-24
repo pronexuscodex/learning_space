@@ -143,6 +143,9 @@ func (a *App) printDashboard() {
 	if dirty {
 		a.printf("  %s\n", sty.Yellow("● uncommitted changes"))
 	}
+	if h := a.nextHint(); h != "" {
+		a.println("  " + h)
+	}
 }
 
 // printMenu draws the dashboard and the menu. Wide terminals get two
@@ -186,9 +189,14 @@ func (a *App) printMenu() {
 		{item("8", sty.Gray("Exit without saving")), ""},
 	}
 	extras := []entry{
-		{item("c", "Classic Mode "+mode), hint("struggle, predict, type it in")},
+		{item("n", sty.Bold(sty.Green("What's next"))), hint("best next step")},
+		{item("/", "Search"), hint("find any topic")},
+		{item("f", "Focus timer"), hint("Pomodoro")},
+		{item("p", "Progress report"), hint("calendar & trends")},
+		{item("x", "Export notes"), hint("to Markdown")},
+		{item("c", "Classic Mode "+mode), ""},
 		{item("t", "Tidy screen "+tidyMode), ""},
-		{item("?", "Keys & shortcuts"), hint("Ctrl+L clears the screen")},
+		{item("?", "Keys & shortcuts"), hint("Ctrl+L clears")},
 	}
 
 	edge := sty.Gray
@@ -214,8 +222,19 @@ func (a *App) printMenu() {
 			a.println("  " + edge("│ ") + show(right[i], inner))
 		}
 	}
-	for _, e := range extras {
-		a.println("  " + edge("│ ") + show(e, inner))
+	a.println("  " + edge("│"))
+	if inner >= colWidth+34 {
+		for i := 0; i < len(extras); i += 2 {
+			line := padRight(show(extras[i], colWidth-1), colWidth)
+			if i+1 < len(extras) {
+				line += show(extras[i+1], inner-colWidth)
+			}
+			a.println("  " + edge("│ ") + line)
+		}
+	} else {
+		for _, e := range extras {
+			a.println("  " + edge("│ ") + show(e, inner))
+		}
 	}
 	a.println("  " + edge("└"+strings.Repeat("─", max(0, w-3))))
 }
@@ -801,6 +820,11 @@ func (a *App) showShortcuts() {
 	a.printf("  %s\n", sty.Bold("Main menu"))
 	row("0 – 9", "the menu options")
 	row("r", "Daily Review (same as 9)")
+	row("n", "What's next: your best next steps, one key to start")
+	row("/  or  s", "search concepts, glossary, resources and classics")
+	row("f", "focus timer: a timed study session that is logged")
+	row("p", "progress report: activity calendar, weekly trend, weak cards")
+	row("x", "export all your notes and progress to a Markdown file")
 	row("c", "Classic Mode on/off")
 	row("t", "tidy screen on/off: start every action on a clean screen")
 	row("clear / cls", "clear the screen now")
@@ -862,6 +886,16 @@ func (a *App) run() {
 			}
 		case "?", "h", "help":
 			a.paged(true, a.showShortcuts)
+		case "n":
+			actionErr = a.whatsNext()
+		case "/", "s", "search":
+			actionErr = a.searchScreen()
+		case "f":
+			actionErr = a.focusTimer()
+		case "p":
+			a.paged(true, a.progressReport)
+		case "x":
+			actionErr = a.exportNotes()
 		case "1":
 			a.paged(true, a.viewLedger)
 		case "2":
@@ -893,7 +927,7 @@ func (a *App) run() {
 		case "":
 			// Blank line: just redraw the menu.
 		default:
-			a.con.warn("%q is not a menu option. Choose 0-9, c, t or ? for help.", choice)
+			a.con.warn("%q is not a menu option. Choose 0-9, n, /, f, p, x, c, t or ? for help.", choice)
 		}
 
 		switch {

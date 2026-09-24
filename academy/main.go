@@ -245,6 +245,7 @@ type Registry struct {
 	Reviews       map[string]ReviewCard `json:"reviews"`        // card ID → spaced-repetition state
 	ReviewHistory map[string]int        `json:"review_history"` // local date → cards reviewed that day
 	TidyScreen    bool                  `json:"tidy_screen"`    // start each action on a clean screen
+	StudySessions []StudySession        `json:"study_sessions"` // focus-timer sessions
 
 	// Classic Mode (see classic.go).
 	ClassicMode    bool                 `json:"classic_mode"`
@@ -366,6 +367,14 @@ func (r *Registry) stats(now time.Time, activityDays int) campusStats {
 			}
 		}
 	}
+	// Focus-timer sessions count as study time too.
+	for _, ss := range r.StudySessions {
+		cs.hours += ss.Minutes / 60
+		ago := int(math.Round(today.Sub(dayStart(ss.Start)).Hours() / 24))
+		if ago >= 0 && ago < activityDays {
+			cs.activity[activityDays-1-ago] += ss.Minutes / 60
+		}
+	}
 	cs.hours = roundHours(cs.hours)
 	cs.due = len(r.dueCards(now))
 
@@ -448,6 +457,9 @@ func (r *Registry) validate() error {
 	}
 	if r.ReviewHistory == nil {
 		r.ReviewHistory = map[string]int{}
+	}
+	if r.StudySessions == nil {
+		r.StudySessions = []StudySession{}
 	}
 	if r.Notebook == nil {
 		r.Notebook = []NotebookEntry{}
@@ -726,13 +738,17 @@ func sortByRank[T any](items []T, rank func(T) int) {
 // Sequence: write temp file in the same directory -> fsync -> close ->
 // rename over target (atomic on POSIX and on NTFS via MoveFileEx) -> fsync
 // the directory so the rename itself is durable.
-func atomicWriteJSON(path string, v any) (err error) {
+func atomicWriteJSON(path string, v any) error {
 	data, err := json.MarshalIndent(v, "", "  ")
 	if err != nil {
 		return fmt.Errorf("marshal: %w", err)
 	}
-	data = append(data, '\n')
+	return atomicWriteFile(path, append(data, '\n'))
+}
 
+// atomicWriteFile writes data to path with the same temp-file, fsync and
+// rename sequence, so the file is never seen half-written.
+func atomicWriteFile(path string, data []byte) (err error) {
 	dir := filepath.Dir(path)
 	tmp, err := os.CreateTemp(dir, ".academy-registry-*.tmp")
 	if err != nil {

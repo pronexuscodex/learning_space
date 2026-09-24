@@ -643,6 +643,11 @@ A SIMPLE STUDY RHYTHM
 - Take the stage's quiz at the end of the week, and its Mastery Check when every concept is understood.
 - Finish each stage with one real-world exercise or lab blueprint. Building is where it sticks.
 - Log your hours. The streak and the activity chart are there to keep you going.
+- Not sure what to do? Press n for What's next: it picks your best next step and starts it for you.
+- Study in focused blocks with the Focus timer [f]: 25 minutes on one task, phone away, then a short break. Sessions are logged automatically.
+- Once a week, open the Progress report [p] to see your calendar, your trend against last week, and the cards you forget most.
+- Looking for something? Press / to search every concept, glossary term, resource and classic.
+- Press x to export your notes, explanations and progress to a Markdown file you can keep, print or share.
 
 IF IT FEELS HARD
 That is normal and means you are learning. Re-read the analogy, look at

@@ -351,5 +351,9 @@ func banner(width int) string {
 // heading renders a double-ruled section title in the given colour.
 func heading(title string, color func(string) string, width int) string {
 	rule := strings.Repeat("═", width)
-	return "\n" + color(rule) + "\n" + color(sty.Bold("  "+title)) + "\n" + color(rule)
+	out := "\n" + color(rule)
+	for _, l := range wrap(title, width, "  ") {
+		out += "\n" + color(sty.Bold(l))
+	}
+	return out + "\n" + color(rule)
 }

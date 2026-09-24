@@ -175,6 +175,12 @@ func (a *App) studyConcept(stageID int, g StageGuide) error {
 	if err != nil {
 		return err
 	}
+	return a.studyConceptAt(stageID, g, idx)
+}
+
+// studyConceptAt opens concept idx of a stage directly (used by the Study
+// Hall, What's next and Search).
+func (a *App) studyConceptAt(stageID int, g StageGuide, idx int) error {
 	c := g.Concepts[idx]
 	a.mu.Lock()
 	_, s := a.reg.findStage(stageID)
