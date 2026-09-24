@@ -425,9 +425,10 @@ PagedAttention stores those notes on fixed-size index cards filed
 wherever there is space, with an index to find them, instead of needing
 one giant empty shelf reserved in advance.`,
 		Example: `Chat services answer many users at once on the same GPUs by batching
-their requests together. The vLLM project, which introduced
-PagedAttention, reported up to 24× higher throughput than a standard
-Hugging Face Transformers setup.`,
+their requests together. The PagedAttention paper, which introduced the
+vLLM serving system, reports 2–4× higher throughput than earlier serving
+systems such as FasterTransformer and Orca, at the same latency, mostly
+by no longer wasting KV-cache memory.`,
 	},
 }
 
