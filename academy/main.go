@@ -138,13 +138,15 @@ type Lab struct {
 
 // Stage is one numbered unit of the curriculum.
 type Stage struct {
-	ID              int          `json:"id"`
-	Title           string       `json:"title"`
-	Status          Status       `json:"status"`
-	Literature      []Literature `json:"required_literature"`
-	ConceptsStudied []string     `json:"concepts_studied"`
-	ExercisesDone   []string     `json:"exercises_done"`
-	Labs            []Lab        `json:"labs"`
+	ID              int               `json:"id"`
+	Title           string            `json:"title"`
+	Status          Status            `json:"status"`
+	Literature      []Literature      `json:"required_literature"`
+	ConceptsStudied []string          `json:"concepts_studied"`
+	ExercisesDone   []string          `json:"exercises_done"`
+	Notes           map[string]string `json:"notes"` // concept → the learner's own explanation
+	MasteryCheck    *MasteryCheck     `json:"mastery_check,omitempty"`
+	Labs            []Lab             `json:"labs"`
 }
 
 // contains reports whether list holds item.
@@ -235,10 +237,12 @@ type Track struct {
 
 // Registry is the complete persisted state of the academy.
 type Registry struct {
-	SchemaVersion int       `json:"schema_version"`
-	LastCommit    time.Time `json:"last_commit"`
-	NextLabID     int       `json:"next_lab_id"`
-	Tracks        []Track   `json:"tracks"`
+	SchemaVersion int                   `json:"schema_version"`
+	LastCommit    time.Time             `json:"last_commit"`
+	NextLabID     int                   `json:"next_lab_id"`
+	Tracks        []Track               `json:"tracks"`
+	Reviews       map[string]ReviewCard `json:"reviews"`        // card ID → spaced-repetition state
+	ReviewHistory map[string]int        `json:"review_history"` // local date → cards reviewed that day
 }
 
 // findStage returns the stage with the given global ID and its track.
@@ -308,6 +312,9 @@ type campusStats struct {
 	texts, textsRead          int
 	concepts, conceptsStudied int
 	exercises, exercisesDone  int
+	masteryPoints, masteryMax int
+	mastered                  int
+	due                       int
 	activity                  []float64 // hours per day, oldest first
 	streak                    int       // consecutive active days
 }
@@ -333,6 +340,10 @@ func (r *Registry) stats(now time.Time, activityDays int) campusStats {
 			done, exercises := exerciseProgress(s)
 			cs.exercisesDone += done
 			cs.exercises += exercises
+			pts, maxPts, mastered, _ := r.stageMastery(s)
+			cs.masteryPoints += pts
+			cs.masteryMax += maxPts
+			cs.mastered += mastered
 			for _, l := range s.Labs {
 				cs.labs++
 				cs.hours += l.HoursLogged
@@ -349,14 +360,19 @@ func (r *Registry) stats(now time.Time, activityDays int) campusStats {
 		}
 	}
 	cs.hours = roundHours(cs.hours)
+	cs.due = len(r.dueCards(now))
 
-	// Streak: consecutive days with logged time, ending today (or yesterday,
-	// so the streak survives until you study today).
+	// Streak: consecutive days with logged hours or reviews, ending today
+	// (or yesterday, so the streak survives until you study today).
+	active := func(i int) bool {
+		day := today.AddDate(0, 0, i-(activityDays-1)).Format("2006-01-02")
+		return cs.activity[i] > 0 || r.ReviewHistory[day] > 0
+	}
 	i := activityDays - 1
-	if i >= 0 && cs.activity[i] == 0 {
+	if i >= 0 && !active(i) {
 		i--
 	}
-	for ; i >= 0 && cs.activity[i] > 0; i-- {
+	for ; i >= 0 && active(i); i-- {
 		cs.streak++
 	}
 	return cs
@@ -396,6 +412,9 @@ func (r *Registry) validate() error {
 			if s.ExercisesDone == nil {
 				s.ExercisesDone = []string{}
 			}
+			if s.Notes == nil {
+				s.Notes = map[string]string{}
+			}
 			if s.Labs == nil {
 				s.Labs = []Lab{}
 			}
@@ -417,6 +436,12 @@ func (r *Registry) validate() error {
 			}
 		}
 	}
+	if r.Reviews == nil {
+		r.Reviews = map[string]ReviewCard{}
+	}
+	if r.ReviewHistory == nil {
+		r.ReviewHistory = map[string]int{}
+	}
 	if r.NextLabID <= maxLab {
 		r.NextLabID = maxLab + 1
 	}
@@ -429,12 +454,14 @@ func seedRegistry() *Registry {
 	paper := func(title, author string) Literature { return Literature{Title: title, Author: author, Kind: "Paper"} }
 	stage := func(id int, title string, lit ...Literature) Stage {
 		return Stage{ID: id, Title: title, Status: StatusActive, Literature: lit,
-			ConceptsStudied: []string{}, ExercisesDone: []string{}, Labs: []Lab{}}
+			ConceptsStudied: []string{}, ExercisesDone: []string{}, Notes: map[string]string{}, Labs: []Lab{}}
 	}
 
 	return &Registry{
 		SchemaVersion: schemaVersion,
 		NextLabID:     1,
+		Reviews:       map[string]ReviewCard{},
+		ReviewHistory: map[string]int{},
 		Tracks: []Track{
 			{
 				ID:   "F",
@@ -738,9 +765,17 @@ func roundHours(h float64) float64 { return math.Round(h*100) / 100 }
 func main() {
 	pathFlag := flag.String("registry", "", "path to the JSON registry (default: "+registryFileName+" beside the binary)")
 	noColor := flag.Bool("no-color", false, "disable ANSI colours (also honours NO_COLOR)")
+	checkLinks := flag.Bool("check-links", false, "verify every resource URL over the network, then exit")
 	flag.Parse()
 
 	sty = Style{on: colorEnabled(*noColor)}
+
+	if *checkLinks {
+		if failed := runLinkCheck(os.Stdout); failed > 0 {
+			os.Exit(1)
+		}
+		return
+	}
 
 	path := *pathFlag
 	if path == "" {

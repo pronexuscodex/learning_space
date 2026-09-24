@@ -647,7 +647,7 @@ paradox is why hash functions need long outputs to avoid collisions.`,
 		},
 		Resources: []Resource{
 			{"Course", "MIT 6.042J Mathematics for Computer Science (OCW)", "https://ocw.mit.edu/courses/6-042j-mathematics-for-computer-science-fall-2010/", "The standard course; the lecture notes are a full free textbook."},
-			{"Book", "Book of Proof (free)", "https://www.people.vcu.edu/~rhammack/BookOfProof/", "A gentle, clear introduction to proofs."},
+			{"Book", "Book of Proof (free)", "https://richardhammack.github.io/BookOfProof/", "A gentle, clear introduction to proofs."},
 			{"Course", "Khan Academy: Statistics & Probability", "https://www.khanacademy.org/math/statistics-probability", "Friendly videos and exercises on probability."},
 			{"Tool", "Seeing Theory", "https://seeing-theory.brown.edu/", "Interactive visual introduction to probability."},
 		},

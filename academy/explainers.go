@@ -586,7 +586,27 @@ HOW EACH CONCEPT IS TAUGHT
 - Diagram: a picture of the mechanism, where one helps.
 - Mental model: one sentence to carry around in your head.
 - Exercises: three per concept, from easy to real-world (see below).
+- Connects to: related ideas in other stages, so knowledge forms a web instead of a list.
+- Go deeper: exactly which chapter or lecture of a verified resource to read next.
 - Words to know: any jargon in the card, defined at the bottom.
+
+HOW YOU WILL REMEMBER IT
+Reading something once is not learning it; most of it fades within days.
+This academy uses five techniques that research on memory consistently
+supports:
+- Retrieval practice: the Daily Review [9] asks you questions instead of showing you answers. The effort of recalling is what makes memories last.
+- Spacing: each card comes back after 1 day, then 3, then about a week, then weeks and months, a little before you would forget it.
+- Interleaving: reviews and mastery checks mix topics and stages, which trains you to recognise which idea applies.
+- Your own words: when you mark a concept as understood, you explain it in your own words. Your explanation is shown back to you at review time.
+- Connections: every concept links to related ones, so each new idea hooks onto something you already know.
+
+MASTERY LEVELS
+Each concept climbs a ladder: ○ new → ◔ understood → ◑ practised (two
+exercises done) → ◕ retained (every review card remembered a week apart)
+→ ● mastered (all exercises done and remembered three weeks apart). You
+cannot reach mastered in a day, and that is the point: it measures what
+you still know weeks later. Each stage also has a Mastery Check, a mixed
+exam you pass at 80%.
 
 HOW TO PRACTISE
 Every concept has three exercises, and each has a hint:
@@ -601,13 +621,15 @@ WHERE TO START
 - Complete beginner? Start at Stage 1, Programming Fundamentals, and follow Track F in order.
 - After Track F, take Tracks A and S in either order.
 - For AI, Stages 1 to 3 are enough preparation for Stage 13.
+- Each stage shows what it builds on. If those stages feel shaky, a quick visit back first pays off.
 - Stuck on a word? Open the Glossary in the stage's Study Hall.
 
 A SIMPLE STUDY RHYTHM
-- One concept per session. Read it slowly, then close your eyes and explain it out loud.
+- Start every session with the Daily Review [9]. It takes 5 to 15 minutes and protects everything you have learned.
+- Then one new concept. Read it slowly, then close your eyes and explain it out loud.
 - Do its warm-up the same day and its practice exercise the next.
 - Mark a concept as understood only when you could explain it to a friend.
-- Take the stage's quiz at the end of the week. Missed answers show you what to re-read.
+- Take the stage's quiz at the end of the week, and its Mastery Check when every concept is understood.
 - Finish each stage with one real-world exercise or lab blueprint. Building is where it sticks.
 - Log your hours. The streak and the activity chart are there to keep you going.
 
@@ -625,6 +647,12 @@ Once the sixteen stages feel comfortable, these electives build on them:
 - Bioinformatics: Rosalind problems (rosalind.info)
 - Game development, robotics, human-computer interaction and computer vision all reuse the ideas you have learned here.
 
+RESOURCES YOU CAN TRUST
+Every resource link was reviewed on ` + resourcesVerifiedOn + `. Links
+can move over time, so run "academy -check-links" on any computer with
+internet access to re-verify all of them.
+
 YOUR DATA
-Everything you do is saved in one readable JSON file next to the program.
-Nothing is sent anywhere.`
+Everything you do, including review schedules and your own explanations,
+is saved in one readable JSON file next to the program. Nothing is sent
+anywhere.`

@@ -36,6 +36,7 @@ func (a *App) studyHall() error {
 			fmt.Sprintf("Resource library %s", sty.Gray(fmt.Sprintf("(%d)", len(guide.Resources)))),
 			fmt.Sprintf("Lab blueprints %s", sty.Gray(fmt.Sprintf("(%d, enroll with one keystroke)", len(guide.Blueprints)))),
 			fmt.Sprintf("Self-check quiz %s", sty.Gray(fmt.Sprintf("(%d questions)", len(guide.Quiz)))),
+			fmt.Sprintf("%s %s", sty.Bold("Mastery check"), sty.Gray(fmt.Sprintf("(mixed exam, %d%% to pass)", int(masteryPassMark*100)))),
 			"Back to main menu",
 		})
 		if err != nil {
@@ -54,6 +55,8 @@ func (a *App) studyHall() error {
 			err = a.showBlueprints(stageID, guide)
 		case 5:
 			err = a.runQuiz(guide)
+		case 6:
+			err = a.masteryCheck(stageID)
 		default:
 			return nil
 		}
@@ -72,18 +75,44 @@ func (a *App) renderStageSyllabus(stageID int, g StageGuide) {
 	t, s := a.reg.findStage(stageID)
 	color := trackColor(t.ID)
 	title := s.Title
-	studiedSet := map[string]bool{}
+	level := map[string]int{}
 	dots := map[string]string{}
 	for _, c := range g.Concepts {
-		studiedSet[c.Name] = s.hasStudied(c.Name)
+		level[c.Name] = a.reg.conceptMastery(s, c)
 		dots[c.Name] = exerciseDots(s, c)
 	}
-	studied, total := conceptProgress(s)
+	points, maxPoints, mastered, total := a.reg.stageMastery(s)
+	check := s.MasteryCheck
+	var prereqs []string
+	weak := 0
+	for _, pid := range stagePrereqs[stageID] {
+		if _, ps := a.reg.findStage(pid); ps != nil {
+			prereqs = append(prereqs, fmt.Sprintf("Stage %d (%s)", pid, ps.Title))
+			if st, tot := conceptProgress(ps); st*2 < tot {
+				weak++
+			}
+		}
+	}
 	a.mu.Unlock()
 
 	a.printf("\n  %s %s %s\n", color(sty.Bold(fmt.Sprintf("Stage %d", stageID))), sty.Gray("·"), sty.Bold(title))
 	for _, l := range wrap(g.Overview, a.width-4, "  ") {
 		a.println(sty.Italic(l))
+	}
+	if len(prereqs) > 0 {
+		a.println("")
+		for i, l := range wrap(strings.Join(prereqs, ", "), a.width-16, "") {
+			lead := "              "
+			if i == 0 {
+				lead = sty.Bold(sty.Blue("🧱 Builds on")) + "  "
+			}
+			a.printf("  %s%s\n", lead, sty.Gray(l))
+		}
+		if weak > 0 {
+			for _, l := range wrap("Tip: you have covered less than half of some of these. A quick visit there first will make this stage easier.", a.width-16, "") {
+				a.printf("  %s%s\n", strings.Repeat(" ", 14), sty.Yellow(l))
+			}
+		}
 	}
 	if len(g.Outcomes) > 0 {
 		a.printf("\n  %s\n", sty.Bold(sty.Green("After this stage you'll be able to:")))
@@ -96,20 +125,27 @@ func (a *App) renderStageSyllabus(stageID int, g StageGuide) {
 			}
 		}
 	}
-	a.printf("\n  %s %s %d/%d   %s\n", sty.Gray("Concepts"), bar(studied, total, 20, sty.Blue), studied, total,
-		sty.Gray("(✔ understood · ●●● exercises done)"))
-	for i, c := range g.Concepts {
-		mark := sty.Gray("○")
-		if studiedSet[c.Name] {
-			mark = sty.Green("✔")
+	checkNote := sty.Gray("mastery check not taken")
+	if check != nil {
+		if check.Passed {
+			checkNote = sty.Green(fmt.Sprintf("mastery check passed %d/%d", check.Score, check.Total))
+		} else {
+			checkNote = sty.Yellow(fmt.Sprintf("mastery check %d/%d, not yet passed", check.Score, check.Total))
 		}
-		a.printf("    %s %s %s %s %s\n", mark, color(fmt.Sprintf("%d.", i+1)), dots[c.Name], sty.Bold(c.Name),
+	}
+	a.printf("\n  %s %s %s   %s\n", sty.Gray("Mastery "), bar(points, maxPoints, 20, sty.Green),
+		sty.Bold(fmt.Sprintf("%d/%d mastered", mastered, total)), checkNote)
+	a.printf("  %s\n", masteryLegend()+sty.Gray("   ●●● = exercises done"))
+	for i, c := range g.Concepts {
+		a.printf("    %s %s %s %s %s\n", masteryBadge(level[c.Name]), color(fmt.Sprintf("%d.", i+1)), dots[c.Name], sty.Bold(c.Name),
 			sty.Gray("— "+truncate(c.Summary, a.width-len([]rune(c.Name))-18)))
 	}
 	a.println("")
 }
 
-// studyConcept renders one concept card and offers to mark it understood.
+// studyConcept renders one concept card, then either marks it understood
+// (asking the learner to explain it in their own words) or lets them
+// refresh their explanation.
 func (a *App) studyConcept(stageID int, g StageGuide) error {
 	names := make([]string, len(g.Concepts))
 	for i, c := range g.Concepts {
@@ -123,36 +159,71 @@ func (a *App) studyConcept(stageID int, g StageGuide) error {
 	a.mu.Lock()
 	_, s := a.reg.findStage(stageID)
 	already := s.hasStudied(c.Name)
+	note := s.Notes[c.Name]
+	level := a.reg.conceptMastery(s, c)
 	done := make([]bool, len(c.Exercises))
 	for i := range c.Exercises {
 		done[i] = s.hasDone(c.Name, i)
 	}
 	a.mu.Unlock()
-	a.renderConcept(c, idx+1, len(g.Concepts), g.Glossary, done)
+	a.renderConcept(c, idx+1, len(g.Concepts), g.Glossary, done, note, level)
 
-	label := "Mark as understood?"
-	if already {
-		label = "Already understood. Move back to 'needs review'?"
+	if !already {
+		yes, err := a.con.confirm("Do you understand it well enough to explain it to a friend?")
+		if err != nil || !yes {
+			if err == nil {
+				a.con.note("No rush. Re-read the analogy, try the warm-up exercise, then come back.")
+			}
+			return err
+		}
+		a.con.note("Now explain it in your own words; putting it into your own words is what makes it stick.")
+		text, err := a.con.promptText("Your explanation (Enter to skip)", maxNotesLen, false)
+		if err != nil && !errors.Is(err, errCancel) {
+			return err
+		}
+		a.mutate(func(r *Registry) {
+			_, s := r.findStage(stageID)
+			s.setStudied(c.Name, true)
+			if text != "" {
+				s.Notes[c.Name] = text
+			}
+		})
+		a.con.ok("%s marked as understood. Its %d review cards join your Daily Review [9].", sty.Bold(c.Name), len(conceptCards(stageID, c)))
+		return nil
 	}
-	yes, err := a.con.confirm(label)
-	if err != nil || !yes {
+
+	choice, err := a.con.promptChoice("Next", []string{
+		"Continue",
+		"Write or update my own explanation",
+		"Mark as needing review (removes its cards from the Daily Review)",
+	})
+	if err != nil {
 		return err
 	}
-	a.mutate(func(r *Registry) {
-		_, s := r.findStage(stageID)
-		s.setStudied(c.Name, !already)
-	})
-	if already {
+	switch choice {
+	case 1:
+		text, err := a.con.promptText("Your explanation", maxNotesLen, true)
+		if err != nil {
+			return err
+		}
+		a.mutate(func(r *Registry) {
+			_, s := r.findStage(stageID)
+			s.Notes[c.Name] = text
+		})
+		a.con.ok("Explanation saved. You will see it when this concept comes up in your reviews.")
+	case 2:
+		a.mutate(func(r *Registry) {
+			_, s := r.findStage(stageID)
+			s.setStudied(c.Name, false)
+		})
 		a.con.ok("%s moved back to review.", sty.Bold(c.Name))
-	} else {
-		a.con.ok("%s marked as understood.", sty.Bold(c.Name))
 	}
 	return nil
 }
 
 // renderConcept prints a concept as a heavy-bordered reading card, going
 // from intuition (analogy, real life) to precision (details, diagram).
-func (a *App) renderConcept(c Concept, n, total int, glossary []Term, done []bool) {
+func (a *App) renderConcept(c Concept, n, total int, glossary []Term, done []bool, note string, level int) {
 	w := a.width
 	edge := sty.Blue("┃")
 	blank := func() { a.printf("  %s\n", edge) }
@@ -168,7 +239,8 @@ func (a *App) renderConcept(c Concept, n, total int, glossary []Term, done []boo
 	plainText := func(s string) string { return s }
 
 	a.println("")
-	a.printf("  %s %s %s\n", sty.Blue("┏━"), sty.Gray(fmt.Sprintf("Concept %d/%d ·", n, total)), sty.Bold(sty.Blue(c.Name)))
+	a.printf("  %s %s %s   %s %s\n", sty.Blue("┏━"), sty.Gray(fmt.Sprintf("Concept %d/%d ·", n, total)), sty.Bold(sty.Blue(c.Name)),
+		masteryBadge(level), sty.Gray(masteryNames[level]))
 	a.printf("  %s %s\n", edge, sty.Italic(c.Summary))
 
 	if c.Analogy != "" {
@@ -209,6 +281,22 @@ func (a *App) renderConcept(c Concept, n, total int, glossary []Term, done []boo
 		}
 		blank()
 		a.printf("  %s %s\n", edge, sty.Gray("Hints and check-off: Study Hall → Exercise gym."))
+	}
+	if l, ok := conceptLinks[c.Name]; ok {
+		if len(l.Related) > 0 {
+			section("🔗 Connects to", sty.Blue)
+			for _, name := range l.Related {
+				a.printf("  %s   %s %s\n", edge, sty.Blue("↔"), name+sty.Gray(fmt.Sprintf(" (Stage %d)", stageOfConcept(name))))
+			}
+		}
+		if l.Read != "" {
+			section("📚 Go deeper", sty.Blue)
+			paragraph(l.Read, plainText)
+		}
+	}
+	if note != "" {
+		section("📝 In your own words", sty.Magenta)
+		paragraph(note, sty.Magenta)
 	}
 	if terms := termsIn(glossary, c.Summary, c.Analogy, c.Example, c.Body); len(terms) > 0 {
 		section("📖 Words to know", sty.Blue)
@@ -427,7 +515,8 @@ func (a *App) showStartHere() {
 // showResources prints the resource library grouped by kind.
 func (a *App) showResources(g StageGuide) {
 	a.println("")
-	a.printf("  %s\n", sty.Bold(sty.Blue("RESOURCE LIBRARY")))
+	a.printf("  %s  %s\n", sty.Bold(sty.Blue("RESOURCE LIBRARY")),
+		sty.Gray("links verified "+resourcesVerifiedOn+" · re-check any time with: academy -check-links"))
 	order := []string{"Course", "Book", "Video", "Article", "Paper", "Tool", "Site"}
 	for _, kind := range order {
 		first := true

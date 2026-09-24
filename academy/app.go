@@ -97,13 +97,21 @@ func (a *App) printDashboard() {
 		stat("Stages", fmt.Sprintf("%d/%d", cs.stagesGrad, cs.stages)),
 		stat("Texts", fmt.Sprintf("%d/%d", cs.textsRead, cs.texts)),
 	}, sep))
+	due := stat("Due for review", strconv.Itoa(cs.due))
+	if cs.due > 0 {
+		due = sty.Gray("Due for review") + " " + sty.Bold(sty.Yellow(strconv.Itoa(cs.due)))
+	}
 	a.println("  " + strings.Join([]string{
 		stat("Concepts", fmt.Sprintf("%d/%d", cs.conceptsStudied, cs.concepts)),
 		stat("Exercises", fmt.Sprintf("%d/%d", cs.exercisesDone, cs.exercises)),
+		stat("Mastered", fmt.Sprintf("%d/%d", cs.mastered, cs.concepts)),
+		due,
 	}, sep))
 
-	done := cs.textsRead + cs.conceptsStudied + cs.exercisesDone + cs.stagesGrad
-	total := cs.texts + cs.concepts + cs.exercises + cs.stages
+	// Campus progress weights long-term mastery most: each concept climbs
+	// four mastery levels, plus reading and graduated stages.
+	done := cs.masteryPoints + cs.textsRead + cs.stagesGrad
+	total := cs.masteryMax + cs.texts + cs.stages
 	streak := sty.Gray("no streak yet")
 	if cs.streak > 0 {
 		streak = sty.Bold(sty.Yellow(fmt.Sprintf("▲ %d-day streak", cs.streak)))
@@ -127,7 +135,16 @@ func (a *App) printMenu() {
 	}
 	edge := sty.Gray
 	a.println("  " + edge("┌─ ") + sty.Bold("MAIN MENU") + " " + edge(strings.Repeat("─", 58)))
-	a.println("  " + edge("│ ") + item("0", sty.Bold(sty.Green("Start Here"))+sty.Gray(" · new? how to learn with this academy")))
+	a.mu.Lock()
+	dueNow := len(a.reg.dueCards(time.Now()))
+	a.mu.Unlock()
+	review := sty.Bold(sty.Green("Daily Review"))
+	if dueNow > 0 {
+		review += " " + sty.Bold(sty.Yellow(fmt.Sprintf("(%d due)", dueNow)))
+	} else {
+		review += sty.Gray(" (nothing due)")
+	}
+	a.println("  " + edge("│ ") + padRight(item("0", sty.Bold(sty.Green("Start Here"))), 32) + item("9", review))
 	for _, r := range rows {
 		a.println("  " + edge("│ ") + padRight(r[0], 32) + r[1])
 	}
@@ -190,6 +207,20 @@ func (a *App) renderStageCard(s *Stage, color func(string) string) {
 	line(padRight(sty.Gray("Reading"), 10) + bar(read, total, 20, sty.Green) + " " + fmt.Sprintf("%d/%d", read, total))
 	line(padRight(sty.Gray("Concepts"), 10) + bar(studied, concepts, 20, sty.Blue) + " " + fmt.Sprintf("%d/%d", studied, concepts))
 	line(padRight(sty.Gray("Exercises"), 10) + bar(exDone, exTotal, 20, sty.Magenta) + " " + fmt.Sprintf("%d/%d", exDone, exTotal))
+	if g, ok := guideFor(s.ID); ok {
+		var glyphs strings.Builder
+		for _, c := range g.Concepts {
+			glyphs.WriteString(masteryBadge(a.reg.conceptMastery(s, c)))
+		}
+		_, _, mastered, total := a.reg.stageMastery(s)
+		check := sty.Gray("check not taken")
+		if s.MasteryCheck != nil && s.MasteryCheck.Passed {
+			check = sty.Green("✓ check passed")
+		} else if s.MasteryCheck != nil {
+			check = sty.Yellow(fmt.Sprintf("check %d/%d", s.MasteryCheck.Score, s.MasteryCheck.Total))
+		}
+		line(padRight(sty.Gray("Mastery"), 10) + padRight(glyphs.String(), 20) + " " + fmt.Sprintf("%d/%d", mastered, total) + "  " + check)
+	}
 
 	for _, lit := range s.Literature {
 		mark := sty.Gray("○")
@@ -493,6 +524,7 @@ func (a *App) toggleStage() error {
 	read, total := literatureProgress(s)
 	studied, concepts := conceptProgress(s)
 	exDone, exTotal := exerciseProgress(s)
+	checkPassed := s.MasteryCheck != nil && s.MasteryCheck.Passed
 	activeLabs := 0
 	for _, l := range s.Labs {
 		if l.Status != StatusGraduated {
@@ -501,9 +533,12 @@ func (a *App) toggleStage() error {
 	}
 	a.mu.Unlock()
 
-	if next == StatusGraduated && (read < total || studied < concepts || exDone < exTotal || activeLabs > 0) {
+	if next == StatusGraduated && (read < total || studied < concepts || exDone < exTotal || activeLabs > 0 || !checkPassed) {
 		a.con.warn("Stage %d still has %d unread text(s), %d unstudied concept(s), %d open exercise(s) and %d active lab(s).",
 			id, total-read, concepts-studied, exTotal-exDone, activeLabs)
+		if !checkPassed {
+			a.con.warn("Its mastery check has not been passed yet (Study Hall → Mastery check).")
+		}
 		ok, err := a.con.confirm("Graduate anyway?")
 		if err != nil {
 			return err
@@ -642,6 +677,8 @@ func (a *App) run() {
 		switch strings.ToLower(choice) {
 		case "0":
 			a.showStartHere()
+		case "9", "r":
+			actionErr = a.dailyReview()
 		case "1":
 			a.viewLedger()
 		case "2":
@@ -672,7 +709,7 @@ func (a *App) run() {
 		case "":
 			// Blank line: just redraw the menu.
 		default:
-			a.con.warn("%q is not a menu option. Choose 0-8.", choice)
+			a.con.warn("%q is not a menu option. Choose 0-9.", choice)
 		}
 
 		switch {
