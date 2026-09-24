@@ -813,6 +813,7 @@ func main() {
 		dirty: loaded.Seeded || loaded.Migrated || loaded.NewStages > 0,
 		con:   &console{in: bufio.NewReader(os.Stdin), out: os.Stdout},
 		width: termWidth(),
+		pager: interactive(),
 	}
 
 	fmt.Print(banner())

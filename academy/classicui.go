@@ -138,7 +138,7 @@ func (a *App) classicCorner(stageID int) error {
 				return err
 			}
 		case 1:
-			a.showNotebook(stageID)
+			a.paged(true, func() { a.showNotebook(stageID) })
 		default:
 			return nil
 		}

@@ -22,6 +22,7 @@ type App struct {
 	dirty bool
 	con   *console
 	width int
+	pager bool // page long screens (stdin is a terminal)
 }
 
 // commit atomically persists the registry to disk.
@@ -694,13 +695,13 @@ func (a *App) run() {
 		var actionErr error
 		switch strings.ToLower(choice) {
 		case "0":
-			a.showStartHere()
+			a.paged(true, a.showStartHere)
 		case "9", "r":
 			actionErr = a.dailyReview()
 		case "c":
 			actionErr = a.toggleClassicMode()
 		case "1":
-			a.viewLedger()
+			a.paged(true, a.viewLedger)
 		case "2":
 			actionErr = a.enrollLab()
 		case "3":

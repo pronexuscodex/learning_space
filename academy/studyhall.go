@@ -50,9 +50,9 @@ func (a *App) studyHall() error {
 		case 1:
 			err = a.exerciseGym(stageID, guide)
 		case 2:
-			a.showGlossary(guide)
+			a.paged(true, func() { a.showGlossary(guide) })
 		case 3:
-			a.showResources(guide)
+			a.paged(true, func() { a.showResources(guide) })
 		case 4:
 			err = a.showBlueprints(stageID, guide)
 		case 5:
@@ -170,7 +170,7 @@ func (a *App) studyConcept(stageID int, g StageGuide) error {
 		done[i] = s.hasDone(c.Name, i)
 	}
 	a.mu.Unlock()
-	a.renderConcept(c, idx+1, len(g.Concepts), g.Glossary, done, note, level)
+	a.paged(false, func() { a.renderConcept(c, idx+1, len(g.Concepts), g.Glossary, done, note, level) })
 
 	if !already {
 		yes, err := a.con.confirm("Do you understand it well enough to explain it to a friend?")
