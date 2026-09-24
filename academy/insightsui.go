@@ -324,7 +324,7 @@ func (a *App) runLiveTimer(total time.Duration, goal string) (time.Duration, err
 				return
 			}
 			keys <- r
-			if r == '\r' || r == '\n' || r == 's' || r == 'S' || r == 'q' || r == 'Q' {
+			if r == '\r' || r == '\n' || r == 's' || r == 'S' || r == 'q' || r == 'Q' || r == keyCtrlD {
 				return
 			}
 		}
@@ -384,9 +384,9 @@ func (a *App) runLiveTimer(total time.Duration, goal string) (time.Duration, err
 				if !done {
 					paused = !paused
 				}
-			case 's', 'S', 'q', 'Q', '\r', '\n':
+			case 's', 'S', 'q', 'Q', keyCtrlD, '\r', '\n':
 				fmt.Fprintln(a.con.out)
-				if !done && r != 's' && r != 'S' && r != 'q' && r != 'Q' {
+				if !done && (r == '\r' || r == '\n') {
 					// Enter before time is up: finish early.
 					a.con.note("Finished early.")
 				}

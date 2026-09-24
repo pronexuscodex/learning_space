@@ -26,7 +26,9 @@ TOKENS = (
     + ["\x0c", "\x7f", "\x7f\x7f", "\x15", "\x17", "\x1b[A", "\x1b[D", "\x1b[3~", "\x1bOP", "p", "s"]
     + ["RESIZE"] * 3
 )
-FATAL = [b"panic:", b"goroutine ", b"fatal error:", b"SIGSEGV", b"runtime error"]
+# Go's own crash output. Bare words such as "SIGSEGV" or "runtime error"
+# are not enough: the curriculum teaches them, so they appear in lessons.
+FATAL = [re.compile(p, re.M) for p in (rb"^\s*panic: ", rb"goroutine \d+ \[running\]", rb"^\s*fatal error: ", rb"\[signal SIG[A-Z]+")]
 
 
 def set_size(fd, rows, cols):
@@ -91,8 +93,16 @@ def session(rng, keys, reg):
                     break
             else:
                 pass  # some prompts legitimately echo nothing new; timers and fetches are slow
-    if exited is None:
-        os.write(fd, b"\x04")  # Ctrl+D: commit and exit
+    # End the session the way a person would: Ctrl+U clears any half-typed
+    # line (Ctrl+D only ends input on an empty line, as in a shell), then
+    # Ctrl+D commits and exits.
+    for _ in range(3):
+        if exited is not None:
+            break
+        try:
+            os.write(fd, b"\x15\x04")
+        except OSError:
+            break
         pump(3)
     if exited is None:
         os.kill(pid, signal.SIGKILL)
@@ -100,7 +110,13 @@ def session(rng, keys, reg):
         return "hang", out, history
     os.close(fd)
     code = os.waitstatus_to_exitcode(exited)
-    if any(m in out for m in FATAL) or code not in (0,):
+    clean = ANSI.sub(b"", bytes(out))
+    for pattern in FATAL:
+        m = pattern.search(clean)
+        if m:
+            context = clean[max(0, m.start() - 120):m.end() + 200].decode("utf-8", "replace")
+            return f"crash (exit {code}): {m.group(0).decode().strip()!r} in …{context}…", out, history
+    if code != 0:
         return f"crash (exit {code})", out, history
     return None, out, history
 
