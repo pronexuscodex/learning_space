@@ -47,8 +47,29 @@ func (a *App) libraryEntries(stage int) []LibraryDoc {
 			docs = append(docs, d)
 		}
 	}
+	// The learner's own PDF links, unless the catalogue already has them.
+	have := map[string]bool{}
+	for _, d := range docs {
+		have[d.PDF] = true
+	}
+	a.mu.Lock()
+	mine := a.reg.myLibraryDocs(stage)
+	a.mu.Unlock()
+	for _, d := range mine {
+		if !have[d.PDF] {
+			have[d.PDF] = true
+			docs = append(docs, d)
+		}
+	}
+	order := func(stage int) int { // general (stage 0) items go last
+		if stage == 0 {
+			return 1 << 10
+		}
+		return stage
+	}
+	sort.SliceStable(docs, func(i, j int) bool { return order(docs[i].Stage) < order(docs[j].Stage) })
 	if stage == 0 {
-		docs = append(docs, ownDownloads(libraryDir(a.path), all)...)
+		docs = append(docs, ownDownloads(libraryDir(a.path), append(all, mine...))...)
 	}
 	return docs
 }

@@ -150,6 +150,7 @@ func (a *App) printDashboard() {
 	for _, l := range a.goalsLine() {
 		a.println(l)
 	}
+	a.println(a.wordOfTheDayLine())
 	if h := a.nextHint(); h != "" {
 		a.println("  " + h)
 	}
@@ -202,7 +203,10 @@ func (a *App) printMenu() {
 		{item("p", "Progress report"), hint("calendar & trends")},
 		{item("x", "Export notes"), hint("to Markdown")},
 		{item("m", "Roadmap"), hint("all 16 stages")},
+		{item("d", sty.Bold("Dictionary")), hint("every word explained")},
 		{item("l", sty.Bold("Library")), hint("download PDFs")},
+		{item("+", "My resources"), hint("add your own")},
+		{item("w", sty.Bold("Tech watch")), hint("keep up with trends")},
 		{item("g", "Weekly goals"), ""},
 		{item("a", "Achievements"), ""},
 		{item("c", "Classic Mode "+mode), ""},
@@ -836,6 +840,9 @@ func (a *App) showShortcuts() {
 	row("f", "focus timer: a timed study session that is logged")
 	row("p", "progress report: activity calendar, weekly trend, weak cards")
 	row("x", "export all your notes and progress to a Markdown file")
+	row("d", "programmer's dictionary: jargon explained with analogies and code")
+	row("w", "tech watch: the method, live headlines, a watch log and your tech radar")
+	row("+", "my resources: add, edit, import and export your own finds")
 	row("l", "library: download free books and papers as PDFs and open them")
 	row("m", "roadmap: every stage's state and what it builds on; open any Study Hall")
 	row("g", "weekly goals: minutes, days and review cards, tracked on the dashboard")
@@ -913,6 +920,12 @@ func (a *App) run() {
 			actionErr = a.exportNotes()
 		case "m":
 			actionErr = a.roadmap()
+		case "d":
+			actionErr = a.dictionary()
+		case "w":
+			actionErr = a.techWatch()
+		case "+", "my":
+			actionErr = a.myResources()
 		case "l":
 			actionErr = a.library(0)
 		case "g":

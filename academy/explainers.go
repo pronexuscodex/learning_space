@@ -644,6 +644,9 @@ A SIMPLE STUDY RHYTHM
 - Finish each stage with one real-world exercise or lab blueprint. Building is where it sticks.
 - Log your hours. The streak and the activity chart are there to keep you going.
 - Set weekly goals [g] you can keep on a bad week, and watch them on the dashboard. Consistency beats intensity.
+- Stuck on a word like "type casting" or "segfault"? The Programmer's dictionary [d] explains it with an everyday comparison and real code. Press r on a word to add it to your reviews.
+- Once the foundations feel solid, spend about 20% of your time on tech watch [w]: a short weekly habit of following your field. Fundamentals first; trends make sense only on top of them.
+- Found a great resource? Add it with [+] so it shows up beside the academy's own.
 - The Library [l] downloads the free books and papers as PDFs and opens them in your PDF viewer, so reading is one key away.
 - The Roadmap [m] shows every stage, what each builds on, and where you are.
 - Not sure what to do? Press n for What's next: it picks your best next step and starts it for you.

@@ -117,6 +117,9 @@ func (a *App) reviewCard(card Card, n, total int) (int, error) {
 	if card.Concept != "" {
 		source += " · " + card.Concept
 	}
+	if card.Kind == CardWord {
+		source = "Programmer's dictionary"
+	}
 	a.printf("  %s %s %s %s\n", sty.Green("┏━"), sty.Gray(fmt.Sprintf("%d/%d ·", n, total)),
 		sty.Bold(sty.Green(strings.ToUpper(card.Kind))), sty.Gray(source))
 	for _, l := range wrap(card.Q, w-6, "") {

@@ -248,6 +248,11 @@ type Registry struct {
 	StudySessions []StudySession        `json:"study_sessions"` // focus-timer sessions
 	Goals         Goals                 `json:"goals"`          // weekly targets (zero: none)
 	Achievements  map[string]time.Time  `json:"achievements"`   // achievement ID → when earned
+	WordDeck      []string              `json:"word_deck"`      // dictionary words added to the review deck (lower case)
+	MyResources   []MyResource          `json:"my_resources"`   // resources the learner added
+	Feeds         []Feed                `json:"feeds"`          // the learner's own tech-watch feeds
+	Watch         []WatchItem           `json:"watch"`          // the tech-watch log
+	WatchVisited  time.Time             `json:"watch_visited"`  // last time headlines were fetched
 
 	// Classic Mode (see classic.go).
 	ClassicMode    bool                 `json:"classic_mode"`

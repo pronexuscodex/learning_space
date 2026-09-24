@@ -32,6 +32,7 @@ const (
 	SuggestMastery  = "mastery"
 	SuggestTypeIn   = "type-in"
 	SuggestFocus    = "focus"
+	SuggestWatch    = "watch"
 )
 
 // Suggestion is one recommended next step.
@@ -169,6 +170,12 @@ exercises:
 		out = append(out, Suggestion{Kind: SuggestFocus, Title: "Start a 25-minute focus session", Why: why})
 	}
 
+	// A weekly tech watch, once there is some foundation to connect news to.
+	if cs := r.stats(now, 1); cs.conceptsStudied >= 5 && !r.watchedRecently(now) {
+		out = append(out, Suggestion{Kind: SuggestWatch, Title: "Weekly tech watch: 30 minutes",
+			Why: "Skim the headlines, save at most three, read one deeply, and write why it matters."})
+	}
+
 	if len(out) > 4 {
 		out = out[:4]
 	}
@@ -186,6 +193,8 @@ const (
 	HitResource  = "resource"
 	HitClassic   = "classic"
 	HitBlueprint = "blueprint"
+	HitWord      = "word"
+	HitMine      = "yours"
 )
 
 // Hit is one search result.
@@ -279,6 +288,11 @@ func search(query string) []Hit {
 					hits = append(hits, Hit{Kind: HitClassic, Stage: id, Title: cr.Title, Snippet: cr.Author, score: 2 + titleScore(cr.Title)})
 				}
 			}
+		}
+	}
+	for _, w := range vocab {
+		if matches(w.Word, strings.Join(w.Also, " "), w.Means) {
+			hits = append(hits, Hit{Kind: HitWord, Stage: w.Stage, Title: w.Word, Snippet: w.Means, score: 3 + titleScore(w.Word)})
 		}
 	}
 	sort.SliceStable(hits, func(i, j int) bool { return hits[i].score > hits[j].score })
@@ -451,6 +465,35 @@ func (r *Registry) exportMarkdown(now time.Time) string {
 			}
 			b.WriteString("\n")
 		}
+	}
+	if mine := r.myResourcesFor(0); len(mine) > 0 {
+		b.WriteString("## My resources\n\n")
+		for _, m := range mine {
+			line := "- "
+			if m.URL != "" {
+				line += fmt.Sprintf("[%s](%s)", m.Title, m.URL)
+			} else {
+				line += m.Title
+			}
+			line += " · " + m.Kind
+			if m.Stage > 0 {
+				line += fmt.Sprintf(" · Stage %d", m.Stage)
+			}
+			if m.Note != "" {
+				line += ": " + m.Note
+			}
+			b.WriteString(line + "\n")
+		}
+		b.WriteString("\n")
+	}
+	if len(r.WordDeck) > 0 {
+		b.WriteString("## Words I'm learning\n\n")
+		for _, name := range r.WordDeck {
+			if w, ok := lookupWord(name); ok {
+				fmt.Fprintf(&b, "- **%s**: %s\n", w.Word, w.Means)
+			}
+		}
+		b.WriteString("\n")
 	}
 	return b.String()
 }

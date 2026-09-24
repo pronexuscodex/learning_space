@@ -58,7 +58,14 @@ func (a *App) studyHallFor(stageID int) error {
 		case 2:
 			a.paged(true, func() { a.showGlossary(guide) })
 		case 3:
-			a.paged(true, func() { a.showResources(guide) })
+			a.paged(false, func() { a.showResources(stageID, guide) })
+			s, rerr := a.con.readLine(promptLabel("a add your own resource to this stage", "Enter back"))
+			if rerr != nil {
+				return rerr
+			}
+			if strings.EqualFold(strings.TrimSpace(s), "a") {
+				err = a.addResourceFlow(stageID)
+			}
 		case 4:
 			err = a.showBlueprints(stageID, guide)
 		case 5:
@@ -361,6 +368,20 @@ func (a *App) renderConcept(c Concept, n, total int, glossary []Term, done []boo
 			}
 		}
 	}
+	skip := map[string]bool{}
+	for _, t := range glossary {
+		skip[strings.ToLower(t.Word)] = true
+	}
+	if words := wordsIn(5, skip, c.Summary, c.Analogy, c.Example, c.Body); len(words) > 0 {
+		section("🔤 Programmer words here", sty.Cyan)
+		for _, pw := range words {
+			lead := sty.Bold(pw.Word) + " — "
+			a.printf("  %s   %s%s\n", edge, lead, sty.Gray(truncate(pw.Means, max(10, w-10-visibleLen(lead)))))
+		}
+		for _, l := range wrap("Full explanations with code: the dictionary [d] on the main menu.", w-8, "") {
+			a.printf("  %s   %s\n", edge, sty.Gray(l))
+		}
+	}
 	a.println("  " + sty.Blue("┗"+strings.Repeat("━", w-4)))
 }
 
@@ -640,7 +661,7 @@ func (a *App) showStartHere() {
 }
 
 // showResources prints the resource library grouped by kind.
-func (a *App) showResources(g StageGuide) {
+func (a *App) showResources(stageID int, g StageGuide) {
 	a.println("")
 	for _, l := range flow([]string{sty.Bold(sty.Blue("RESOURCE LIBRARY")), sty.Gray("links verified " + resourcesVerifiedOn), sty.Gray("re-check any time: academy -check-links")}, sty.Gray(" · "), a.cols(), "  ") {
 		a.println(l)
@@ -674,6 +695,15 @@ func (a *App) showResources(g StageGuide) {
 			for _, l := range wrap(r.Note, a.cols()-8, "      ") {
 				a.println(sty.Gray(l))
 			}
+		}
+	}
+	a.mu.Lock()
+	mine := a.reg.myResourcesFor(stageID)
+	a.mu.Unlock()
+	if len(mine) > 0 {
+		a.printf("\n  %s\n", sty.Yellow(sty.Bold("YOUR RESOURCES")))
+		for _, m := range mine {
+			a.renderMyResource(0, m)
 		}
 	}
 	a.println("")

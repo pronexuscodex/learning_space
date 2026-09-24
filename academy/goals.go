@@ -174,6 +174,12 @@ var achievements = []Achievement{
 		func(r *Registry, cs campusStats) bool { return cs.labs >= 1 }},
 	{"lab-graduated", "Shipped It", "Graduated a lab.",
 		func(r *Registry, cs campusStats) bool { return cs.labsGrad >= 1 }},
+	{"lookout", "Lookout", "Saved 10 items to your tech-watch log, each with why it matters.",
+		func(r *Registry, cs campusStats) bool { return len(r.Watch) >= 10 }},
+	{"wordsmith", "Wordsmith", "Added 20 dictionary words to your review deck.",
+		func(r *Registry, cs campusStats) bool { return len(r.WordDeck) >= 20 }},
+	{"curator", "Curator", "Added 5 of your own resources.",
+		func(r *Registry, cs campusStats) bool { return len(r.MyResources) >= 5 }},
 	{"type-in", "Typed It In", "Completed a Classic Mode type-in.",
 		func(r *Registry, cs campusStats) bool {
 			return r.anyStage(func(s *Stage) bool { return s.TypeInDone })

@@ -189,6 +189,11 @@ func (r *Registry) unlockedCards() []Card {
 			}
 		}
 	}
+	for _, name := range r.WordDeck {
+		if w, ok := lookupWord(name); ok {
+			cards = append(cards, wordCard(w))
+		}
+	}
 	return cards
 }
 

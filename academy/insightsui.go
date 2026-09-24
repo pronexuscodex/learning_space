@@ -72,6 +72,8 @@ func (a *App) doSuggestion(s Suggestion) error {
 		return a.typeInLab(s.Stage, ti)
 	case SuggestFocus:
 		return a.focusTimer()
+	case SuggestWatch:
+		return a.techWatch()
 	}
 	return nil
 }
@@ -98,6 +100,9 @@ func (a *App) searchScreen() error {
 		return err
 	}
 	hits := search(q)
+	a.mu.Lock()
+	hits = append(a.reg.myResourceHits(q), hits...)
+	a.mu.Unlock()
 	if len(hits) == 0 {
 		a.con.note("Nothing matches %q. Try fewer or shorter words.", q)
 		return nil
@@ -108,7 +113,7 @@ func (a *App) searchScreen() error {
 	}
 	a.printf("\n  %s\n", sty.Gray(fmt.Sprintf("%d match(es)%s", len(hits), map[bool]string{true: ", showing the best 15", false: ""}[len(hits) > 15])))
 	for i, h := range shown {
-		kind := map[string]func(string) string{HitConcept: sty.Blue, HitGlossary: sty.Cyan, HitResource: sty.Magenta, HitClassic: sty.Yellow, HitBlueprint: sty.Green}[h.Kind]
+		kind := map[string]func(string) string{HitConcept: sty.Blue, HitGlossary: sty.Cyan, HitResource: sty.Magenta, HitClassic: sty.Yellow, HitBlueprint: sty.Green, HitWord: sty.Cyan, HitMine: sty.Yellow}[h.Kind]
 		head := fmt.Sprintf("%s %s %s", kind(padRight(h.Kind, 9)), sty.Gray(fmt.Sprintf("Stage %-2d", h.Stage)), sty.Bold(h.Title))
 		a.printf("  %s %s\n", sty.Cyan(fmt.Sprintf("%2d.", i+1)), truncate(stripANSI(head), a.cols()-7))
 		if h.Snippet != "" {
@@ -157,6 +162,23 @@ func (a *App) openHit(h Hit) error {
 		}
 	case HitClassic:
 		return a.classicCorner(h.Stage)
+	case HitMine:
+		a.mu.Lock()
+		var found *MyResource
+		for i := range a.reg.MyResources {
+			if a.reg.MyResources[i].ID == h.Concept {
+				m := a.reg.MyResources[i]
+				found = &m
+			}
+		}
+		a.mu.Unlock()
+		if found != nil {
+			return a.editResourceFlow(*found)
+		}
+	case HitWord:
+		if w, ok := lookupWord(h.Title); ok {
+			return a.showWord(w)
+		}
 	case HitBlueprint:
 		return a.showBlueprints(h.Stage, g)
 	}

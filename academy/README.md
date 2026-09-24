@@ -137,7 +137,10 @@ Other flags: `-no-color`, `-check-links` (verify every resource URL), `-backups`
 | l | **Library**: download free books and papers as PDFs without leaving the academy, then open them in your PDF viewer (see below) |
 | m | **Roadmap**: all 16 stages by track, each marked locked · ready · in progress · understood · mastered, with concept progress, "you are here", and which stages a locked one still needs; open any stage's Study Hall from it |
 | g | **Weekly goals**: study minutes, study days and review cards per week (Monday to Sunday), tracked on the dashboard: cyan on track, yellow behind, green done |
-| a | **Achievements**: 20 milestones (first concept, 7- and 30-day streaks, 100 and 1,000 reviews, a mastered concept, a passed mastery check, a whole track, graduation…), announced the moment you earn them |
+| d | **Programmer's dictionary**: 270+ jargon words explained plainly (see below) |
+| w | **Tech watch**: a method for keeping up, live headlines from 19 curated feeds, a watch log and your tech radar (see below) |
+| + | **My resources**: add, edit, import and export your own books, courses, videos and sites |
+| a | **Achievements**: 23 milestones (first concept, 7- and 30-day streaks, 100 and 1,000 reviews, a mastered concept, a passed mastery check, a whole track, graduation…), announced the moment you earn them |
 | c | **Classic Mode** on/off: struggle clock, lab notebook, classic corners and type-ins |
 | t | **Tidy screen** on/off: every action starts on a clean screen |
 | ? | **Keys & shortcuts** (also `h` or `help`) · `clear` / `cls` clears the screen |
@@ -233,6 +236,55 @@ Downloads are careful:
 
 The academy cannot show PDF pages inside a terminal, so it hands them to your PDF viewer. On a machine without one (a server over SSH), it prints the file's path instead.
 
+## Programmer's dictionary
+
+Press **`d`**. Programmers use hundreds of words without explaining them, and every one is a chance to get lost. The dictionary explains 270+ of them in 12 categories: basics, types & data, functions & structure, memory & C, tools & workflow, systems & concurrency, networks & web, data & databases, algorithms, security, AI & ML, and programmer culture. Each entry has:
+
+- **What it means**, in plain words;
+- **Think of it like**: an everyday comparison;
+- **In code**: a real example, in Python or, for memory and machine topics, in C;
+- **⚠ Watch out**: the usual confusion or mistake;
+- **Related** words you can jump to by number.
+
+For example, *type casting* explains explicit and implicit conversion, shows `int("42")`, `(int)3.99` and why `"3" + 3` fails in Python but gives `"33"` in JavaScript, and warns that casting a float truncates instead of rounding.
+
+Type any word, alias or part of one (`cast`, `segfault`, `GC`), browse by category or A–Z, or open the word of the day (also shown on the dashboard). Press **`r`** on a word to add it to your review deck; it then comes up in the Daily Review with spaced repetition. Every concept card has a **🔤 Programmer words here** box listing the jargon it uses, and search (`/`) covers the dictionary too.
+
+## Your own resources
+
+Press **`+`** to add resources you found yourself: title, link, kind (book, course, video, article, paper, tool, site, podcast, newsletter), stage (or general), and a note on why it is good. They appear, marked ★:
+- in that stage's **Resource library** (which also has **a** to add one on the spot);
+- in **search** (`/`);
+- in the **Library** (`l`) when the link is a PDF or an arXiv page, ready to download;
+- in the **Markdown export** (`x`).
+
+Share them: **e** writes `academy_resources.json` next to your registry, and **i** imports such a file from a friend, skipping duplicates and reporting anything invalid. The format is simple enough to write by hand:
+
+```json
+{
+  "format": "academy-resources/1",
+  "resources": [
+    { "stage": 5, "kind": "Book", "title": "Modern C", "url": "https://…", "note": "Free, rigorous, up to date" }
+  ]
+}
+```
+
+### Adding resources to the curriculum itself
+
+To ship a resource to every learner, add it to the stage's `Resources` in `curriculum*.go`, as `{Kind, Title, URL, Note}`. Use an official source over HTTPS, then run `go test ./...`, which checks that every link is HTTPS and every stage is complete, and `./academy -check-links` on a machine with internet access. A free, official PDF of a whole book goes in `freeBooks` in `library.go`, and a classic text in `classic.go`.
+
+## Tech watch: keeping up with the field
+
+Press **`w`**. Tech watch (*veille technologique*) is the habit of following what changes in your field deliberately, a little and often, and turning it into knowledge instead of noise.
+
+- **How to keep up:** the method. It starts from fundamentals first: C, Unix, SQL and TCP/IP have lasted for decades (the Lindy effect), and deep knowledge of the layers underneath is what lets you judge any trend. It then describes a weekly 30–45 minute loop (skim → triage, save at most three → read one deeply → write why it matters → try one thing), a monthly radar review, how to choose sources, questions that cut through hype, and what to avoid.
+- **Latest headlines:** fetched live (RSS 2.0, RSS 1.0 and Atom, parsed with Go's standard library) from 19 curated, high-signal feeds in 8 topics: arXiv (machine learning, operating systems, security), LWN, kernel.org releases, Brendan Gregg, Julia Evans, Dan Luu, the Go and Rust blogs, PostgreSQL news, Krebs on Security, Schneier on Security, Hugging Face, Simon Willison, Martin Fowler, Cloudflare, Hacker News and Lobsters. New items since your last visit are marked. Open an item to save it, open it in your browser, or download its PDF (arXiv papers) straight into the Library.
+- **Watch log:** every saved item needs a line on *why it matters to you*, and moves from to read → read → tried (or dropped), with a note on what you learned.
+- **My tech radar:** place items in Adopt, Trial, Assess or Hold, an idea popularised by Thoughtworks' Technology Radar.
+- **Sources:** add any RSS or Atom feed of your own.
+
+Feeds are fetched over HTTPS only, at most 5 MB each, six at a time with a 15-second timeout. Control characters and odd link schemes (such as `javascript:`) are removed, so a hostile feed cannot repaint your terminal or plant a bad link. Once you have some foundations (5 concepts understood), What's next suggests a weekly tech watch if you have not saved anything for 7 days.
+
 ## Colours
 
 Colour is turned on automatically when output goes to a terminal. It is turned off by `-no-color`, by setting `NO_COLOR`, by `TERM=dumb`, or when output is piped. Text follows the live terminal width (40–110 columns; `$COLUMNS` or 80 when it cannot be read).
@@ -252,6 +304,9 @@ The tests check:
 - **Layout:** display widths (emoji, CJK and combining marks), wrap and flow never exceed the width, and long prompts wrap.
 - **Guidance:** What's next ordering and its four-step limit, prerequisites, search AND semantics and ranking, snippets, daily minutes and the weekly comparison, focus sessions in stats, and the Markdown export.
 - **Goals, roadmap and achievements:** the calendar week's minutes, days and cards; the on-track rule; each stage state and its missing prerequisites; achievements awarded exactly once; backups deduplicated, rotated to 10, restored, and bad backups refused without touching the registry.
+- **Dictionary:** 200+ complete entries in known categories, globally unique names and aliases, every "related" link resolves, lookup by alias, search ranking, detection in prose (skipping everyday words), a stable word of the day, and word review cards.
+- **My resources:** validation (titles, stages, kinds, http(s) links only, no control characters), duplicate detection, search hits, Library PDFs, export, and import of both file formats with problems reported.
+- **Tech watch:** parsing RSS 2.0, RSS 1.0 and Atom (CDATA, HTML entities, links only in a GUID, Latin-1 feeds, HTML titles, hostile control characters and `javascript:` links), fetching from a local HTTPS server (including 404s and plain `http`), per-feed limits and newest-first merging, watch-log and feed validation, the radar, and the weekly suggestion.
 - **Library:** PDF address detection (including arXiv), a catalogue of unique, HTTPS, stage-filed documents, and downloads against a local HTTPS server: success with progress reporting, and refusal of non-PDF responses, HTTP errors, redirects to plain `http`, and oversized files, never leaving a partial file behind.
 - **Mechanics:** text wrapping, hour parsing, the atomic-write round trip and the activity streak.
 
@@ -283,6 +338,11 @@ One package, one build target:
 | `goalsui.go` | goals, roadmap and achievements screens |
 | `library.go` | PDF catalogue, safe HTTPS downloader, system viewer, `-fetch-library` |
 | `libraryui.go` | Library screen: download, open, re-download, delete, your own links |
+| `vocab.go`, `vocab_*.go` | the programmer's dictionary and its entries |
+| `vocabui.go` | dictionary screens, word of the day, word cards |
+| `myresources.go`, `myresourcesui.go` | your own resources: storage, validation, import/export, screens |
+| `techwatch.go` | curated feeds, RSS/Atom fetching and parsing, watch log, radar |
+| `techwatchui.go` | tech-watch method, headlines, log, radar and sources screens |
 | `typeins.go` | generated type-in listings with their real output (see `typeins/`) |
 | `curriculum.go` | types, plus Tracks A and B (stages 5–8, 13, 15, 16) |
 | `curriculum_foundations.go` | Track F (stages 1–4) |
@@ -332,6 +392,10 @@ One package, one build target:
   "review_history": { "2026-09-24": 4 },
   "goals": { "minutes": 150, "days": 5, "cards": 70 },
   "achievements": { "first-concept": "2026-09-24T11:05:00Z" },
+  "word_deck": ["type casting", "pointer"],
+  "my_resources": [{ "id": 1, "stage": 5, "kind": "Book", "title": "Modern C", "url": "https://…", "added": "2026-09-24T12:00:00Z" }],
+  "feeds": [{ "title": "My favourite blog", "url": "https://…/atom.xml", "topic": "Systems" }],
+  "watch": [{ "id": 1, "title": "…", "topic": "Systems", "why": "Stage 6 virtual memory in practice", "status": "read", "ring": "assess", "added": "2026-09-24T12:00:00Z" }],
   "study_sessions": [{ "start": "2026-09-24T14:00:00Z", "minutes": 25, "stage": 2, "note": "hash table exercise" }]
 }
 ```
