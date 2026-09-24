@@ -1,0 +1,5 @@
+# Local binary and personal ledger data
+/academy
+/academy.exe
+academy_campus_registry.json
+.academy-registry-*.tmp
