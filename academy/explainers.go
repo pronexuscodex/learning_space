@@ -609,6 +609,16 @@ cannot reach mastered in a day, and that is the point: it measures what
 you still know weeks later. Each stage also has a Mastery Check, a mixed
 exam you pass at 80%.
 
+CLASSIC MODE: LEARN LIKE IT'S 1985
+Press c on the main menu. Classic Mode brings back the habits that made
+the best 1980s and 1990s learners so strong:
+- Read one anchor book per stage, cover to cover, plus a classic text from the field's history and real source code (see each Study Hall's Classic corner).
+- Type programs in by hand, like magazine listings, and predict the output before running them.
+- Struggle before you peek: hints unlock after 10, 30 or 45 minutes, or earlier if you write down what you tried.
+- Keep a lab notebook of plans, predictions and what actually happened.
+- Work in offline blocks with only man pages and saved docs, and keep a paper notebook beside you.
+The modern help is still there; you just earn it first.
+
 HOW TO PRACTISE
 Every concept has three exercises, and each has a hint:
 - Warm-up: pen and paper, or a few minutes of thinking. No code needed.

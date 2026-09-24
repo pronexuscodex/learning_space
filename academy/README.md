@@ -49,6 +49,26 @@ Each understood concept adds **three review cards** to your deck: its key idea, 
 
 ![Daily review](docs/daily-review.png)
 
+## Classic Mode: learn like it's 1985
+
+Press **`c`** on the main menu. Classic Mode brings back the habits that made strong 1980s and 1990s learners so effective, and keeps modern help for when it is truly needed:
+
+- **The struggle clock:** an exercise's hint stays locked for 10 min (warm-up), 30 min (practice) or 45 min (real-world) after you first open it. If you are truly stuck, you write down what you tried and where you are stuck, and the hint unlocks early. Describing the problem often solves it.
+- **The lab notebook:** before an exercise you record a plan or prediction; afterwards, what actually happened. Entries are saved (`notebook`) and shown per exercise and per stage.
+- **A classic corner in every Study Hall:**
+  - **📕 Anchor book:** one book to read cover to cover, free wherever possible (HtDP, Erickson, Book of Proof, *Code*, CS:APP, OSTEP, DDIA, HPBN, Crafting Interpreters, MML, ISL…).
+  - **📜 Classic text:** the field's history in the original, e.g. Dijkstra 1959 and 1968, von Neumann's EDVAC report (1945), Ritchie & Thompson's UNIX paper, Codd 1970, Thompson's *Trusting Trust*, Saltzer–Reed–Clark, Brooks's *No Silver Bullet*, *Smashing the Stack*, McCarthy's Lisp paper, Goldberg on floating point, LeNet (1998), and Wulf & McKee's *Memory Wall*.
+  - **🔎 Read the source:** real, small codebases, such as Norvig's spelling corrector, algs4, Visual 6502, chibicc, xv6, SQLite, Redis's event loop, **Git's very first commit**, Juice Shop, Pike's regex matcher, lispy, micrograd and llm.c.
+- **The type-in lab:** every stage has a short magazine-style listing, such as Collatz, the sieve, a ripple-carry adder built from gates, `fork(); fork();`, SQL injection, a regex matcher, a Lisp or a micro-autograd. You predict the output, type it in by hand (never paste), run it, then compare with the real output.
+
+![Classic corner](docs/classic-corner.png)
+
+![Type-in lab](docs/type-in-lab.png)
+
+**Every type-in is tested:** the listings live in [`typeins/`](typeins/), and `typeins.go` is *generated* by running them (`python3 typeins/gen.py && gofmt -w typeins.go`). So the code on screen is exactly the code that was run, and every "expected output" is real output. Every classic-corner link was confirmed against live web search results.
+
+![Struggle clock](docs/struggle-clock.png)
+
 ## Accurate resources
 
 - **Verified links:** every resource link was reviewed on 2026-09-24. The less-established URLs were confirmed against live web search results. That review corrected several links: Book of Proof moved to the author's GitHub Pages site; MIT 6.1810 now points to its permanent OCW archive; OWASP now points to the 2025 edition; Drepper's paper, Hughes' paper and 3Blue1Brown now point to their canonical hosts; and two links became more precise deep links.
@@ -107,6 +127,7 @@ On first run, the program creates `academy_campus_registry.json` next to the bin
 |---|--------|
 | 0 | **Start Here**: what the academy covers, how memory works, how to practise, where to begin and a study rhythm |
 | 9 | **Daily Review**: your due spaced-repetition cards, interleaved across stages (`r` works too) |
+| c | **Classic Mode** on/off: struggle clock, lab notebook, classic corners and type-ins |
 | 1 | **View Campus Ledger**: a colour card per stage, with reading, concept and exercise progress bars, labs and hours |
 | 2 | **Enroll in a New Lab**: pick a track (`F`/`A`/`S`/`B`), a stage, then a name, notes and initial hours |
 | 3 | **Log Study/Lab Hours**: add hours (`1.5`, `1h30m`, `45m`) with an optional note |
@@ -136,6 +157,7 @@ For every stage:
 - **Lab blueprints:** larger projects with milestones (a text adventure, a route planner, a CPU emulator, a password manager, a regex engine, Raft, GPT from scratch…). You can enroll any of them as a lab in one step.
 - **Self-check quiz:** flashcards with self-scoring.
 - **Mastery check:** a 12-question interleaved exam, passed at 80%.
+- **Classic corner:** anchor book, classic text, real source code, the type-in lab and your lab notebook.
 
 Concepts link across stages. For example, logic gates (Stage 4) become the CPU; the memory hierarchy (Stage 5) returns as the roofline model (Stage 16); and paging (Stage 6) returns as PagedAttention.
 
@@ -157,6 +179,7 @@ The tests check:
 - **Curriculum integrity:** every seeded stage has a guide; every concept has an analogy, a real-life example and a warm-up → practice → real-world exercise ladder with hints; no orphaned explainer or exercise sets.
 - **The v1 → v2 migration and stage merging.**
 - **Retention:** the scheduler's intervals grow and reset on a lapse; deck unlocking and due cards; each step of the mastery ladder.
+- **Classic Mode:** every stage has a complete classic corner with HTTPS links; the struggle clock's thresholds and early unlock; notebook and type-in progress survive a save round trip.
 - **Connections:** globally unique concept names; every concept has valid cross-links and a go-deeper pointer; prerequisites only point backwards; every resource uses HTTPS.
 - **Mechanics:** text wrapping, hour parsing, the atomic-write round trip and the activity streak.
 
@@ -175,6 +198,9 @@ One package, one build target:
 | `review.go` | Daily Review and Mastery Check screens |
 | `connections.go` | concept cross-links, go-deeper pointers, stage prerequisites |
 | `linkcheck.go` | `-check-links` resource verifier |
+| `classic.go` | Classic Mode: classic corners, struggle clock, notebook |
+| `classicui.go` | Classic Mode screens: toggle, classic corner, type-in lab, notebook |
+| `typeins.go` | generated type-in listings with their real output (see `typeins/`) |
 | `curriculum.go` | types, plus Tracks A and B (stages 5–8, 13, 15, 16) |
 | `curriculum_foundations.go` | Track F (stages 1–4) |
 | `curriculum_software.go` | Track S (stages 9–12) |

@@ -119,6 +119,12 @@ func (a *App) printDashboard() {
 	a.printf("  %s %s %s   %s %s  %s\n",
 		sty.Gray("Campus"), bar(done, total, 24, sty.Cyan), sty.Bold(pct(done, total)),
 		sty.Gray("Last 14d"), sparkline(cs.activity[len(cs.activity)-14:]), streak)
+	a.mu.Lock()
+	classic := a.reg.ClassicMode
+	a.mu.Unlock()
+	if classic {
+		a.printf("  %s  %s\n", classicBadge(), sty.Gray("hints behind the struggle clock · notebook on · type-ins waiting in each Classic corner"))
+	}
 	if dirty {
 		a.printf("  %s\n", sty.Yellow("● uncommitted changes"))
 	}
@@ -148,6 +154,14 @@ func (a *App) printMenu() {
 	for _, r := range rows {
 		a.println("  " + edge("│ ") + padRight(r[0], 32) + r[1])
 	}
+	a.mu.Lock()
+	classic := a.reg.ClassicMode
+	a.mu.Unlock()
+	mode := sty.Gray("off")
+	if classic {
+		mode = sty.Bold(sty.Yellow("ON"))
+	}
+	a.println("  " + edge("│ ") + item("c", "Classic Mode "+mode+sty.Gray(" · learn like it's 1985: struggle, predict, type it in")))
 	a.println("  " + edge("└"+strings.Repeat("─", 70)))
 }
 
@@ -219,7 +233,11 @@ func (a *App) renderStageCard(s *Stage, color func(string) string) {
 		} else if s.MasteryCheck != nil {
 			check = sty.Yellow(fmt.Sprintf("check %d/%d", s.MasteryCheck.Score, s.MasteryCheck.Total))
 		}
-		line(padRight(sty.Gray("Mastery"), 10) + padRight(glyphs.String(), 20) + " " + fmt.Sprintf("%d/%d", mastered, total) + "  " + check)
+		typeIn := ""
+		if s.TypeInDone {
+			typeIn = sty.Green("  ⌨ type-in ✓")
+		}
+		line(padRight(sty.Gray("Mastery"), 10) + padRight(glyphs.String(), 20) + " " + fmt.Sprintf("%d/%d", mastered, total) + "  " + check + typeIn)
 	}
 
 	for _, lit := range s.Literature {
@@ -679,6 +697,8 @@ func (a *App) run() {
 			a.showStartHere()
 		case "9", "r":
 			actionErr = a.dailyReview()
+		case "c":
+			actionErr = a.toggleClassicMode()
 		case "1":
 			a.viewLedger()
 		case "2":
@@ -709,7 +729,7 @@ func (a *App) run() {
 		case "":
 			// Blank line: just redraw the menu.
 		default:
-			a.con.warn("%q is not a menu option. Choose 0-9.", choice)
+			a.con.warn("%q is not a menu option. Choose 0-9 or c.", choice)
 		}
 
 		switch {

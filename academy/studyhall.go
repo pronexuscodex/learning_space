@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"time"
 )
 
 // studyHall picks a stage and loops over its learning menu.
@@ -37,6 +38,7 @@ func (a *App) studyHall() error {
 			fmt.Sprintf("Lab blueprints %s", sty.Gray(fmt.Sprintf("(%d, enroll with one keystroke)", len(guide.Blueprints)))),
 			fmt.Sprintf("Self-check quiz %s", sty.Gray(fmt.Sprintf("(%d questions)", len(guide.Quiz)))),
 			fmt.Sprintf("%s %s", sty.Bold("Mastery check"), sty.Gray(fmt.Sprintf("(mixed exam, %d%% to pass)", int(masteryPassMark*100)))),
+			fmt.Sprintf("%s %s", sty.Bold("Classic corner"), sty.Gray("(anchor book, classic text, real source, type-in lab)")),
 			"Back to main menu",
 		})
 		if err != nil {
@@ -57,6 +59,8 @@ func (a *App) studyHall() error {
 			err = a.runQuiz(guide)
 		case 6:
 			err = a.masteryCheck(stageID)
+		case 7:
+			err = a.classicCorner(stageID)
 		default:
 			return nil
 		}
@@ -391,11 +395,20 @@ func (a *App) exerciseGym(stageID int, g StageGuide) error {
 }
 
 // workExercise shows one exercise in full, offers the hint, and toggles
-// its done state.
+// its done state. In Classic Mode the hint sits behind the struggle clock,
+// and the learner keeps a lab notebook: a plan before, observations after.
 func (a *App) workExercise(stageID int, c Concept, i int) error {
 	e := c.Exercises[i]
+	key := exerciseKey(c.Name, i)
 	w := a.width
 	edge := sty.Magenta("┃")
+
+	a.mu.Lock()
+	classic := a.reg.ClassicMode
+	opened, seen := a.reg.ExerciseOpened[key]
+	notes := a.reg.notebookFor(stageID, key)
+	a.mu.Unlock()
+
 	a.println("")
 	a.printf("  %s %s %s\n", sty.Magenta("┏━"), levelBadge(e.Level), sty.Gray("· "+c.Name))
 	for _, l := range wrap(e.Task, w-6, "") {
@@ -403,9 +416,69 @@ func (a *App) workExercise(stageID int, c Concept, i int) error {
 	}
 	a.println("  " + sty.Magenta("┗"+strings.Repeat("━", w-4)))
 
+	if classic {
+		for _, n := range notes {
+			a.printf("  %s %s\n", sty.Yellow("📓 "+strings.ToUpper(n.Kind)), sty.Gray(formatTime(n.At)))
+			for _, l := range wrap(n.Text, w-8, "     ") {
+				a.println(l)
+			}
+		}
+		if !seen {
+			opened = time.Now()
+			a.mutate(func(r *Registry) { r.ExerciseOpened[key] = opened })
+			a.printf("  %s %s\n", classicBadge(), sty.Yellow(fmt.Sprintf("Struggle clock started: the hint unlocks in %d minutes.", struggleMinutes[e.Level])))
+			plan, err := a.con.promptText("Before you start: your plan or prediction (Enter to skip)", maxNotesLen, false)
+			if err != nil {
+				return err
+			}
+			a.addNote(stageID, key, NotePlan, plan)
+		}
+	}
+
 	show, err := a.con.confirm("Show the hint?")
 	if err != nil {
 		return err
+	}
+	if show && classic {
+		a.mu.Lock()
+		stuck := a.reg.stuckLogged(key)
+		a.mu.Unlock()
+		if ok, left := hintUnlocked(opened, e.Level, stuck, time.Now()); !ok {
+			a.printf("  %s %s\n", sty.Yellow("🔒"), sty.Yellow(fmt.Sprintf("The hint unlocks in %d more minute(s). Productive struggle is where the learning happens.", int(left.Minutes())+1)))
+			choice, err := a.con.promptChoice("What now?", []string{
+				"Keep working (come back later)",
+				"Log what I have tried so far",
+				"I'm truly stuck: write down what I tried and unlock the hint now",
+			})
+			if err != nil {
+				return err
+			}
+			switch choice {
+			case 0:
+				show = false
+			case 1:
+				text, err := a.con.promptText("What have you tried?", maxNotesLen, true)
+				if err != nil {
+					return err
+				}
+				a.addNote(stageID, key, NoteTried, text)
+				a.con.ok("Logged. Keep going; the clock is still running.")
+				show = false
+			case 2:
+				for {
+					text, err := a.con.promptText("What did you try, and where exactly are you stuck?", maxNotesLen, true)
+					if err != nil {
+						return err
+					}
+					if len([]rune(text)) < 20 {
+						a.con.warn("Say a little more (at least a sentence). Describing the problem often solves it.")
+						continue
+					}
+					a.addNote(stageID, key, NoteStuck, text)
+					break
+				}
+			}
+		}
 	}
 	if show {
 		a.println("")
@@ -430,6 +503,13 @@ func (a *App) workExercise(stageID int, c Concept, i int) error {
 	yes, err := a.con.confirm(label)
 	if err != nil || !yes {
 		return err
+	}
+	if classic && !already {
+		observed, err := a.con.promptText("What happened? Did your plan or prediction hold? (Enter to skip)", maxNotesLen, false)
+		if err != nil {
+			return err
+		}
+		a.addNote(stageID, key, NoteObserved, observed)
 	}
 	a.mutate(func(r *Registry) {
 		_, s := r.findStage(stageID)

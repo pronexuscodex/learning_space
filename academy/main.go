@@ -146,6 +146,7 @@ type Stage struct {
 	ExercisesDone   []string          `json:"exercises_done"`
 	Notes           map[string]string `json:"notes"` // concept → the learner's own explanation
 	MasteryCheck    *MasteryCheck     `json:"mastery_check,omitempty"`
+	TypeInDone      bool              `json:"type_in_done,omitempty"`
 	Labs            []Lab             `json:"labs"`
 }
 
@@ -243,6 +244,11 @@ type Registry struct {
 	Tracks        []Track               `json:"tracks"`
 	Reviews       map[string]ReviewCard `json:"reviews"`        // card ID → spaced-repetition state
 	ReviewHistory map[string]int        `json:"review_history"` // local date → cards reviewed that day
+
+	// Classic Mode (see classic.go).
+	ClassicMode    bool                 `json:"classic_mode"`
+	Notebook       []NotebookEntry      `json:"notebook"`
+	ExerciseOpened map[string]time.Time `json:"exercise_opened"` // exercise key → first opened (the struggle clock)
 }
 
 // findStage returns the stage with the given global ID and its track.
@@ -442,6 +448,12 @@ func (r *Registry) validate() error {
 	if r.ReviewHistory == nil {
 		r.ReviewHistory = map[string]int{}
 	}
+	if r.Notebook == nil {
+		r.Notebook = []NotebookEntry{}
+	}
+	if r.ExerciseOpened == nil {
+		r.ExerciseOpened = map[string]time.Time{}
+	}
 	if r.NextLabID <= maxLab {
 		r.NextLabID = maxLab + 1
 	}
@@ -458,10 +470,12 @@ func seedRegistry() *Registry {
 	}
 
 	return &Registry{
-		SchemaVersion: schemaVersion,
-		NextLabID:     1,
-		Reviews:       map[string]ReviewCard{},
-		ReviewHistory: map[string]int{},
+		SchemaVersion:  schemaVersion,
+		NextLabID:      1,
+		Reviews:        map[string]ReviewCard{},
+		ReviewHistory:  map[string]int{},
+		Notebook:       []NotebookEntry{},
+		ExerciseOpened: map[string]time.Time{},
 		Tracks: []Track{
 			{
 				ID:   "F",
