@@ -1,11 +1,12 @@
 package main
 
-// Study Hall: per-stage concept explanations, resource library, lab
-// blueprints (one-step enrolment) and self-check quizzes.
+// Study Hall: per-stage concept explanations, glossary, resource library,
+// lab blueprints (one-step enrolment) and self-check quizzes.
 
 import (
 	"errors"
 	"fmt"
+	"regexp"
 	"strings"
 )
 
@@ -26,6 +27,7 @@ func (a *App) studyHall() error {
 		a.renderStageSyllabus(stageID, guide)
 		choice, err := a.con.promptChoice("Study Hall", []string{
 			"Study a concept",
+			fmt.Sprintf("Glossary %s", sty.Gray(fmt.Sprintf("(%d words explained simply)", len(guide.Glossary)))),
 			fmt.Sprintf("Resource library %s", sty.Gray(fmt.Sprintf("(%d)", len(guide.Resources)))),
 			fmt.Sprintf("Lab blueprints %s", sty.Gray(fmt.Sprintf("(%d, enroll with one keystroke)", len(guide.Blueprints)))),
 			fmt.Sprintf("Self-check quiz %s", sty.Gray(fmt.Sprintf("(%d questions)", len(guide.Quiz)))),
@@ -38,10 +40,12 @@ func (a *App) studyHall() error {
 		case 0:
 			err = a.studyConcept(stageID, guide)
 		case 1:
-			a.showResources(guide)
+			a.showGlossary(guide)
 		case 2:
-			err = a.showBlueprints(stageID, guide)
+			a.showResources(guide)
 		case 3:
+			err = a.showBlueprints(stageID, guide)
+		case 4:
 			err = a.runQuiz(guide)
 		default:
 			return nil
@@ -72,6 +76,17 @@ func (a *App) renderStageSyllabus(stageID int, g StageGuide) {
 	for _, l := range wrap(g.Overview, a.width-4, "  ") {
 		a.println(sty.Italic(l))
 	}
+	if len(g.Outcomes) > 0 {
+		a.printf("\n  %s\n", sty.Bold(sty.Green("After this stage you'll be able to:")))
+		for _, o := range g.Outcomes {
+			for i, l := range wrap(o, a.width-8, "      ") {
+				if i == 0 {
+					l = "    " + sty.Green("✓") + " " + strings.TrimLeft(l, " ")
+				}
+				a.println(l)
+			}
+		}
+	}
 	a.printf("\n  %s %s %d/%d\n", sty.Gray("Concepts"), bar(studied, total, 20, sty.Blue), studied, total)
 	for i, c := range g.Concepts {
 		mark := sty.Gray("○")
@@ -94,7 +109,7 @@ func (a *App) studyConcept(stageID int, g StageGuide) error {
 		return err
 	}
 	c := g.Concepts[idx]
-	a.renderConcept(c, idx+1, len(g.Concepts))
+	a.renderConcept(c, idx+1, len(g.Concepts), g.Glossary)
 
 	a.mu.Lock()
 	_, s := a.reg.findStage(stageID)
@@ -121,47 +136,120 @@ func (a *App) studyConcept(stageID int, g StageGuide) error {
 	return nil
 }
 
-// renderConcept prints a concept as a heavy-bordered reading card.
-func (a *App) renderConcept(c Concept, n, total int) {
+// renderConcept prints a concept as a heavy-bordered reading card, going
+// from intuition (analogy, real life) to precision (details, diagram).
+func (a *App) renderConcept(c Concept, n, total int, glossary []Term) {
 	w := a.width
 	edge := sty.Blue("┃")
+	blank := func() { a.printf("  %s\n", edge) }
+	section := func(title string, color func(string) string) {
+		blank()
+		a.printf("  %s %s\n", edge, sty.Bold(color(title)))
+	}
+	paragraph := func(text string, style func(string) string) {
+		for _, l := range wrap(text, w-6, "") {
+			a.printf("  %s %s\n", edge, style(l))
+		}
+	}
+	plainText := func(s string) string { return s }
+
 	a.println("")
 	a.printf("  %s %s %s\n", sty.Blue("┏━"), sty.Gray(fmt.Sprintf("Concept %d/%d ·", n, total)), sty.Bold(sty.Blue(c.Name)))
 	a.printf("  %s %s\n", edge, sty.Italic(c.Summary))
-	a.printf("  %s\n", edge)
-	for _, l := range wrap(c.Body, w-6, "") {
-		a.printf("  %s %s\n", edge, l)
+
+	if c.Analogy != "" {
+		section("💬 In plain words", sty.Magenta)
+		paragraph(c.Analogy, plainText)
 	}
+	if c.Example != "" {
+		section("🌍 Real life", sty.Green)
+		paragraph(c.Example, plainText)
+	}
+	section("🔍 The details", sty.Cyan)
+	paragraph(c.Body, plainText)
 	if c.Diagram != "" {
-		a.printf("  %s\n", edge)
+		blank()
 		for _, l := range dedent(c.Diagram) {
 			a.printf("  %s   %s\n", edge, sty.Cyan(l))
 		}
 	}
 	if c.MentalModel != "" {
-		a.printf("  %s\n", edge)
-		for i, l := range wrap(c.MentalModel, w-24, "") {
-			lead := "              "
-			if i == 0 {
-				lead = sty.Bold(sty.Yellow("◆ Mental model")) + " "
-			} else {
-				lead += " "
-			}
-			a.printf("  %s %s%s\n", edge, lead, sty.Yellow(l))
-		}
+		section("◆ Mental model", sty.Yellow)
+		paragraph(c.MentalModel, sty.Yellow)
 	}
 	if c.TryIt != "" {
-		for i, l := range wrap(c.TryIt, w-24, "") {
-			lead := "              "
-			if i == 0 {
-				lead = padRight(sty.Bold(sty.Green("▶ Try it")), 14) + " "
-			} else {
-				lead += " "
+		section("▶ Try it (optional)", sty.Green)
+		paragraph(c.TryIt, plainText)
+	}
+	if terms := termsIn(glossary, c.Summary, c.Analogy, c.Example, c.Body); len(terms) > 0 {
+		section("📖 Words to know", sty.Blue)
+		for _, t := range terms {
+			for i, l := range wrap(t.Meaning, w-10-len(t.Word), "") {
+				lead := strings.Repeat(" ", len(t.Word)+3)
+				if i == 0 {
+					lead = sty.Bold(t.Word) + " — "
+				}
+				a.printf("  %s   %s%s\n", edge, lead, sty.Gray(l))
 			}
-			a.printf("  %s %s%s\n", edge, lead, l)
 		}
 	}
 	a.println("  " + sty.Blue("┗"+strings.Repeat("━", w-4)))
+}
+
+// termRegex caches one case-insensitive, plural-tolerant pattern per term.
+var termRegex = map[string]*regexp.Regexp{}
+
+// termsIn returns the glossary entries whose word appears in any text.
+func termsIn(glossary []Term, texts ...string) []Term {
+	joined := strings.Join(texts, " ")
+	var found []Term
+	for _, t := range glossary {
+		re, ok := termRegex[t.Word]
+		if !ok {
+			re = regexp.MustCompile(`(?i)\b` + regexp.QuoteMeta(t.Word) + `(s|es)?\b`)
+			termRegex[t.Word] = re
+		}
+		if re.MatchString(joined) {
+			found = append(found, t)
+		}
+	}
+	return found
+}
+
+// showGlossary prints a stage's jargon in plain English.
+func (a *App) showGlossary(g StageGuide) {
+	a.println("")
+	a.printf("  %s\n", sty.Bold(sty.Blue("GLOSSARY · words explained simply")))
+	width := 0
+	for _, t := range g.Glossary {
+		width = max(width, len([]rune(t.Word)))
+	}
+	for _, t := range g.Glossary {
+		for i, l := range wrap(t.Meaning, a.width-width-10, "") {
+			lead := strings.Repeat(" ", width)
+			if i == 0 {
+				lead = padRight(t.Word, width)
+			}
+			a.printf("    %s  %s\n", sty.Bold(sty.Cyan(lead)), l)
+		}
+	}
+	a.println("")
+}
+
+// showStartHere prints the orientation guide for new learners.
+func (a *App) showStartHere() {
+	a.println(heading("START HERE · how to learn with this academy", sty.Green, a.width))
+	a.println("")
+	for _, l := range wrap(startHere, a.width-4, "  ") {
+		t := strings.TrimSpace(l)
+		if isHeadingLine(t) {
+			a.println("  " + sty.Bold(sty.Green(t)))
+			continue
+		}
+		a.println(l)
+	}
+	a.println("")
+	a.con.note("Next step: open the Study Hall [6], pick Stage 1 or 5, and study concept 1.")
 }
 
 // showResources prints the resource library grouped by kind.

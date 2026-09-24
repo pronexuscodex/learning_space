@@ -1,6 +1,17 @@
 # Systems & AI Academy — Campus Registry
 
-A terminal-based ledger and study companion for a multi-stage curriculum across low-level systems and from-scratch AI.
+A terminal-based study companion for **self-learners**. It covers a seven-stage curriculum across low-level systems and from-scratch AI, and it assumes no prior knowledge.
+
+Every concept is taught from intuition to precision:
+
+1. **💬 In plain words:** an everyday analogy with no jargon.
+2. **🌍 Real life:** where you have already met this idea, such as the Ariane 5 rocket overflow, Chrome's per-tab processes or Kubernetes running on Raft.
+3. **🔍 The details:** the precise technical explanation, with a diagram where one helps.
+4. **◆ Mental model:** one sentence to remember.
+5. **▶ Try it (optional):** a small hands-on exercise.
+6. **📖 Words to know:** any jargon in the card is defined automatically at the bottom.
+
+New here? Run the app and press **`0`** for the *Start Here* guide.
 It is written in Go, uses only the standard library, and keeps all its data in one flat JSON file.
 
 ## Build
@@ -20,10 +31,13 @@ To put the file somewhere else, pass `-registry path/to/file.json`.
 
 ![Concept card](docs/concept-card.png)
 
+![Start Here](docs/start-here.png)
+
 ## Menu
 
 | # | Action |
 |---|--------|
+| 0 | **Start Here**: how to learn with this academy, where to begin and a simple study rhythm |
 | 1 | **View Campus Ledger**: a colour card per stage, with reading and concept progress bars, labs, compilation badges and cumulative hours |
 | 2 | **Enroll in a New Lab**: pick a track (`A`/`B`), a stage ID, then a name, architecture notes and initial hours |
 | 3 | **Log Study/Lab Hours**: add hours (`1.5`, `1h30m`, `45m`) with an optional note to an existing lab |
@@ -39,9 +53,11 @@ To cancel a prompt, type `q` at number prompts or `:q` at text prompts. Ctrl-D a
 
 ## Study Hall
 
-Every stage has built-in teaching material, compiled into the binary (`curriculum.go`):
+Every stage has built-in teaching material, compiled into the binary:
 
-- **Concepts (5 per stage, 35 in total):** each is a plain-language explanation, with an ASCII diagram where one helps, a *mental model* to remember and a *try it* exercise. You can mark concepts as understood; that progress is stored in the registry (`concepts_studied`) and shown in the ledger.
+- **What you'll be able to do:** concrete outcomes for the stage, shown before you begin.
+- **Concepts (5 per stage, 35 in total):** each uses the six-part card described above. You can mark concepts as understood; that progress is stored in the registry (`concepts_studied`) and shown in the ledger.
+- **Glossary:** 8–10 words per stage explained simply, such as *kernel*, *fsync*, *gradient* or *token*.
 - **Resource library:** free courses, books, papers, articles, videos and tools with links, grouped by type. Examples: OSTEP, MIT 6.1810 and 6.5840, CMU 15-445, Crafting Interpreters, Karpathy's *Zero to Hero*, 3Blue1Brown, and Simon Boehm's CUDA matmul article.
 - **Lab blueprints (3–4 per stage):** suggested projects with milestones, such as a custom malloc, an LSM-tree engine, Raft, an autograd engine, GPT from scratch or a CUDA SGEMM ladder. You can enroll any of them as a lab in one step.
 - **Self-check quiz:** flashcards. You answer in your head, reveal the answer, then score yourself.
@@ -60,7 +76,7 @@ Colour is turned on automatically when output goes to a terminal. It is turned o
 go test ./...
 ```
 
-The tests check the curriculum's integrity, text wrapping, hour parsing, the atomic-write round trip, loading older registry files, and the activity streak.
+The tests check the curriculum's integrity (including that every concept has an analogy and a real-life example), text wrapping, hour parsing, the atomic-write round trip, loading older registry files, and the activity streak.
 
 ## Source layout
 
@@ -72,8 +88,9 @@ One package, one build target:
 | `console.go` | sanitised, line-based input over `bufio` |
 | `ui.go` | ANSI styling, progress bars, text wrapping, sparklines |
 | `app.go` | dashboard, ledger and all ledger actions |
-| `studyhall.go` | concept reader, resource library, blueprints, quizzes |
-| `curriculum.go` | the Study Hall knowledge base |
+| `studyhall.go` | concept reader, glossary, resource library, blueprints, quizzes, Start Here |
+| `curriculum.go` | Study Hall knowledge base: overviews, technical explanations, resources, blueprints, quizzes |
+| `explainers.go` | beginner layer: analogies, real-life examples, glossaries, outcomes, Start Here guide |
 
 ## Data safety
 

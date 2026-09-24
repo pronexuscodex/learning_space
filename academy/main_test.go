@@ -139,3 +139,36 @@ func TestStatsActivityAndStreak(t *testing.T) {
 		t.Errorf("labs=%d hours=%v", cs.labs, cs.hours)
 	}
 }
+
+// Beginners must never meet a concept without its plain-words layer.
+func TestEveryConceptHasBeginnerExplanations(t *testing.T) {
+	for id, g := range curriculum {
+		if len(g.Outcomes) == 0 || len(g.Glossary) < 5 {
+			t.Errorf("stage %d: needs outcomes and at least 5 glossary terms", id)
+		}
+		for _, c := range g.Concepts {
+			if c.Analogy == "" || c.Example == "" {
+				t.Errorf("stage %d concept %q: missing analogy or real-life example", id, c.Name)
+			}
+		}
+	}
+	for name := range plainWords {
+		found := false
+		for _, g := range curriculum {
+			for _, c := range g.Concepts {
+				found = found || c.Name == name
+			}
+		}
+		if !found {
+			t.Errorf("explainer %q matches no concept (renamed?)", name)
+		}
+	}
+}
+
+func TestTermsInMatchesWholeWordsAndPlurals(t *testing.T) {
+	gl := []Term{{Word: "Register"}, {Word: "Cache"}, {Word: "ABI"}}
+	got := termsIn(gl, "The CPU has 16 registers and a big cache.", "Nothing about tabIs.")
+	if len(got) != 2 || got[0].Word != "Register" || got[1].Word != "Cache" {
+		t.Fatalf("termsIn = %+v", got)
+	}
+}

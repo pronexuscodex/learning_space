@@ -17,8 +17,9 @@
 //	console.go     sanitised line-based input over bufio
 //	ui.go          ANSI styling, bars, wrapping, sparklines
 //	app.go         the interactive ledger actions
-//	studyhall.go   concept reader, resource library, blueprints, quizzes
-//	curriculum.go  the Study Hall knowledge base
+//	studyhall.go   concept reader, glossary, resources, blueprints, quizzes
+//	curriculum.go  the Study Hall knowledge base (technical layer)
+//	explainers.go  beginner layer: analogies, real-life examples, glossary
 //
 // Build:
 //
@@ -570,6 +571,7 @@ func main() {
 	fmt.Print(banner())
 	if seeded {
 		app.con.note("No registry found. Seeded a new campus at %s", path)
+		app.con.ok("Welcome! New here? Press %s for the Start Here guide.", sty.Bold(sty.Green("0")))
 		if err := app.commit(); err != nil {
 			fmt.Fprintf(os.Stderr, "✗ could not create registry: %v\n", err)
 			os.Exit(1)

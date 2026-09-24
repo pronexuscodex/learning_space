@@ -148,8 +148,8 @@ func sparkline(vals []float64) string {
 }
 
 // reflow turns authored text into logical lines. Blank lines separate
-// paragraphs, lines starting with "- " are bullets, and other newlines are
-// soft (joined with a space).
+// paragraphs, lines starting with "- " are bullets, ALL-CAPS lines are
+// headings, and other newlines are soft (joined with a space).
 func reflow(text string) []string {
 	var out []string
 	cur := ""
@@ -168,6 +168,9 @@ func reflow(text string) []string {
 		case strings.HasPrefix(line, "- "):
 			flush()
 			cur = line
+		case isHeadingLine(line):
+			flush()
+			out = append(out, line)
 		case cur == "":
 			cur = line
 		default:
@@ -176,6 +179,12 @@ func reflow(text string) []string {
 	}
 	flush()
 	return out
+}
+
+// isHeadingLine reports whether a line is an ALL-CAPS section heading.
+func isHeadingLine(line string) bool {
+	return line == strings.ToUpper(line) && strings.ContainsAny(line, "ABCDEFGHIJKLMNOPQRSTUVWXYZ") &&
+		!strings.ContainsAny(line, "abcdefghijklmnopqrstuvwxyz")
 }
 
 // wrap word-wraps text to width columns, prefixing each line with indent.

@@ -123,6 +123,7 @@ func (a *App) printMenu() {
 	}
 	edge := sty.Gray
 	a.println("  " + edge("┌─ ") + sty.Bold("MAIN MENU") + " " + edge(strings.Repeat("─", 58)))
+	a.println("  " + edge("│ ") + item("0", sty.Bold(sty.Green("Start Here"))+sty.Gray(" · new? how to learn with this academy")))
 	for _, r := range rows {
 		a.println("  " + edge("│ ") + padRight(r[0], 32) + r[1])
 	}
@@ -630,6 +631,8 @@ func (a *App) run() {
 
 		var actionErr error
 		switch strings.ToLower(choice) {
+		case "0":
+			a.showStartHere()
 		case "1":
 			a.viewLedger()
 		case "2":
@@ -660,7 +663,7 @@ func (a *App) run() {
 		case "":
 			// Blank line: just redraw the menu.
 		default:
-			a.con.warn("%q is not a menu option. Choose 1-8.", choice)
+			a.con.warn("%q is not a menu option. Choose 0-8.", choice)
 		}
 
 		switch {

@@ -18,6 +18,16 @@ type Concept struct {
 	Diagram     string // optional ASCII diagram
 	MentalModel string // the sentence to remember
 	TryIt       string // a small hands-on exercise
+
+	// Beginner layer, filled in from explainers.go.
+	Analogy string // the idea in everyday terms, no jargon
+	Example string // where this shows up in the real world
+}
+
+// Term is one piece of jargon explained in plain English.
+type Term struct {
+	Word    string
+	Meaning string
 }
 
 // Resource is an external course, book, article, tool or video.
@@ -44,6 +54,8 @@ type Question struct {
 // StageGuide is the full Study Hall content for one stage.
 type StageGuide struct {
 	Overview   string
+	Outcomes   []string // "after this stage you can…", from explainers.go
+	Glossary   []Term   // from explainers.go
 	Concepts   []Concept
 	Resources  []Resource
 	Blueprints []Blueprint
