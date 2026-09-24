@@ -873,7 +873,17 @@ func main() {
 	listBackupsFlag := flag.Bool("backups", false, "list the automatic backups of the registry, then exit")
 	fetchLibraryFlag := flag.Bool("fetch-library", false, "download every free PDF in the library for offline study, then exit")
 	restoreFlag := flag.String("restore", "", "restore the registry from a backup (a number from -backups, or a file path), then exit")
+	showVersion := flag.Bool("version", false, "print the version, then exit")
+	flag.Usage = usage(os.Stderr, flag.CommandLine)
 	flag.Parse()
+	if flag.NArg() > 0 {
+		fmt.Fprintf(os.Stderr, "academy: unexpected argument %q (flags start with -; see academy -h)\n", flag.Arg(0))
+		os.Exit(2)
+	}
+	if *showVersion {
+		fmt.Println(versionLine())
+		return
+	}
 
 	sty = Style{on: colorEnabled(*noColor)}
 

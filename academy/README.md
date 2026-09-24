@@ -8,7 +8,7 @@ New here? Build it (below), run it, and press **`0`** for the *Start Here* guide
 
 ## Contents
 
-- [Build](#build)
+- [Install](#install)
 - [The curriculum](#the-curriculum)
 - [How computers work (Stage 0)](#how-computers-work-stage-0)
 - [C first: see what is under the hood](#c-first-see-what-is-under-the-hood)
@@ -30,8 +30,50 @@ New here? Build it (below), run it, and press **`0`** for the *Start Here* guide
 - [Schema (abridged)](#schema-abridged)
 - [Tests](#tests)
 - [Source layout](#source-layout)
+- [Releasing](#releasing)
 
-## Build
+## Install
+
+### Download a release (no Go needed)
+
+1. Download the archive for your system from the [Releases page](https://github.com/pronexuscodex/learning_space/releases):
+
+   | System | File |
+   |--------|------|
+   | Linux (most PCs) | `academy-vX.Y.Z-linux-amd64.tar.gz` |
+   | Linux (Raspberry Pi 4/5, ARM servers) | `academy-vX.Y.Z-linux-arm64.tar.gz` |
+   | macOS (Apple silicon: M1 and later) | `academy-vX.Y.Z-darwin-arm64.tar.gz` |
+   | macOS (Intel) | `academy-vX.Y.Z-darwin-amd64.tar.gz` |
+   | Windows (most PCs) | `academy-vX.Y.Z-windows-amd64.zip` |
+   | Windows on ARM | `academy-vX.Y.Z-windows-arm64.zip` |
+   | FreeBSD | `academy-vX.Y.Z-freebsd-amd64.tar.gz` |
+
+2. Optionally check that the download is intact against `SHA256SUMS`:
+
+   ```sh
+   sha256sum -c SHA256SUMS --ignore-missing           # Linux
+   shasum -a 256 -c SHA256SUMS --ignore-missing       # macOS
+   ```
+
+   On Windows, run `Get-FileHash academy-*.zip` in PowerShell and compare the result with the line in `SHA256SUMS`.
+
+3. Unpack it and run it from a terminal:
+
+   ```sh
+   tar -xzf academy-*-linux-amd64.tar.gz
+   cd academy-*-linux-amd64
+   ./academy
+   ```
+
+   On Windows, unzip it, open the folder, and run `academy.exe` from Windows Terminal or PowerShell.
+
+The executables are not code-signed, so the first launch may show a warning:
+- **macOS** says it "cannot verify the developer". Either right-click the file in Finder, choose **Open**, and confirm, or run `xattr -d com.apple.quarantine ./academy` once.
+- **Windows** SmartScreen may say it "protected your PC". Choose **More info**, then **Run anyway**.
+
+Everything runs locally and offline, apart from the optional Library downloads, tech-watch headlines and `-check-links`. Nothing is sent anywhere.
+
+### Build from source
 
 ```sh
 cd academy
@@ -40,7 +82,9 @@ go build -trimpath -ldflags="-s -w" -o academy.exe .  # Windows
 ./academy
 ```
 
-Requires Go 1.22+. Nothing is downloaded, because there are no dependencies.
+It needs Go 1.22 or later, and nothing else: there are no dependencies to download. Run `./academy -version` to see what you have, and `./academy -h` for every flag.
+
+### Where your progress lives
 
 On first run, the program creates `academy_campus_registry.json` next to the binary. To put the file somewhere else, pass `-registry path/to/file.json`. (With `go run .`, the file goes in the current directory, because the temporary build directory would be deleted.)
 
@@ -89,6 +133,8 @@ Each concept has the usual analogy, real-life example, diagram and three exercis
 
 Stage 1 (C) builds on it, so a fresh campus starts at Stage 0.
 
+![Start Here: why C first](docs/start-here.png)
+
 ## C first: see what is under the hood
 
 Stage 1 teaches programming **in C**. In C, every value has a size and an address, and the compiler turns your text into real machine instructions, so from the first week you see what other languages do for you behind the scenes. Stage 1 has eight concepts:
@@ -117,6 +163,8 @@ Every exercise is in C. The reading list is K&R, King's *C Programming: A Modern
 Why C: it is small, it is what the operating system, databases, language runtimes and firmware underneath everything are written in, and strong universities teach systems in it. Harvard's CS50 switches to C in its first week, and Stanford's CS107, Berkeley's CS61C and CMU's 15-213 teach systems in C. (Many universities start with Python for the very first course and then move to C; the academy goes straight to C for understanding.) C also lets you make mistakes other languages hide, so Stage 1 teaches the defensive habits from day one.
 
 **Existing registries** are updated on load: Stage 1's title changes, the C books are added to its reading list (books you already marked read are kept), and all concept progress, notes and reviews stay as they were. The five original concept names are unchanged, so nothing is lost.
+
+![Under the hood](docs/under-the-hood.png)
 
 ## How each concept is taught
 
@@ -225,6 +273,12 @@ To cancel a prompt, type `q` at number prompts or `:q` at text prompts. Ctrl-D a
 
 ![Stages](docs/stages.png)
 
+![Main menu](docs/menu.png)
+
+![Roadmap](docs/roadmap.png)
+
+![Progress report](docs/progress.png)
+
 ## Study Hall
 
 For every stage:
@@ -262,6 +316,8 @@ For example, *type casting* explains explicit and implicit conversion, shows `in
 
 Type any word, alias or part of one (`cast`, `segfault`, `GC`), browse by category or A–Z, or open the word of the day (also shown on the dashboard). Press **`r`** on a word to add it to your review deck; it then comes up in the Daily Review with spaced repetition. Every concept card has a **🔤 Programmer words here** box listing the jargon it uses, and search (`/`) covers the dictionary too.
 
+![Dictionary](docs/dictionary.png)
+
 ## Library: PDFs without leaving the academy
 
 Press **`l`** on the main menu (or open a stage's **PDF library** in the Study Hall). The Library lists every free, legally hosted PDF in the curriculum, by stage:
@@ -282,6 +338,8 @@ Downloads are careful:
 - `HTTPS_PROXY` and the other standard proxy settings are honoured.
 
 The academy cannot show PDF pages inside a terminal, so it hands them to your PDF viewer. On a machine without one (a server over SSH), it prints the file's path instead.
+
+![Library](docs/library.png)
 
 ## Your own resources
 
@@ -319,6 +377,8 @@ Press **`w`**. Tech watch (*veille technologique*) is the habit of following wha
 - **Sources:** add any RSS or Atom feed of your own.
 
 Feeds are fetched over HTTPS only, at most 5 MB each, six at a time with a 15-second timeout. Control characters and odd link schemes (such as `javascript:`) are removed, so a hostile feed cannot repaint your terminal or plant a bad link. Once you have some foundations (5 concepts understood), What's next suggests a weekly tech watch if you have not saved anything for 7 days.
+
+![Tech radar](docs/techwatch.png)
 
 ## Classic Mode: learn like it's 1985
 
@@ -500,3 +560,27 @@ One package, one build target:
 | `explainers.go` | analogies, real-life examples and glossaries for the original stages; Start Here |
 | `exercises.go` | exercises for the original stages |
 
+## Releasing
+
+For maintainers:
+
+1. Update `CHANGELOG.md`, adding a `## [X.Y.Z] - YYYY-MM-DD` section.
+2. Make sure CI is green on the commit you want to release.
+3. Tag the commit and push the tag:
+
+   ```sh
+   git tag -a vX.Y.Z -m "vX.Y.Z"
+   git push origin vX.Y.Z
+   ```
+
+The **Release** workflow (`.github/workflows/release.yml`) then:
+- runs vet and the race-enabled tests;
+- builds all seven targets with `tools/release.sh`, stamping the version into the binary;
+- publishes a GitHub release with the archives, `SHA256SUMS`, and that version's changelog section as the release notes. A tag with a hyphen, such as `v1.1.0-rc.1`, is published as a pre-release.
+
+To try the same build locally, run `tools/release.sh v0.0.0` and look in `dist/`.
+
+Other tools in `tools/`:
+- `layout_check.py`: renders every screen in a pseudo-terminal at chosen widths and reports overflowing lines.
+- `monkey.py`: sends thousands of random keys and fails on any crash or hang.
+- `screenshots.py`: regenerates `docs/*.png` from the real app, using a demo registry and headless Chromium.

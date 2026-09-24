@@ -58,7 +58,9 @@ func (a *App) dailyReview() error {
 	for _, l := range wrap("Recall each answer before you reveal it; that effort is what builds memory.", a.cols()-4, "  ") {
 		a.println(l)
 	}
-	a.printf("  %s\n", sty.Gray("Grade honestly: 1 forgot · 2 hard · 3 good · 4 easy. q stops (progress is kept)."))
+	for _, l := range wrap("Grade honestly: 1 forgot · 2 hard · 3 good · 4 easy. q stops (progress is kept).", a.cols()-4, "  ") {
+		a.println(sty.Gray(l))
+	}
 
 	// Interleave: shuffle so stages and card types mix.
 	rand.Shuffle(len(due), func(i, j int) { due[i], due[j] = due[j], due[i] })
@@ -192,7 +194,9 @@ func (a *App) masteryCheck(stageID int) error {
 	if studied < total {
 		a.con.warn("You have understood %d of %d concepts; the check covers all of them.", studied, total)
 	}
-	a.printf("  %s\n", sty.Gray(fmt.Sprintf("Answer in your head (or type), reveal, and judge yourself honestly. %d%% or more passes.", int(masteryPassMark*100))))
+	for _, l := range wrap(fmt.Sprintf("Answer in your head (or type), reveal, and judge yourself honestly. %d%% or more passes.", int(masteryPassMark*100)), a.cols()-4, "  ") {
+		a.println(sty.Gray(l))
+	}
 	ok, err := a.con.confirm("Start the mastery check?")
 	if err != nil || !ok {
 		return err

@@ -355,7 +355,7 @@ func banner(width int) string {
 		"   █▀█ █▄▄ █▀█ █▄▀ ██▄ █░▀░█ ░█░",
 	}
 	sub := ""
-	for _, l := range wrap("Systems & AI · Campus Registry · zero dependencies", width-3, "   ") {
+	for _, l := range wrap("Systems & AI · Campus Registry · "+appVersion(), width-3, "   ") {
 		sub += sty.Dim(l) + "\n"
 	}
 	return "\n" + sty.Bold(sty.Cyan(art[0])) + "\n" + sty.Bold(sty.Magenta(art[1])) + "\n" + sub

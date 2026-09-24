@@ -1,0 +1,59 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: test (${{ matrix.os }}, Go ${{ matrix.go }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        go: [stable]
+        include:
+          - os: ubuntu-latest
+            go: "1.22" # the minimum in go.mod
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: academy
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ matrix.go }}
+          cache-dependency-path: academy/go.mod
+      - name: Formatting
+        if: runner.os == 'Linux'
+        run: |
+          unformatted=$(gofmt -l .)
+          if [ -n "$unformatted" ]; then echo "Run gofmt -w on:"; echo "$unformatted"; exit 1; fi
+      - name: Vet
+        run: go vet ./...
+      - name: Test
+        run: go test ./...
+      - name: Race detector
+        if: runner.os == 'Linux'
+        run: go test -race ./...
+      - name: Cross-compile every release target
+        if: runner.os == 'Linux' && matrix.go == 'stable'
+        run: |
+          for t in linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64 windows/arm64 freebsd/amd64; do
+            CGO_ENABLED=0 GOOS=${t%/*} GOARCH=${t#*/} go build -o /dev/null . && echo "$t ok"
+          done
+      - name: Layout check in a real terminal
+        if: runner.os == 'Linux' && matrix.go == 'stable'
+        run: |
+          go build -o academy .
+          out=$(python3 tools/layout_check.py 40 80 120)
+          echo "$out"
+          if echo "$out" | grep -q -E ': [1-9][0-9]* overflowing'; then exit 1; fi
+      - name: Monkey test (random input, fails on any panic or hang)
+        if: runner.os == 'Linux' && matrix.go == 'stable'
+        run: python3 tools/monkey.py 3 200 "$GITHUB_RUN_NUMBER"

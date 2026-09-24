@@ -40,6 +40,8 @@ KEYS = [
   "d\r", "type casting\r", "1\r", "\r", "c\r", "4\r", "1\r", "\r", "a\r", "q\r", "q\r", "q\r",  # dictionary: word → related → categories → A–Z
   "+\r", "a\r", "Modern C, a free book on writing C well\r", "https://example.org/modern-c.pdf\r", "1\r", "5\r", "A long note that should wrap neatly at every terminal width\r", "q\r",  # my resources
   "w\r", "1\r", "q\r", "4\r", "q\r", "5\r", "q\r", "7\r",  # tech watch: method, radar, sources
+  "9\r", "q\r",             # daily review intro, then stop
+  "c\r", "y\r", "6\r", "1\r", "2\r", "5\r", "2\r", "y\r", "n\r", "n\r", "q\r", "10\r", "c\r", "y\r",  # Classic Mode: struggle clock message, then off again
   "5\r",                    # commit & exit
 ]
 

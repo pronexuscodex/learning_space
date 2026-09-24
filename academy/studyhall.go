@@ -516,7 +516,7 @@ func (a *App) workExercise(stageID int, c Concept, i int) error {
 		stuck := a.reg.stuckLogged(key)
 		a.mu.Unlock()
 		if ok, left := hintUnlocked(opened, e.Level, stuck, time.Now()); !ok {
-			a.printf("  %s %s\n", sty.Yellow("🔒"), sty.Yellow(fmt.Sprintf("The hint unlocks in %d more minute(s). Productive struggle is where the learning happens.", int(left.Minutes())+1)))
+			a.con.say(sty.Yellow("🔒"), fmt.Sprintf("The hint unlocks in %d more minute(s). Productive struggle is where the learning happens.", int(left.Minutes())+1), sty.Yellow)
 			choice, err := a.con.promptChoice("What now?", []string{
 				"Keep working (come back later)",
 				"Log what I have tried so far",

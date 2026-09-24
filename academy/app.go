@@ -884,6 +884,7 @@ func (a *App) showShortcuts() {
 	row("Enter", "next page")
 	row("q", "stop paging and continue")
 	a.println("")
+	a.printf("  %s\n", sty.Gray(truncate(versionLine(), a.cols()-4)))
 	if !a.con.raw {
 		for _, l := range wrap("Your terminal is in line mode (for example on Windows, or when input is piped), so Ctrl+L takes effect after you press Enter.", a.cols()-6, "  ") {
 			a.println(sty.Gray(l))

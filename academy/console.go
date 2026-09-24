@@ -37,6 +37,11 @@ type console struct {
 	curBuf    []rune
 	shown     int
 	cols      func() int // current layout width (nil: 80)
+
+	// closed is set once input has ended (Ctrl+D or end of a pipe). It is
+	// sticky, so every later prompt also sees the end of input and the
+	// app always reaches its commit-and-exit path.
+	closed bool
 }
 
 // setOnClear installs (or removes, with nil) the redraw hook, under the
@@ -57,8 +62,9 @@ func (c *console) width() int {
 
 // say prints a status message with a marker, wrapped to the terminal.
 func (c *console) say(marker, text string, style func(string) string) {
-	for i, l := range wrap(text, c.width()-4, "") {
-		lead := "    "
+	indent := 3 + visibleLen(marker) // "  ✓ "; emoji markers are two columns wide
+	for i, l := range wrap(text, c.width()-indent, "") {
+		lead := strings.Repeat(" ", indent)
 		if i == 0 {
 			lead = "  " + marker + " "
 		}
@@ -123,10 +129,20 @@ func isCancel(s string) bool {
 // readLine prints prompt and returns one sanitized line. It returns io.EOF
 // when input is exhausted (Ctrl-D / closed pipe). Ctrl+L clears the screen.
 func (c *console) readLine(prompt string) (string, error) {
-	if c.raw {
-		return c.readLineRaw(prompt)
+	if c.closed {
+		return "", io.EOF
 	}
-	return c.readLineCooked(prompt)
+	var s string
+	var err error
+	if c.raw {
+		s, err = c.readLineRaw(prompt)
+	} else {
+		s, err = c.readLineCooked(prompt)
+	}
+	if errors.Is(err, io.EOF) {
+		c.closed = true
+	}
+	return s, err
 }
 
 // readLineCooked reads a whole line at once, as the terminal delivers it.
