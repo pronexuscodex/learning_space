@@ -1,5 +1,7 @@
 package main
 
+import "fmt"
+
 // This file is the Study Hall knowledge base: static teaching content that
 // ships inside the binary. It is deliberately kept out of the JSON registry,
 // which only holds *your* progress (which concepts you have studied).
@@ -19,9 +21,35 @@ type Concept struct {
 	MentalModel string // the sentence to remember
 	TryIt       string // a small hands-on exercise
 
-	// Beginner layer, filled in from explainers.go.
-	Analogy string // the idea in everyday terms, no jargon
-	Example string // where this shows up in the real world
+	// Beginner layer. Set inline for newer stages, or merged in from
+	// explainers.go and exercises.go for the original ones.
+	Analogy   string     // the idea in everyday terms, no jargon
+	Example   string     // where this shows up in the real world
+	Exercises []Exercise // warm-up → practice → real-world, each with a hint
+}
+
+// Exercise levels, in the order they are always presented.
+const (
+	LevelWarmUp    = "warm-up"
+	LevelPractice  = "practice"
+	LevelRealWorld = "real-world"
+)
+
+// Exercise is one graded practice task with a hint.
+type Exercise struct {
+	Level string
+	Task  string
+	Hint  string
+}
+
+// trio builds the standard three-exercise ladder for a concept:
+// a warm-up (no code), a practice task, and a real-world project.
+func trio(warm, warmHint, practice, practiceHint, real, realHint string) []Exercise {
+	return []Exercise{
+		{LevelWarmUp, warm, warmHint},
+		{LevelPractice, practice, practiceHint},
+		{LevelRealWorld, real, realHint},
+	}
 }
 
 // Term is one piece of jargon explained in plain English.
@@ -62,15 +90,36 @@ type StageGuide struct {
 	Quiz       []Question
 }
 
+// curriculum is every stage's guide, keyed by stage ID. Each track's
+// content lives in its own file.
+var curriculum = mergeGuides(foundationsGuides, systemsAndAIGuides, softwareGuides, dataGuides)
+
+// mergeGuides combines per-file guide maps; a duplicate stage ID is a
+// programming error.
+func mergeGuides(parts ...map[int]StageGuide) map[int]StageGuide {
+	out := map[int]StageGuide{}
+	for _, part := range parts {
+		for id, g := range part {
+			if _, dup := out[id]; dup {
+				panic(fmt.Sprintf("curriculum: stage %d defined twice", id))
+			}
+			out[id] = g
+		}
+	}
+	return out
+}
+
 // guideFor returns the Study Hall content for a stage, if any.
 func guideFor(stageID int) (StageGuide, bool) {
 	g, ok := curriculum[stageID]
 	return g, ok
 }
 
-var curriculum = map[int]StageGuide{
+// systemsAndAIGuides holds Track A (stages 5–8) and the original Track B
+// stages (13, 15, 16).
+var systemsAndAIGuides = map[int]StageGuide{
 	// -----------------------------------------------------------------
-	1: {
+	5: {
 		Overview: `Everything above this stage rests on how source code becomes machine
 instructions, and how those instructions move bytes between registers,
 caches and memory. You will build a working model of the machine a C
@@ -130,7 +179,7 @@ assumption.
 
 IEEE 754 floats store a sign, a biased exponent and a mantissa. Most
 decimals cannot be represented exactly (0.1 + 0.2 != 0.3), and float
-addition is not associative. That last fact returns in Stage 7: a
+addition is not associative. That last fact returns in Stage 16: a
 parallel GPU reduction sums in a different order and can give slightly
 different results from a sequential loop.`,
 				MentalModel: "Every number type is a finite code; learn where the code breaks.",
@@ -146,7 +195,7 @@ lines, so touching one byte brings in its 63 neighbours.
 Programs are fast when they reuse data soon (temporal locality) and use
 neighbouring data (spatial locality). Walking a row-major 2D array
 column by column can be ten times slower than walking it row by row, with
-identical instruction counts. The same idea returns in Stage 7 as the
+identical instruction counts. The same idea returns in Stage 16 as the
 roofline model and GPU memory coalescing.`,
 				Diagram: `  CPU ─ regs ─ L1 (32K) ─ L2 (1M) ─ L3 (tens of MB) ─ DRAM (GBs) ─ SSD
   fast · tiny ◀──────────────────────────────────────────────▶ slow · huge`,
@@ -195,7 +244,7 @@ code generation) is a tree walk.`,
 	},
 
 	// -----------------------------------------------------------------
-	2: {
+	6: {
 		Overview: `The operating system is the program that shares the hardware among
 programs that do not trust each other. Learn how it virtualises the CPU
 and memory, and what really happens on a system call, a page fault and a
@@ -316,7 +365,7 @@ hold-and-wait, no preemption and circular wait. Break any one of them.`,
 	},
 
 	// -----------------------------------------------------------------
-	3: {
+	7: {
 		Overview: `A database is a data structure that survives crashes. Learn how bytes
 are laid out on disk, how indexes trade write cost for read cost, and how
 durability is actually guaranteed. Hint: this very program uses the
@@ -408,6 +457,46 @@ checks (SSI) or locking (2PL).`,
 				MentalModel: "Every transaction reads a photo of the past and argues about the future at commit.",
 				TryIt:       "Reproduce write skew (the on-call doctors example) in Postgres at REPEATABLE READ, then fix it with SERIALIZABLE.",
 			},
+			{
+				Name:    "SQL & the Relational Model",
+				Summary: "The language nearly every application uses to ask questions of its data.",
+				Body: `The relational model stores data in tables of rows and columns. Each row
+is identified by a primary key, and rows link to other tables through
+foreign keys. SQL is declarative: you describe the result you want, and
+the database's query planner decides how to produce it.
+
+The core statements: SELECT … FROM … WHERE filters rows; JOIN combines
+tables; GROUP BY aggregates (COUNT, SUM, AVG); INSERT, UPDATE and DELETE
+change data. Normalisation removes duplication so that each fact is
+stored once. Indexes (the B-trees from this stage) make lookups fast,
+and EXPLAIN shows the plan the database chose.`,
+				Diagram: `customers                  orders
+┌────┬──────┐              ┌────┬─────────────┬───────┐
+│ id │ name │   1 ── many  │ id │ customer_id │ total │
+├────┼──────┤              ├────┼─────────────┼───────┤
+│ 1  │ Ana  │ ◀─────────── │ 10 │ 1           │ 25.00 │
+│ 2  │ Ben  │              │ 11 │ 1           │ 12.50 │
+└────┴──────┘              └────┴─────────────┴───────┘
+SELECT c.name, SUM(o.total) FROM customers c
+JOIN orders o ON o.customer_id = c.id GROUP BY c.name;`,
+				MentalModel: "Store each fact once, and answer questions with joins.",
+				TryIt:       "Create the two tables above in SQLite and run the query.",
+				Analogy: `A well-organised spreadsheet workbook where each sheet holds one kind of
+thing (customers, orders) and a customer number links them, instead of
+retyping the customer's address on every single order.`,
+				Example: `Almost every app you use (banking, shopping, social media, and your
+phone's own messages and contacts, stored in SQLite) keeps its data in
+relational databases and queries it with SQL. SQL dates from the 1970s
+and is still among the most widely used languages in developer surveys.`,
+				Exercises: trio(
+					`Given students(id, name) and grades(student_id, course, grade), describe in plain English what "SELECT name FROM students JOIN grades ON grades.student_id = students.id WHERE grade < 50" returns.`,
+					"Students with at least one failing grade, possibly listed more than once.",
+					"Design tables for a library (books, members, loans), create them in SQLite with sample data, and write queries for overdue books, the most borrowed book, and members who have never borrowed anything.",
+					`"Never borrowed" needs a LEFT JOIN … WHERE loans.id IS NULL.`,
+					"Import a public CSV dataset (city bike trips, films, weather) into SQLite or PostgreSQL, answer five questions you care about with SQL, then add an index for your slowest query and compare EXPLAIN output and timing before and after.",
+					".import in the sqlite3 shell loads a CSV file directly.",
+				),
+			},
 		},
 		Resources: []Resource{
 			{"Course", "CMU 15-445 Database Systems", "https://15445.courses.cs.cmu.edu/", "Andy Pavlo's lectures and the BusTub project."},
@@ -435,7 +524,7 @@ checks (SSI) or locking (2PL).`,
 	},
 
 	// -----------------------------------------------------------------
-	4: {
+	8: {
 		Overview: `Programs on different machines can only talk through an unreliable
 network with no shared clock. Learn the protocol stack, how to write
 servers that handle thousands of connections, and how replicated systems
@@ -527,6 +616,46 @@ practice.`,
 				MentalModel: "A value is decided the moment a majority has written it down.",
 				TryIt:       "Explore raft.github.io's visualisation: kill the leader and watch the election.",
 			},
+			{
+				Name:    "HTTP, DNS & How the Web Works",
+				Summary: "What really happens when you type a web address and press Enter.",
+				Body: `First, DNS translates a name such as example.com into an IP address by
+asking a chain of servers (your resolver, a root server, the .com
+servers, then the domain's own servers) and caching the answer. Your
+browser opens a TCP (or QUIC) connection to that address, sets up TLS
+for encryption (Stage 10), and sends an HTTP request: a method (GET,
+POST), a path, headers and sometimes a body.
+
+The server replies with a status code (200 OK, 404 Not Found, 500 Server
+Error), headers and content. The HTML refers to CSS, JavaScript and
+images, each of which triggers more requests. CDNs cache content close
+to users, cookies keep you logged in, and REST/JSON APIs use the same
+HTTP for mobile apps.`,
+				Diagram: `browser ── "example.com?" ───────▶ DNS resolver ──▶ IP address
+browser ── TCP + TLS handshake ─────────────────▶ server
+browser ── GET /index.html ─────────────────────▶ server
+browser ◀── 200 OK + HTML ─────────────────────── server
+browser ── GET /style.css, /app.js, images … ───▶ often a CDN`,
+				MentalModel: "Name → address → connection → request → response, repeated for every resource on the page.",
+				TryIt:       "Open your browser's developer tools (F12), go to the Network tab, reload a page and count the requests.",
+				Analogy: `Looking up a friend's number in your contacts (DNS), calling them (the
+connection), asking for something specific (the request) and getting an
+answer (the response). A CDN is a chain store with a branch in every
+city, so you do not have to travel to the head office.`,
+				Example: `In October 2021, Facebook, Instagram and WhatsApp vanished for about six
+hours after a configuration change withdrew the network routes to
+Facebook's DNS servers, so the rest of the internet could no longer find
+them. CDNs such as Cloudflare and Akamai serve a large share of all web
+traffic.`,
+				Exercises: trio(
+					"Match each status code to its meaning: 200, 301, 404, 500 and 503.",
+					"2xx success, 3xx redirect, 4xx your mistake, 5xx the server's.",
+					"Use curl -v to fetch a web page and identify the connection, the TLS handshake, the request headers and the response headers. Then use dig or nslookup to look up the domain's DNS records.",
+					"curl -v https://example.com prints every step.",
+					"Write a tiny HTTP server from raw sockets (no web framework) that serves files from a folder with correct status codes and Content-Type headers, and open it in your browser.",
+					`Read the request line ("GET /path HTTP/1.1"), then send "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n" followed by the file.`,
+				),
+			},
 		},
 		Resources: []Resource{
 			{"Book", "Beej's Guide to Network Programming", "https://beej.us/guide/bgnet/", "The friendliest introduction to the sockets API."},
@@ -541,7 +670,7 @@ practice.`,
 				[]string{"Blocking echo server", "Non-blocking + epoll loop", "HTTP request parsing", "Keep-alive", "Benchmark and profile"}},
 			{"Raft Implementation", "Leader election, log replication and persistence, tested under simulated partitions.",
 				[]string{"Election with terms", "AppendEntries replication", "Commit index and apply", "Persistence and restart", "Partition test harness"}},
-			{"Replicated KV (capstone A)", "Put the Stage 3 storage engine behind the Raft log: a fault-tolerant KV service.",
+			{"Replicated KV (capstone A)", "Put the Stage 7 storage engine behind the Raft log: a fault-tolerant KV service.",
 				[]string{"Client protocol", "Raft-backed state machine", "Snapshots", "Linearizable reads", "Chaos testing"}},
 		},
 		Quiz: []Question{
@@ -553,11 +682,11 @@ practice.`,
 	},
 
 	// -----------------------------------------------------------------
-	5: {
+	13: {
 		Overview: `Deep learning is linear algebra plus the chain rule, run at scale. This
 stage builds fluent intuition for matrices as transformations and for
 derivatives of functions of vectors and matrices, so that every
-backward pass in Stage 6 is something you can derive on paper.`,
+backward pass in Stage 15 is something you can derive on paper.`,
 		Concepts: []Concept{
 			{
 				Name:    "Matrices as Linear Maps",
@@ -650,7 +779,7 @@ yet in practice SGD-family methods find good minima.`,
 			{"Matrix Library from Scratch", "Dense matrices with matmul (naive, then cache-blocked), transpose, LU and solve, benchmarked against BLAS.",
 				[]string{"Matrix type and matmul", "Cache-blocked matmul", "LU decomposition", "Linear solve", "Benchmark vs numpy"}},
 			{"Gradient Checker", "Compare analytic gradients with central finite differences, reporting relative error.",
-				[]string{"Finite-difference engine", "Relative-error metric", "Test matmul, softmax and CE", "Reuse in Stage 6"}},
+				[]string{"Finite-difference engine", "Relative-error metric", "Test matmul, softmax and CE", "Reuse in Stage 15"}},
 			{"PCA via Power Iteration", "Find the top principal components of MNIST using power iteration and deflation.",
 				[]string{"Load and centre the data", "Power iteration", "Deflation for k components", "Visualise the eigen-digits"}},
 		},
@@ -663,7 +792,7 @@ yet in practice SGD-family methods find good minima.`,
 	},
 
 	// -----------------------------------------------------------------
-	6: {
+	15: {
 		Overview: `Build the machinery of modern AI yourself: an automatic differentiation
 engine, then the layers that sit on it, up to a transformer. Once you
 have written backward() by hand, frameworks stop being magic.`,
@@ -688,7 +817,7 @@ backward:  ∂L/∂y = 2(y − t)
            ∂L/∂a = ∂L/∂y     ∂L/∂b = ∂L/∂y
            ∂L/∂w = ∂L/∂a·x   ∂L/∂x = ∂L/∂a·w`,
 				MentalModel: "Every op knows its own local derivative; the graph multiplies them together.",
-				TryIt:       "Build a scalar Value type with + × tanh and backward(), and check it against the Stage 5 gradient checker.",
+				TryIt:       "Build a scalar Value type with + × tanh and backward(), and check it against the Stage 13 gradient checker.",
 			},
 			{
 				Name:    "MLPs, Activations & Initialisation",
@@ -730,7 +859,7 @@ A causal mask stops a token from seeing the future, which is what makes
 next-token prediction possible. Multi-head attention runs several of
 these in parallel subspaces. A transformer block is attention plus an
 MLP, each wrapped in a residual connection and a norm. The cost is
-O(n²) in sequence length, the bottleneck that FlashAttention (Stage 7)
+O(n²) in sequence length, the bottleneck that FlashAttention (Stage 16)
 attacks.`,
 				Diagram: `tokens ─▶ embed ─▶ ┌──────────────────────────────┐ × N
                    │ x + Attn(Norm(x))            │
@@ -783,9 +912,9 @@ bug.`,
 	},
 
 	// -----------------------------------------------------------------
-	7: {
-		Overview: `This stage is where the other six meet. The memory hierarchy (Stage 1),
-virtual memory (Stage 2) and the math and autograd (Stages 5 and 6)
+	16: {
+		Overview: `This stage is where the other six meet. The memory hierarchy (Stage 5),
+virtual memory (Stage 6) and the math and autograd (Stages 13 and 15)
 collide on a GPU. Learn why AI performance is mostly about moving bytes,
 and how kernels, attention and inference servers are designed around
 that.`,
@@ -876,7 +1005,7 @@ Batching many requests reuses each weight read across all of them,
 which raises arithmetic intensity. Continuous batching adds and removes
 requests at every step. PagedAttention (vLLM) stores the KV cache in
 fixed-size blocks mapped through a block table: virtual memory from
-Stage 2, applied to attention. This removes fragmentation and lets
+Stage 6, applied to attention. This removes fragmentation and lets
 requests share prompt prefixes. Quantisation (int8, int4) cuts bytes
 everywhere.`,
 				MentalModel: "An LLM server is an operating system whose scarce resource is KV memory.",
@@ -908,7 +1037,7 @@ everywhere.`,
 			{"Estimate the decode speed limit at batch size 1 for a 13B int8 model on an 800 GB/s GPU.", "About 13 GB of weights are read per token: 800 / 13 ≈ 60 tokens per second at most."},
 			{"Why does batching raise decode throughput?", "Each weight read from HBM serves every sequence in the batch, which multiplies arithmetic intensity."},
 			{"What does FlashAttention avoid writing to HBM?", "The n×n attention score and probability matrices. It uses tiling plus an online softmax."},
-			{"Which Stage 2 idea does PagedAttention borrow?", "Paging: a per-sequence block table maps logical KV positions to fixed-size physical blocks."},
+			{"Which Stage 6 idea does PagedAttention borrow?", "Paging: a per-sequence block table maps logical KV positions to fixed-size physical blocks."},
 		},
 	},
 }

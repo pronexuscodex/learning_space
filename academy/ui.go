@@ -49,8 +49,12 @@ func colorEnabled(forceOff bool) bool {
 // trackColor gives each track a consistent accent colour.
 func trackColor(id string) func(string) string {
 	switch id {
+	case "F":
+		return sty.Green
 	case "A":
 		return sty.Cyan
+	case "S":
+		return sty.Yellow
 	case "B":
 		return sty.Magenta
 	default:

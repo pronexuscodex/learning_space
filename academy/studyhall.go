@@ -12,7 +12,7 @@ import (
 
 // studyHall picks a stage and loops over its learning menu.
 func (a *App) studyHall() error {
-	a.println(heading("STUDY HALL · concepts, resources & blueprints", sty.Blue, a.width))
+	a.println(heading("STUDY HALL · learn, practise, build", sty.Blue, a.width))
 	stageID, err := a.pickStage(nil)
 	if err != nil {
 		return err
@@ -25,8 +25,13 @@ func (a *App) studyHall() error {
 
 	for {
 		a.renderStageSyllabus(stageID, guide)
+		a.mu.Lock()
+		_, st := a.reg.findStage(stageID)
+		exDone, exTotal := exerciseProgress(st)
+		a.mu.Unlock()
 		choice, err := a.con.promptChoice("Study Hall", []string{
 			"Study a concept",
+			fmt.Sprintf("%s %s", sty.Bold("Exercise gym"), sty.Gray(fmt.Sprintf("(%d/%d done · warm-up → practice → real-world)", exDone, exTotal))),
 			fmt.Sprintf("Glossary %s", sty.Gray(fmt.Sprintf("(%d words explained simply)", len(guide.Glossary)))),
 			fmt.Sprintf("Resource library %s", sty.Gray(fmt.Sprintf("(%d)", len(guide.Resources)))),
 			fmt.Sprintf("Lab blueprints %s", sty.Gray(fmt.Sprintf("(%d, enroll with one keystroke)", len(guide.Blueprints)))),
@@ -40,12 +45,14 @@ func (a *App) studyHall() error {
 		case 0:
 			err = a.studyConcept(stageID, guide)
 		case 1:
-			a.showGlossary(guide)
+			err = a.exerciseGym(stageID, guide)
 		case 2:
-			a.showResources(guide)
+			a.showGlossary(guide)
 		case 3:
-			err = a.showBlueprints(stageID, guide)
+			a.showResources(guide)
 		case 4:
+			err = a.showBlueprints(stageID, guide)
+		case 5:
 			err = a.runQuiz(guide)
 		default:
 			return nil
@@ -66,8 +73,10 @@ func (a *App) renderStageSyllabus(stageID int, g StageGuide) {
 	color := trackColor(t.ID)
 	title := s.Title
 	studiedSet := map[string]bool{}
+	dots := map[string]string{}
 	for _, c := range g.Concepts {
 		studiedSet[c.Name] = s.hasStudied(c.Name)
+		dots[c.Name] = exerciseDots(s, c)
 	}
 	studied, total := conceptProgress(s)
 	a.mu.Unlock()
@@ -87,13 +96,15 @@ func (a *App) renderStageSyllabus(stageID int, g StageGuide) {
 			}
 		}
 	}
-	a.printf("\n  %s %s %d/%d\n", sty.Gray("Concepts"), bar(studied, total, 20, sty.Blue), studied, total)
+	a.printf("\n  %s %s %d/%d   %s\n", sty.Gray("Concepts"), bar(studied, total, 20, sty.Blue), studied, total,
+		sty.Gray("(✔ understood · ●●● exercises done)"))
 	for i, c := range g.Concepts {
 		mark := sty.Gray("○")
 		if studiedSet[c.Name] {
 			mark = sty.Green("✔")
 		}
-		a.printf("    %s %s %s %s\n", mark, color(fmt.Sprintf("%d.", i+1)), sty.Bold(c.Name), sty.Gray("— "+truncate(c.Summary, a.width-len(c.Name)-14)))
+		a.printf("    %s %s %s %s %s\n", mark, color(fmt.Sprintf("%d.", i+1)), dots[c.Name], sty.Bold(c.Name),
+			sty.Gray("— "+truncate(c.Summary, a.width-len([]rune(c.Name))-18)))
 	}
 	a.println("")
 }
@@ -109,12 +120,15 @@ func (a *App) studyConcept(stageID int, g StageGuide) error {
 		return err
 	}
 	c := g.Concepts[idx]
-	a.renderConcept(c, idx+1, len(g.Concepts), g.Glossary)
-
 	a.mu.Lock()
 	_, s := a.reg.findStage(stageID)
 	already := s.hasStudied(c.Name)
+	done := make([]bool, len(c.Exercises))
+	for i := range c.Exercises {
+		done[i] = s.hasDone(c.Name, i)
+	}
 	a.mu.Unlock()
+	a.renderConcept(c, idx+1, len(g.Concepts), g.Glossary, done)
 
 	label := "Mark as understood?"
 	if already {
@@ -138,7 +152,7 @@ func (a *App) studyConcept(stageID int, g StageGuide) error {
 
 // renderConcept prints a concept as a heavy-bordered reading card, going
 // from intuition (analogy, real life) to precision (details, diagram).
-func (a *App) renderConcept(c Concept, n, total int, glossary []Term) {
+func (a *App) renderConcept(c Concept, n, total int, glossary []Term, done []bool) {
 	w := a.width
 	edge := sty.Blue("┃")
 	blank := func() { a.printf("  %s\n", edge) }
@@ -181,6 +195,21 @@ func (a *App) renderConcept(c Concept, n, total int, glossary []Term) {
 		section("▶ Try it (optional)", sty.Green)
 		paragraph(c.TryIt, plainText)
 	}
+	if len(c.Exercises) > 0 {
+		section("🏋 Exercises", sty.Magenta)
+		for i, e := range c.Exercises {
+			mark := sty.Gray("○")
+			if i < len(done) && done[i] {
+				mark = sty.Green("✔")
+			}
+			a.printf("  %s %s %s\n", edge, mark, levelBadge(e.Level))
+			for _, l := range wrap(e.Task, w-10, "") {
+				a.printf("  %s     %s\n", edge, l)
+			}
+		}
+		blank()
+		a.printf("  %s %s\n", edge, sty.Gray("Hints and check-off: Study Hall → Exercise gym."))
+	}
 	if terms := termsIn(glossary, c.Summary, c.Analogy, c.Example, c.Body); len(terms) > 0 {
 		section("📖 Words to know", sty.Blue)
 		for _, t := range terms {
@@ -194,6 +223,149 @@ func (a *App) renderConcept(c Concept, n, total int, glossary []Term) {
 		}
 	}
 	a.println("  " + sty.Blue("┗"+strings.Repeat("━", w-4)))
+}
+
+// levelBadge renders an exercise level as a coloured label.
+func levelBadge(level string) string {
+	switch level {
+	case LevelWarmUp:
+		return sty.Bold(sty.Green("● WARM-UP")) + sty.Gray(" · no code needed")
+	case LevelPractice:
+		return sty.Bold(sty.Yellow("● PRACTICE")) + sty.Gray(" · a small program")
+	case LevelRealWorld:
+		return sty.Bold(sty.Red("● REAL-WORLD")) + sty.Gray(" · a real situation")
+	default:
+		return sty.Bold(level)
+	}
+}
+
+// exerciseDots shows a concept's exercises as ●/○, one per exercise.
+// Caller holds mu.
+func exerciseDots(s *Stage, c Concept) string {
+	var b strings.Builder
+	for i := range c.Exercises {
+		if s.hasDone(c.Name, i) {
+			b.WriteString(sty.Magenta("●"))
+		} else {
+			b.WriteString(sty.Gray("○"))
+		}
+	}
+	return b.String()
+}
+
+// exerciseGym lets the learner pick an exercise, reveal its hint and tick
+// it off. q at any prompt returns to the Study Hall menu.
+func (a *App) exerciseGym(stageID int, g StageGuide) error {
+	for {
+		a.println("")
+		a.printf("  %s\n", sty.Bold(sty.Magenta("EXERCISE GYM · try first, then peek at the hint")))
+		a.mu.Lock()
+		_, s := a.reg.findStage(stageID)
+		options := make([]string, len(g.Concepts))
+		for i, c := range g.Concepts {
+			options[i] = exerciseDots(s, c) + " " + c.Name
+		}
+		a.mu.Unlock()
+
+		ci, err := a.con.promptChoice("Concept", options)
+		if errors.Is(err, errCancel) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		c := g.Concepts[ci]
+
+		a.mu.Lock()
+		_, s = a.reg.findStage(stageID)
+		exOptions := make([]string, len(c.Exercises))
+		for i, e := range c.Exercises {
+			mark := sty.Gray("○")
+			if s.hasDone(c.Name, i) {
+				mark = sty.Green("✔")
+			}
+			exOptions[i] = mark + " " + levelBadge(e.Level) + "\n        " + truncate(e.Task, a.width-12)
+		}
+		a.mu.Unlock()
+
+		a.printf("\n  %s\n", sty.Bold(c.Name))
+		ei, err := a.con.promptChoice("Exercise", exOptions)
+		if errors.Is(err, errCancel) {
+			continue
+		}
+		if err != nil {
+			return err
+		}
+		if err := a.workExercise(stageID, c, ei); err != nil && !errors.Is(err, errCancel) {
+			return err
+		}
+	}
+}
+
+// workExercise shows one exercise in full, offers the hint, and toggles
+// its done state.
+func (a *App) workExercise(stageID int, c Concept, i int) error {
+	e := c.Exercises[i]
+	w := a.width
+	edge := sty.Magenta("┃")
+	a.println("")
+	a.printf("  %s %s %s\n", sty.Magenta("┏━"), levelBadge(e.Level), sty.Gray("· "+c.Name))
+	for _, l := range wrap(e.Task, w-6, "") {
+		a.printf("  %s %s\n", edge, l)
+	}
+	a.println("  " + sty.Magenta("┗"+strings.Repeat("━", w-4)))
+
+	show, err := a.con.confirm("Show the hint?")
+	if err != nil {
+		return err
+	}
+	if show {
+		a.println("")
+		for i, l := range wrap(e.Hint, w-14, "") {
+			lead := "           "
+			if i == 0 {
+				lead = sty.Bold(sty.Yellow("💡 Hint")) + "    "
+			}
+			a.printf("  %s%s\n", lead, sty.Yellow(l))
+		}
+	}
+
+	a.mu.Lock()
+	_, s := a.reg.findStage(stageID)
+	already := s.hasDone(c.Name, i)
+	a.mu.Unlock()
+
+	label := "Mark this exercise as done?"
+	if already {
+		label = "Already done. Untick it?"
+	}
+	yes, err := a.con.confirm(label)
+	if err != nil || !yes {
+		return err
+	}
+	a.mutate(func(r *Registry) {
+		_, s := r.findStage(stageID)
+		s.setDone(c.Name, i, !already)
+	})
+	if already {
+		a.con.ok("Exercise unticked.")
+	} else {
+		a.con.ok("Nice work! %s exercise done.", levelBadgePlain(e.Level))
+	}
+	return nil
+}
+
+// levelBadgePlain is the level name without decoration, for sentences.
+func levelBadgePlain(level string) string {
+	switch level {
+	case LevelWarmUp:
+		return "Warm-up"
+	case LevelPractice:
+		return "Practice"
+	case LevelRealWorld:
+		return "Real-world"
+	}
+	return level
 }
 
 // termRegex caches one case-insensitive, plural-tolerant pattern per term.

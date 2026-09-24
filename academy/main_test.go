@@ -89,34 +89,65 @@ func TestAtomicWriteRoundTripAndLegacyLoad(t *testing.T) {
 	path := filepath.Join(dir, registryFileName)
 
 	reg := seedRegistry()
-	_, s := reg.findStage(6)
+	_, s := reg.findStage(15)
 	s.setStudied("Attention & the Transformer", true)
+	s.setDone("Attention & the Transformer", 2, true)
 	if err := atomicWriteJSON(path, reg); err != nil {
 		t.Fatal(err)
 	}
-	got, seeded, err := loadRegistry(path)
-	if err != nil || seeded {
-		t.Fatalf("load: seeded=%v err=%v", seeded, err)
+	got, res, err := loadRegistry(path)
+	if err != nil || res != (loadResult{}) {
+		t.Fatalf("load: result=%+v err=%v", res, err)
 	}
-	if _, s := got.findStage(6); !s.hasStudied("Attention & the Transformer") {
-		t.Fatal("concept progress lost in round trip")
+	if _, s := got.findStage(15); !s.hasStudied("Attention & the Transformer") || !s.hasDone("Attention & the Transformer", 2) {
+		t.Fatal("concept or exercise progress lost in round trip")
 	}
 	if entries, _ := os.ReadDir(dir); len(entries) != 1 {
 		t.Fatalf("temp files left behind: %v", entries)
 	}
 
-	// A registry written before concepts_studied existed must still load.
-	legacy := `{"schema_version":1,"next_lab_id":1,"tracks":[{"id":"A","name":"x","stages":[{"id":1,"title":"t","status":"Active Research","required_literature":[],"labs":null}]}]}`
+	// A schema-1 registry (7 stages, no concepts_studied) must migrate:
+	// stage IDs move to their new places, progress and labs survive, and
+	// the new stages are merged in.
+	legacy := `{"schema_version":1,"next_lab_id":2,"tracks":[
+	  {"id":"A","name":"Systems","stages":[{"id":1,"title":"Iron","status":"Mastered/Graduated","required_literature":[],"labs":[
+	    {"id":1,"name":"Tiny C","architecture_notes":"","hours_logged":3,"compilation_status":"Compiles","status":"Active Research","enrolled_at":"2026-01-01T00:00:00Z","hour_log":[]}]}]},
+	  {"id":"B","name":"AI","stages":[{"id":6,"title":"Neural","status":"Active Research","required_literature":[],"concepts_studied":["Attention & the Transformer"],"labs":null}]}]}`
 	if err := os.WriteFile(path, []byte(legacy), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	old, _, err := loadRegistry(path)
+	old, res, err := loadRegistry(path)
 	if err != nil {
 		t.Fatalf("legacy load: %v", err)
 	}
-	if st := old.Tracks[0].Stages[0]; st.ConceptsStudied == nil || st.Labs == nil {
-		t.Fatal("nil slices were not normalised")
+	if !res.Migrated || res.NewStages != 14 {
+		t.Fatalf("result = %+v, want migrated with 14 new stages", res)
 	}
+	if _, s := old.findStage(5); s == nil || s.Title != "Iron" || s.Status != StatusGraduated || len(s.Labs) != 1 {
+		t.Fatalf("stage 1 did not become stage 5 with its progress: %+v", s)
+	}
+	if _, s := old.findStage(15); s == nil || !s.hasStudied("Attention & the Transformer") || s.Labs == nil {
+		t.Fatal("stage 6 did not become stage 15 with its progress")
+	}
+	if tr, s := old.findStage(1); s == nil || tr.ID != "F" || old.Tracks[0].ID != "F" {
+		t.Fatal("Foundations track missing or not first")
+	}
+	var ids []string
+	for _, tr := range old.Tracks {
+		ids = append(ids, tr.ID)
+	}
+	if strings.Join(ids, "") != "FASB" {
+		t.Fatalf("track order = %v, want F A S B", ids)
+	}
+	for _, id := range []int{2, 3, 4, 6, 7, 8} {
+		if _, s := old.findStage(id); s == nil {
+			t.Errorf("stage %d missing after reconcile", id)
+		}
+	}
+	if _, s := old.findStage(5); !strings.HasPrefix(old.Tracks[1].Stages[0].Title, "Iron") || s == nil {
+		t.Error("existing stage should come first in its track")
+	}
+
 }
 
 func TestStatsActivityAndStreak(t *testing.T) {
@@ -150,9 +181,26 @@ func TestEveryConceptHasBeginnerExplanations(t *testing.T) {
 			if c.Analogy == "" || c.Example == "" {
 				t.Errorf("stage %d concept %q: missing analogy or real-life example", id, c.Name)
 			}
+			levels := []string{LevelWarmUp, LevelPractice, LevelRealWorld}
+			if len(c.Exercises) != len(levels) {
+				t.Errorf("stage %d concept %q: has %d exercises, want warm-up, practice and real-world", id, c.Name, len(c.Exercises))
+				continue
+			}
+			for i, e := range c.Exercises {
+				if e.Level != levels[i] || e.Task == "" || e.Hint == "" {
+					t.Errorf("stage %d concept %q exercise %d is incomplete", id, c.Name, i+1)
+				}
+			}
 		}
 	}
+	keyed := map[string]bool{}
 	for name := range plainWords {
+		keyed[name] = true
+	}
+	for name := range conceptExercises {
+		keyed[name] = true
+	}
+	for name := range keyed {
 		found := false
 		for _, g := range curriculum {
 			for _, c := range g.Concepts {
@@ -160,7 +208,7 @@ func TestEveryConceptHasBeginnerExplanations(t *testing.T) {
 			}
 		}
 		if !found {
-			t.Errorf("explainer %q matches no concept (renamed?)", name)
+			t.Errorf("explainer or exercise set %q matches no concept (renamed?)", name)
 		}
 	}
 }
@@ -170,5 +218,25 @@ func TestTermsInMatchesWholeWordsAndPlurals(t *testing.T) {
 	got := termsIn(gl, "The CPU has 16 registers and a big cache.", "Nothing about tabIs.")
 	if len(got) != 2 || got[0].Word != "Register" || got[1].Word != "Cache" {
 		t.Fatalf("termsIn = %+v", got)
+	}
+}
+
+// Every guide must belong to a seeded stage, and IDs must run 1..N.
+func TestGuidesMatchSeedStages(t *testing.T) {
+	reg := seedRegistry()
+	n := 0
+	for _, tr := range reg.Tracks {
+		n += len(tr.Stages)
+	}
+	if n != len(curriculum) {
+		t.Fatalf("%d seeded stages but %d guides", n, len(curriculum))
+	}
+	for id := 1; id <= n; id++ {
+		if _, s := reg.findStage(id); s == nil {
+			t.Errorf("stage %d is not seeded", id)
+		}
+		if _, ok := guideFor(id); !ok {
+			t.Errorf("stage %d has no guide", id)
+		}
 	}
 }

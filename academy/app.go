@@ -90,16 +90,20 @@ func (a *App) printDashboard() {
 
 	stat := func(label, value string) string { return sty.Gray(label) + " " + sty.Bold(value) }
 	a.println("")
+	sep := sty.Gray("  │  ")
 	a.println("  " + strings.Join([]string{
 		stat("Hours", fmt.Sprintf("%.2f", cs.hours)),
 		stat("Labs", fmt.Sprintf("%d", cs.labs)) + sty.Gray(fmt.Sprintf(" (%d★)", cs.labsGrad)),
 		stat("Stages", fmt.Sprintf("%d/%d", cs.stagesGrad, cs.stages)),
 		stat("Texts", fmt.Sprintf("%d/%d", cs.textsRead, cs.texts)),
+	}, sep))
+	a.println("  " + strings.Join([]string{
 		stat("Concepts", fmt.Sprintf("%d/%d", cs.conceptsStudied, cs.concepts)),
-	}, sty.Gray("  │  ")))
+		stat("Exercises", fmt.Sprintf("%d/%d", cs.exercisesDone, cs.exercises)),
+	}, sep))
 
-	done := cs.textsRead + cs.conceptsStudied + cs.stagesGrad
-	total := cs.texts + cs.concepts + cs.stages
+	done := cs.textsRead + cs.conceptsStudied + cs.exercisesDone + cs.stagesGrad
+	total := cs.texts + cs.concepts + cs.exercises + cs.stages
 	streak := sty.Gray("no streak yet")
 	if cs.streak > 0 {
 		streak = sty.Bold(sty.Yellow(fmt.Sprintf("▲ %d-day streak", cs.streak)))
@@ -117,7 +121,7 @@ func (a *App) printMenu() {
 	item := func(key, label string) string { return sty.Cyan("["+key+"]") + " " + label }
 	rows := [][2]string{
 		{item("1", "View Campus Ledger"), item("5", "Atomic Commit & Exit")},
-		{item("2", "Enroll in a New Lab"), item("6", sty.Bold("Study Hall")+sty.Gray(" · concepts & resources"))},
+		{item("2", "Enroll in a New Lab"), item("6", sty.Bold("Study Hall")+sty.Gray(" · learn & practise"))},
 		{item("3", "Log Study/Lab Hours"), item("7", "Checkpoint (save, keep going)")},
 		{item("4", "Advance Academic Status"), item("8", sty.Gray("Exit without saving"))},
 	}
@@ -177,6 +181,7 @@ func (a *App) renderStageCard(s *Stage, color func(string) string) {
 
 	read, total := literatureProgress(s)
 	studied, concepts := conceptProgress(s)
+	exDone, exTotal := exerciseProgress(s)
 
 	a.println("")
 	a.printf("  %s %s %s %s\n", color("╭─"), color(sty.Bold(fmt.Sprintf("Stage %d", s.ID))),
@@ -184,6 +189,7 @@ func (a *App) renderStageCard(s *Stage, color func(string) string) {
 	line(statusPill(s.Status) + sty.Gray(fmt.Sprintf("   %.2fh logged · %d lab(s)", stageHours(s), len(s.Labs))))
 	line(padRight(sty.Gray("Reading"), 10) + bar(read, total, 20, sty.Green) + " " + fmt.Sprintf("%d/%d", read, total))
 	line(padRight(sty.Gray("Concepts"), 10) + bar(studied, concepts, 20, sty.Blue) + " " + fmt.Sprintf("%d/%d", studied, concepts))
+	line(padRight(sty.Gray("Exercises"), 10) + bar(exDone, exTotal, 20, sty.Magenta) + " " + fmt.Sprintf("%d/%d", exDone, exTotal))
 
 	for _, lit := range s.Literature {
 		mark := sty.Gray("○")
@@ -237,12 +243,14 @@ func (a *App) listStages(track *Track) {
 		for si := range t.Stages {
 			s := &t.Stages[si]
 			studied, concepts := conceptProgress(s)
+			exDone, exTotal := exerciseProgress(s)
 			mark := sty.Yellow("◐")
 			if s.Status == StatusGraduated {
 				mark = sty.Green("★")
 			}
-			a.printf("      %s %s %s %s\n", color(fmt.Sprintf("[%d]", s.ID)), mark,
-				padRight(truncate(s.Title, 54), 54), sty.Gray(fmt.Sprintf("%d/%d concepts", studied, concepts)))
+			a.printf("      %s %s %s %s\n", color(padRight(fmt.Sprintf("[%d]", s.ID), 4)), mark,
+				padRight(truncate(s.Title, 50), 50),
+				sty.Gray(fmt.Sprintf("concepts %d/%d · ex %d/%d", studied, concepts, exDone, exTotal)))
 		}
 	}
 }
@@ -484,6 +492,7 @@ func (a *App) toggleStage() error {
 	next := s.Status.Toggled()
 	read, total := literatureProgress(s)
 	studied, concepts := conceptProgress(s)
+	exDone, exTotal := exerciseProgress(s)
 	activeLabs := 0
 	for _, l := range s.Labs {
 		if l.Status != StatusGraduated {
@@ -492,9 +501,9 @@ func (a *App) toggleStage() error {
 	}
 	a.mu.Unlock()
 
-	if next == StatusGraduated && (read < total || studied < concepts || activeLabs > 0) {
-		a.con.warn("Stage %d still has %d unread text(s), %d unstudied concept(s) and %d active lab(s).",
-			id, total-read, concepts-studied, activeLabs)
+	if next == StatusGraduated && (read < total || studied < concepts || exDone < exTotal || activeLabs > 0) {
+		a.con.warn("Stage %d still has %d unread text(s), %d unstudied concept(s), %d open exercise(s) and %d active lab(s).",
+			id, total-read, concepts-studied, exTotal-exDone, activeLabs)
 		ok, err := a.con.confirm("Graduate anyway?")
 		if err != nil {
 			return err

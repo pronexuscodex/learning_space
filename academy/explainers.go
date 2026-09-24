@@ -21,9 +21,13 @@ type stageExtras struct {
 func init() {
 	for id, g := range curriculum {
 		for i := range g.Concepts {
-			if p, ok := plainWords[g.Concepts[i].Name]; ok {
-				g.Concepts[i].Analogy = p.Analogy
-				g.Concepts[i].Example = p.Example
+			c := &g.Concepts[i]
+			if p, ok := plainWords[c.Name]; ok {
+				c.Analogy = p.Analogy
+				c.Example = p.Example
+			}
+			if ex, ok := conceptExercises[c.Name]; ok && len(c.Exercises) == 0 {
+				c.Exercises = ex
 			}
 		}
 		if x, ok := extras[id]; ok {
@@ -36,7 +40,7 @@ func init() {
 
 // plainWords is keyed by Concept.Name.
 var plainWords = map[string]plain{
-	// ---------------- Stage 1: The Iron Layer ----------------
+	// ---------------- Stage 5: The Iron Layer ----------------
 	"The Compilation Pipeline": {
 		Analogy: `Imagine translating a novel into Japanese with a team of specialists
 working in a line. The first splits the text into words, the next works
@@ -101,7 +105,7 @@ highlighting and "go to definition", and your browser parses every
 JSON response it receives.`,
 	},
 
-	// ---------------- Stage 2: Operating Systems ----------------
+	// ---------------- Stage 6: Operating Systems ----------------
 	"Processes & the Address Space": {
 		Analogy: `Every process is a tenant in an apartment building where all the
 apartments have the same floor plan. Apartment "3B" exists in every
@@ -158,7 +162,7 @@ race condition in alarm software contributed to the 2003 blackout in
 the north-eastern US and Canada.`,
 	},
 
-	// ---------------- Stage 3: Storage Engines ----------------
+	// ---------------- Stage 7: Storage Engines ----------------
 	"Durability: Page Cache, fsync & Atomic Rename": {
 		Analogy: `Telling a waiter your order (write) is not the same as seeing it printed
 on the kitchen ticket (fsync). If the waiter trips on the way, your order
@@ -211,7 +215,7 @@ happen completely or not at all. Money must never vanish or be created
 halfway.`,
 	},
 
-	// ---------------- Stage 4: Networks ----------------
+	// ---------------- Stage 8: Networks ----------------
 	"The Layered Stack & Encapsulation": {
 		Analogy: `Sending a letter: you write it (the application), put it in an envelope
 addressed to a person (the port, via TCP or UDP), the post office adds a
@@ -265,7 +269,7 @@ three etcd servers dies, the cluster keeps working. CockroachDB and
 Consul are built on Raft as well.`,
 	},
 
-	// ---------------- Stage 5: Mathematical Foundations ----------------
+	// ---------------- Stage 13: Mathematical Foundations ----------------
 	"Matrices as Linear Maps": {
 		Analogy: `Think of the tools in a photo editor: stretch, rotate, skew, flip. Each
 is a matrix applied to the position of every pixel. Doing one tool after
@@ -317,7 +321,7 @@ recommendations to chatbots, was trained by this exact loop: measure the
 error, compute the slope, take a step, and repeat millions of times.`,
 	},
 
-	// ---------------- Stage 6: Neural Networks & Autograd ----------------
+	// ---------------- Stage 15: Neural Networks & Autograd ----------------
 	"Computational Graphs & Reverse-Mode Autodiff": {
 		Analogy: `A soup tastes too salty. You work backwards through the recipe: how much
 salt did the stock add, how much did the soy sauce add, and how much
@@ -371,7 +375,7 @@ lesion itself looks like. It scored well in the lab and would fail
 elsewhere.`,
 	},
 
-	// ---------------- Stage 7: AI Infrastructure ----------------
+	// ---------------- Stage 16: AI Infrastructure ----------------
 	"The GPU Execution Model": {
 		Analogy: `A CPU is a few brilliant professors who can each handle anything. A GPU
 is a stadium of thousands of students each doing simple arithmetic at
@@ -429,7 +433,7 @@ Hugging Face Transformers setup.`,
 
 // extras is keyed by stage ID.
 var extras = map[int]stageExtras{
-	1: {
+	5: {
 		Outcomes: []string{
 			"Explain what really happens between typing code and the CPU running it",
 			"Read simple assembly output and see why one version of a function is faster",
@@ -448,7 +452,7 @@ var extras = map[int]stageExtras{
 			{"AST", "Abstract Syntax Tree: code turned into a tree that shows its structure."},
 		},
 	},
-	2: {
+	6: {
 		Outcomes: []string{
 			"Explain what the operating system does for every program you run",
 			"Understand crashes such as 'segmentation fault' and 'out of memory'",
@@ -466,7 +470,7 @@ var extras = map[int]stageExtras{
 			{"Race condition", "A bug where the result depends on which thread happens to run first."},
 		},
 	},
-	3: {
+	7: {
 		Outcomes: []string{
 			"Explain how databases find one row among billions in milliseconds",
 			"Explain how data survives crashes and power cuts",
@@ -481,9 +485,12 @@ var extras = map[int]stageExtras{
 			{"Compaction", "Background tidying that merges files and throws away old or deleted data."},
 			{"Transaction", "A group of changes that happens completely or not at all."},
 			{"ACID", "Atomicity, Consistency, Isolation, Durability: the four promises a transaction makes."},
+			{"SQL", "Structured Query Language: the standard language for asking relational databases questions."},
+			{"Primary key", "A column (or columns) that uniquely identifies each row in a table."},
+			{"JOIN", "A SQL operation that combines rows from two tables that share a matching value."},
 		},
 	},
-	4: {
+	8: {
 		Outcomes: []string{
 			"Trace exactly what happens when you open a web page",
 			"Write servers that handle thousands of users at once",
@@ -499,9 +506,12 @@ var extras = map[int]stageExtras{
 			{"Socket", "The program's handle for one network connection, which it reads from and writes to."},
 			{"Node", "One machine (or process) in a distributed system."},
 			{"Consensus", "Getting several machines to agree on the same value even when some fail."},
+			{"DNS", "Domain Name System: the internet's phone book, turning names like example.com into IP addresses."},
+			{"HTTP", "The request/response protocol browsers and apps use to fetch web pages and data."},
+			{"CDN", "Content Delivery Network: servers around the world that keep copies of content close to users."},
 		},
 	},
-	5: {
+	13: {
 		Outcomes: []string{
 			"Read the maths in machine-learning papers without fear",
 			"Derive by hand how a neural network layer learns",
@@ -518,7 +528,7 @@ var extras = map[int]stageExtras{
 			{"Learning rate", "How big a step the model takes each time it adjusts its weights."},
 		},
 	},
-	6: {
+	15: {
 		Outcomes: []string{
 			"Build a neural network library from nothing, including backpropagation",
 			"Train models that recognise handwritten digits",
@@ -535,7 +545,7 @@ var extras = map[int]stageExtras{
 			{"Embedding", "A list of numbers that represents a token (or anything else) in a way the model can compute with."},
 		},
 	},
-	7: {
+	16: {
 		Outcomes: []string{
 			"Explain why AI needs GPUs and what makes a GPU program fast",
 			"Predict how fast a model will run on given hardware, before you run it",
@@ -558,7 +568,16 @@ var extras = map[int]stageExtras{
 const startHere = `Welcome. This academy is built for self-learners. You do not need a
 degree, prior experience or anyone's permission. Every idea is explained
 from scratch, in plain words first, with real-world examples, before any
-jargon appears.
+jargon appears, and every idea comes with exercises drawn from real
+situations.
+
+WHAT IT COVERS
+Sixteen stages in four tracks, covering the core of a computer science
+degree plus modern AI:
+- Track F, Foundations: programming, data structures and algorithms, discrete maths, digital logic and computer architecture.
+- Track A, Systems: compilers and the machine, operating systems, databases and storage, networks and the web.
+- Track S, Software, Security & Theory: software engineering, security and cryptography, theory of computation, programming languages.
+- Track B, AI: linear algebra and calculus, statistics and classical ML, neural networks, AI infrastructure and GPUs.
 
 HOW EACH CONCEPT IS TAUGHT
 - In plain words: an everyday analogy with no jargon at all.
@@ -566,19 +585,30 @@ HOW EACH CONCEPT IS TAUGHT
 - The details: the precise explanation, once the intuition is in place.
 - Diagram: a picture of the mechanism, where one helps.
 - Mental model: one sentence to carry around in your head.
-- Try it (optional): a small hands-on exercise, if you want to go further.
+- Exercises: three per concept, from easy to real-world (see below).
 - Words to know: any jargon in the card, defined at the bottom.
 
+HOW TO PRACTISE
+Every concept has three exercises, and each has a hint:
+- Warm-up: pen and paper, or a few minutes of thinking. No code needed.
+- Practice: a small program that makes the idea concrete.
+- Real-world: a task from a real situation, such as a shop, a bank, your own files or a real dataset.
+
+Open the Exercise Gym in any stage's Study Hall to see hints and tick
+exercises off. Try each one before you peek at the hint.
+
 WHERE TO START
-- Curious about how computers work? Start with Stage 1.
-- Curious about AI? Start with Stage 5. The two tracks can run side by side.
+- Complete beginner? Start at Stage 1, Programming Fundamentals, and follow Track F in order.
+- After Track F, take Tracks A and S in either order.
+- For AI, Stages 1 to 3 are enough preparation for Stage 13.
 - Stuck on a word? Open the Glossary in the stage's Study Hall.
 
 A SIMPLE STUDY RHYTHM
 - One concept per session. Read it slowly, then close your eyes and explain it out loud.
-- Mark it as understood only when you could explain it to a friend.
+- Do its warm-up the same day and its practice exercise the next.
+- Mark a concept as understood only when you could explain it to a friend.
 - Take the stage's quiz at the end of the week. Missed answers show you what to re-read.
-- When a stage feels comfortable, pick one lab blueprint and build it. Building is where it sticks.
+- Finish each stage with one real-world exercise or lab blueprint. Building is where it sticks.
 - Log your hours. The streak and the activity chart are there to keep you going.
 
 IF IT FEELS HARD
@@ -586,6 +616,14 @@ That is normal and means you are learning. Re-read the analogy, look at
 the real-life example, then try one resource from the library. Nobody
 understands this material on the first pass. You have unlimited time and
 no exams.
+
+BEYOND THE CORE
+Once the sixteen stages feel comfortable, these electives build on them:
+- Computer graphics: Scratchapixel (scratchapixel.com)
+- Quantum computing: IBM Quantum Learning (learning.quantum.ibm.com)
+- Embedded systems and electronics: Arduino docs (docs.arduino.cc)
+- Bioinformatics: Rosalind problems (rosalind.info)
+- Game development, robotics, human-computer interaction and computer vision all reuse the ideas you have learned here.
 
 YOUR DATA
 Everything you do is saved in one readable JSON file next to the program.

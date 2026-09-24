@@ -37,6 +37,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"sort"
 	"strings"
 	"syscall"
 	"time"
@@ -46,8 +47,12 @@ import (
 const registryFileName = "academy_campus_registry.json"
 
 // schemaVersion is bumped whenever the JSON layout changes incompatibly.
-// Version 1 files without concepts_studied load fine: the field is additive.
-const schemaVersion = 1
+// Older files are upgraded on load by migrate(); see v1StageRenumber.
+const schemaVersion = 2
+
+// v1StageRenumber maps schema-1 stage IDs (the original seven stages) to
+// their place in the 16-stage curriculum introduced by schema 2.
+var v1StageRenumber = map[int]int{1: 5, 2: 6, 3: 7, 4: 8, 5: 13, 6: 15, 7: 16}
 
 // Input and value limits. Anything outside these is rejected, not truncated.
 const (
@@ -138,31 +143,71 @@ type Stage struct {
 	Status          Status       `json:"status"`
 	Literature      []Literature `json:"required_literature"`
 	ConceptsStudied []string     `json:"concepts_studied"`
+	ExercisesDone   []string     `json:"exercises_done"`
 	Labs            []Lab        `json:"labs"`
 }
 
-// hasStudied reports whether the named concept is marked as understood.
-func (s *Stage) hasStudied(concept string) bool {
-	for _, c := range s.ConceptsStudied {
-		if c == concept {
+// contains reports whether list holds item.
+func contains(list []string, item string) bool {
+	for _, x := range list {
+		if x == item {
 			return true
 		}
 	}
 	return false
 }
 
-// setStudied marks or unmarks a concept as understood.
-func (s *Stage) setStudied(concept string, studied bool) {
-	kept := s.ConceptsStudied[:0]
-	for _, c := range s.ConceptsStudied {
-		if c != concept {
-			kept = append(kept, c)
+// setMember adds or removes item from list, keeping it free of duplicates.
+func setMember(list []string, item string, present bool) []string {
+	kept := list[:0]
+	for _, x := range list {
+		if x != item {
+			kept = append(kept, x)
 		}
 	}
-	if studied {
-		kept = append(kept, concept)
+	if present {
+		kept = append(kept, item)
 	}
-	s.ConceptsStudied = kept
+	return kept
+}
+
+// hasStudied reports whether the named concept is marked as understood.
+func (s *Stage) hasStudied(concept string) bool { return contains(s.ConceptsStudied, concept) }
+
+// setStudied marks or unmarks a concept as understood.
+func (s *Stage) setStudied(concept string, studied bool) {
+	s.ConceptsStudied = setMember(s.ConceptsStudied, concept, studied)
+}
+
+// exerciseKey identifies exercise i (0-based) of a concept in exercises_done.
+func exerciseKey(concept string, i int) string { return fmt.Sprintf("%s #%d", concept, i+1) }
+
+// hasDone reports whether an exercise is ticked off.
+func (s *Stage) hasDone(concept string, i int) bool {
+	return contains(s.ExercisesDone, exerciseKey(concept, i))
+}
+
+// setDone ticks or unticks an exercise.
+func (s *Stage) setDone(concept string, i int, done bool) {
+	s.ExercisesDone = setMember(s.ExercisesDone, exerciseKey(concept, i), done)
+}
+
+// exerciseProgress returns (done, total) across all of a stage's concepts.
+func exerciseProgress(s *Stage) (int, int) {
+	g, ok := guideFor(s.ID)
+	if !ok {
+		return 0, 0
+	}
+	done, total := 0, 0
+	for _, c := range g.Concepts {
+		for i := range c.Exercises {
+			total++
+			if s.hasDone(c.Name, i) {
+				done++
+			}
+		}
+	}
+	return done, total
 }
 
 // conceptProgress returns (studied, total) against the Study Hall guide.
@@ -262,6 +307,7 @@ type campusStats struct {
 	stages, stagesGrad        int
 	texts, textsRead          int
 	concepts, conceptsStudied int
+	exercises, exercisesDone  int
 	activity                  []float64 // hours per day, oldest first
 	streak                    int       // consecutive active days
 }
@@ -284,6 +330,9 @@ func (r *Registry) stats(now time.Time, activityDays int) campusStats {
 			studied, concepts := conceptProgress(s)
 			cs.conceptsStudied += studied
 			cs.concepts += concepts
+			done, exercises := exerciseProgress(s)
+			cs.exercisesDone += done
+			cs.exercises += exercises
 			for _, l := range s.Labs {
 				cs.labs++
 				cs.hours += l.HoursLogged
@@ -344,6 +393,9 @@ func (r *Registry) validate() error {
 			if s.ConceptsStudied == nil {
 				s.ConceptsStudied = []string{}
 			}
+			if s.ExercisesDone == nil {
+				s.ExercisesDone = []string{}
+			}
 			if s.Labs == nil {
 				s.Labs = []Lab{}
 			}
@@ -376,7 +428,8 @@ func seedRegistry() *Registry {
 	book := func(title, author string) Literature { return Literature{Title: title, Author: author, Kind: "Book"} }
 	paper := func(title, author string) Literature { return Literature{Title: title, Author: author, Kind: "Paper"} }
 	stage := func(id int, title string, lit ...Literature) Stage {
-		return Stage{ID: id, Title: title, Status: StatusActive, Literature: lit, ConceptsStudied: []string{}, Labs: []Lab{}}
+		return Stage{ID: id, Title: title, Status: StatusActive, Literature: lit,
+			ConceptsStudied: []string{}, ExercisesDone: []string{}, Labs: []Lab{}}
 	}
 
 	return &Registry{
@@ -384,25 +437,51 @@ func seedRegistry() *Registry {
 		NextLabID:     1,
 		Tracks: []Track{
 			{
+				ID:   "F",
+				Name: "Foundations of Computing",
+				Stages: []Stage{
+					stage(1, "Programming Fundamentals",
+						book("How to Design Programs", "Felleisen, Findler, Flatt & Krishnamurthi"),
+						book("Structure and Interpretation of Computer Programs", "Abelson & Sussman"),
+						book("Think Python", "Allen B. Downey"),
+					),
+					stage(2, "Data Structures & Algorithms",
+						book("Introduction to Algorithms (CLRS)", "Cormen, Leiserson, Rivest & Stein"),
+						book("The Algorithm Design Manual", "Steven Skiena"),
+						book("Grokking Algorithms", "Aditya Bhargava"),
+					),
+					stage(3, "Discrete Mathematics, Logic & Probability",
+						book("Mathematics for Computer Science", "Lehman, Leighton & Meyer"),
+						book("How to Prove It", "Daniel Velleman"),
+						book("Discrete Mathematics and Its Applications", "Kenneth Rosen"),
+					),
+					stage(4, "Digital Logic & Computer Architecture",
+						book("Code: The Hidden Language of Computer Hardware and Software", "Charles Petzold"),
+						book("Digital Design and Computer Architecture", "Harris & Harris"),
+						book("Computer Organization and Design", "Patterson & Hennessy"),
+					),
+				},
+			},
+			{
 				ID:   "A",
 				Name: "System Core Foundations",
 				Stages: []Stage{
-					stage(1, "The Iron Layer (Low-Level Systems & Compilers)",
+					stage(5, "The Iron Layer (Low-Level Systems & Compilers)",
 						book("Computer Systems: A Programmer's Perspective", "Bryant & O'Hallaron"),
 						book("Crafting Interpreters", "Robert Nystrom"),
 						book("Compilers: Principles, Techniques, and Tools", "Aho, Lam, Sethi & Ullman"),
 					),
-					stage(2, "Operating Systems Internals & Memory Layouts",
+					stage(6, "Operating Systems Internals & Memory Layouts",
 						book("Operating Systems: Three Easy Pieces", "Arpaci-Dusseau & Arpaci-Dusseau"),
 						paper("What Every Programmer Should Know About Memory", "Ulrich Drepper"),
 						book("Understanding the Linux Kernel", "Bovet & Cesati"),
 					),
-					stage(3, "Storage Engines & State Persistence",
+					stage(7, "Storage Engines & State Persistence",
 						book("Database Internals", "Alex Petrov"),
 						book("Designing Data-Intensive Applications", "Martin Kleppmann"),
 						paper("The Log-Structured Merge-Tree (LSM-Tree)", "O'Neil, Cheng, Gawlick & O'Neil"),
 					),
-					stage(4, "Networks, Sockets, & Distributed Topology",
+					stage(8, "Networks, Sockets, & Distributed Topology",
 						book("TCP/IP Illustrated, Vol. 1", "W. Richard Stevens"),
 						book("UNIX Network Programming, Vol. 1", "W. Richard Stevens"),
 						paper("Time, Clocks, and the Ordering of Events in a Distributed System", "Leslie Lamport"),
@@ -411,20 +490,50 @@ func seedRegistry() *Registry {
 				},
 			},
 			{
+				ID:   "S",
+				Name: "Software, Security & Theory",
+				Stages: []Stage{
+					stage(9, "Software Engineering & Professional Tools",
+						book("The Pragmatic Programmer", "Hunt & Thomas"),
+						book("A Philosophy of Software Design", "John Ousterhout"),
+						book("Pro Git", "Chacon & Straub"),
+					),
+					stage(10, "Security & Cryptography",
+						book("Security Engineering", "Ross Anderson"),
+						book("Serious Cryptography", "Jean-Philippe Aumasson"),
+						book("The Web Application Hacker's Handbook", "Stuttard & Pinto"),
+					),
+					stage(11, "Theory of Computation & Complexity",
+						book("Introduction to the Theory of Computation", "Michael Sipser"),
+						paper("On Computable Numbers, with an Application to the Entscheidungsproblem", "Alan Turing"),
+					),
+					stage(12, "Programming Languages & Paradigms",
+						book("Essentials of Programming Languages", "Friedman & Wand"),
+						book("Types and Programming Languages", "Benjamin Pierce"),
+						paper("Why Functional Programming Matters", "John Hughes"),
+					),
+				},
+			},
+			{
 				ID:   "B",
 				Name: "Advanced AI & Hardware Stack",
 				Stages: []Stage{
-					stage(5, "Mathematical Foundations (Matrix Calculus & Linear Algebra)",
+					stage(13, "Mathematical Foundations (Matrix Calculus & Linear Algebra)",
 						book("Linear Algebra Done Right", "Sheldon Axler"),
 						book("Mathematics for Machine Learning", "Deisenroth, Faisal & Ong"),
 						paper("The Matrix Calculus You Need for Deep Learning", "Parr & Howard"),
 					),
-					stage(6, "Neural Architectures & Autograd from Scratch",
+					stage(14, "Probability, Statistics & Classical Machine Learning",
+						book("An Introduction to Statistical Learning", "James, Witten, Hastie & Tibshirani"),
+						book("Think Stats", "Allen B. Downey"),
+						book("Pattern Recognition and Machine Learning", "Christopher Bishop"),
+					),
+					stage(15, "Neural Architectures & Autograd from Scratch",
 						book("Deep Learning", "Goodfellow, Bengio & Courville"),
 						paper("Automatic Differentiation in Machine Learning: a Survey", "Baydin, Pearlmutter, Radul & Siskind"),
 						paper("Attention Is All You Need", "Vaswani et al."),
 					),
-					stage(7, "AI Infrastructure, CUDA, & Memory-Bound Inference",
+					stage(16, "AI Infrastructure, CUDA, & Memory-Bound Inference",
 						book("Programming Massively Parallel Processors", "Hwu, Kirk & El Hajj"),
 						paper("Roofline: An Insightful Visual Performance Model", "Williams, Waterman & Patterson"),
 						paper("FlashAttention: Fast and Memory-Efficient Exact Attention", "Dao et al."),
@@ -460,25 +569,114 @@ func defaultRegistryPath() string {
 	return registryFileName
 }
 
+// loadResult says what loadRegistry had to do beyond reading the file.
+type loadResult struct {
+	Seeded    bool // no file existed; a fresh campus was created
+	Migrated  bool // the file used an older schema and was upgraded
+	NewStages int  // stages added from the current curriculum
+}
+
 // loadRegistry reads the registry from path. If the file does not exist, a
-// freshly seeded registry is returned with seeded=true. A corrupt file is an
-// error: it is never silently overwritten.
-func loadRegistry(path string) (reg *Registry, seeded bool, err error) {
+// freshly seeded registry is returned. Older schemas are migrated, and any
+// stages the curriculum gained since the file was written are merged in.
+// A corrupt file is an error: it is never silently overwritten.
+func loadRegistry(path string) (*Registry, loadResult, error) {
+	var res loadResult
 	data, err := os.ReadFile(path)
 	if errors.Is(err, fs.ErrNotExist) {
-		return seedRegistry(), true, nil
+		res.Seeded = true
+		return seedRegistry(), res, nil
 	}
 	if err != nil {
-		return nil, false, fmt.Errorf("read %s: %w", path, err)
+		return nil, res, fmt.Errorf("read %s: %w", path, err)
 	}
-	reg = &Registry{}
+	reg := &Registry{}
 	if err := json.Unmarshal(data, reg); err != nil {
-		return nil, false, fmt.Errorf("parse %s: %w", path, err)
+		return nil, res, fmt.Errorf("parse %s: %w", path, err)
 	}
+	if res.Migrated, err = reg.migrate(); err != nil {
+		return nil, res, fmt.Errorf("migrate %s: %w", path, err)
+	}
+	res.NewStages = reg.reconcile(seedRegistry())
 	if err := reg.validate(); err != nil {
-		return nil, false, fmt.Errorf("validate %s: %w", path, err)
+		return nil, res, fmt.Errorf("validate %s: %w", path, err)
 	}
-	return reg, false, nil
+	return reg, res, nil
+}
+
+// migrate upgrades an older schema in place and reports whether it did.
+func (r *Registry) migrate() (bool, error) {
+	switch r.SchemaVersion {
+	case schemaVersion:
+		return false, nil
+	case 1:
+		// Schema 2 inserted the Foundations track in front of the original
+		// stages, so their IDs move. Labs keep their own IDs.
+		for ti := range r.Tracks {
+			for si := range r.Tracks[ti].Stages {
+				s := &r.Tracks[ti].Stages[si]
+				if to, ok := v1StageRenumber[s.ID]; ok {
+					s.ID = to
+				}
+			}
+		}
+		r.SchemaVersion = 2
+		return true, nil
+	default:
+		return false, fmt.Errorf("unsupported schema_version %d (this build understands up to %d)", r.SchemaVersion, schemaVersion)
+	}
+}
+
+// reconcile merges in any tracks and stages from seed that r lacks, then
+// orders tracks and stages as the seed does (unknown ones keep their place
+// at the end). Existing progress is never touched. It returns the number of
+// stages added.
+func (r *Registry) reconcile(seed *Registry) int {
+	added := 0
+	for _, st := range seed.Tracks {
+		ti := -1
+		for i := range r.Tracks {
+			if r.Tracks[i].ID == st.ID {
+				ti = i
+				break
+			}
+		}
+		if ti < 0 {
+			r.Tracks = append(r.Tracks, st)
+			added += len(st.Stages)
+			continue
+		}
+		t := &r.Tracks[ti]
+		for _, ss := range st.Stages {
+			if _, existing := r.findStage(ss.ID); existing == nil {
+				t.Stages = append(t.Stages, ss)
+				added++
+			}
+		}
+		sortByRank(t.Stages, func(s Stage) int {
+			for i, ss := range st.Stages {
+				if ss.ID == s.ID {
+					return i
+				}
+			}
+			return len(st.Stages) + s.ID
+		})
+	}
+	trackRank := func(t Track) int {
+		for i, st := range seed.Tracks {
+			if st.ID == t.ID {
+				return i
+			}
+		}
+		return len(seed.Tracks)
+	}
+	sortByRank(r.Tracks, trackRank)
+	return added
+}
+
+// sortByRank stably sorts items by the rank function.
+func sortByRank[T any](items []T, rank func(T) int) {
+	sort.SliceStable(items, func(i, j int) bool { return rank(items[i]) < rank(items[j]) })
 }
 
 // atomicWriteJSON serializes v and swaps it into place at path.
@@ -554,7 +752,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	reg, seeded, err := loadRegistry(path)
+	reg, loaded, err := loadRegistry(path)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "✗ %v\n  Refusing to start so the existing file is not overwritten.\n", err)
 		os.Exit(1)
@@ -563,13 +761,13 @@ func main() {
 	app := &App{
 		reg:   reg,
 		path:  path,
-		dirty: seeded,
+		dirty: loaded.Seeded || loaded.Migrated || loaded.NewStages > 0,
 		con:   &console{in: bufio.NewReader(os.Stdin), out: os.Stdout},
 		width: termWidth(),
 	}
 
 	fmt.Print(banner())
-	if seeded {
+	if loaded.Seeded {
 		app.con.note("No registry found. Seeded a new campus at %s", path)
 		app.con.ok("Welcome! New here? Press %s for the Start Here guide.", sty.Bold(sty.Green("0")))
 		if err := app.commit(); err != nil {
@@ -578,6 +776,12 @@ func main() {
 		}
 	} else {
 		app.con.note("Loaded registry from %s", path)
+		if loaded.Migrated {
+			app.con.ok("Upgraded your registry to the 16-stage curriculum; your progress and labs are kept.")
+		}
+		if loaded.NewStages > 0 {
+			app.con.ok("%d new stage(s) added to your campus. Commit (5 or 7) to save them.", loaded.NewStages)
+		}
 	}
 
 	// Commit on Ctrl-C / SIGTERM as well, so an interrupt never loses work.
