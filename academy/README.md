@@ -128,6 +128,8 @@ On first run, the program creates `academy_campus_registry.json` next to the bin
 | 0 | **Start Here**: what the academy covers, how memory works, how to practise, where to begin and a study rhythm |
 | 9 | **Daily Review**: your due spaced-repetition cards, interleaved across stages (`r` works too) |
 | c | **Classic Mode** on/off: struggle clock, lab notebook, classic corners and type-ins |
+| t | **Tidy screen** on/off: every action starts on a clean screen |
+| ? | **Keys & shortcuts** (also `h` or `help`) · `clear` / `cls` clears the screen |
 | 1 | **View Campus Ledger**: a colour card per stage, with reading, concept and exercise progress bars, labs and hours |
 | 2 | **Enroll in a New Lab**: pick a track (`F`/`A`/`S`/`B`), a stage, then a name, notes and initial hours |
 | 3 | **Log Study/Lab Hours**: add hours (`1.5`, `1h30m`, `45m`) with an optional note |
@@ -144,6 +146,19 @@ Long screens (the ledger, Start Here, glossaries, resources, concept cards, the 
 To cancel a prompt, type `q` at number prompts or `:q` at text prompts. Ctrl-D and Ctrl-C/SIGTERM also commit before exiting.
 
 ![Stages](docs/stages.png)
+
+## Keyboard
+
+| Key | Where | Does |
+|-----|-------|------|
+| **Ctrl+L** | any prompt | clears the screen and redraws it (the main menu is redrawn too), keeping what you have typed |
+| Backspace | any prompt | deletes the previous character |
+| Ctrl+U / Ctrl+W | any prompt | erases the whole line / the previous word |
+| Ctrl+D | empty prompt | ends input: commits your work and exits |
+| Ctrl+C | anywhere | commits your work and exits |
+| Enter / q | long screens | next page / back to the menu |
+
+On Linux, macOS and the BSDs, the academy reads keys one at a time (a small built-in line editor using termios from Go's standard library), so Ctrl+L works instantly and arrow keys are ignored instead of printing `^[[A`. The terminal is always restored on exit, including after Ctrl+C. Elsewhere (for example Windows), input stays line-based: press **Ctrl+L then Enter**, or type `clear`.
 
 ## Study Hall
 
@@ -200,6 +215,9 @@ One package, one build target:
 | `review.go` | Daily Review and Mastery Check screens |
 | `connections.go` | concept cross-links, go-deeper pointers, stage prerequisites |
 | `linkcheck.go` | `-check-links` resource verifier |
+| `lineedit.go` | key-by-key line editor: Ctrl+L, Backspace, Ctrl+U/W, ignores escape sequences |
+| `term_*.go` | raw terminal mode via termios (Linux, macOS, BSD) and a line-mode fallback |
+| `pager.go` | pages long screens on interactive terminals |
 | `classic.go` | Classic Mode: classic corners, struggle clock, notebook |
 | `classicui.go` | Classic Mode screens: toggle, classic corner, type-in lab, notebook |
 | `typeins.go` | generated type-in listings with their real output (see `typeins/`) |

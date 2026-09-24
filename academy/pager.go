@@ -18,6 +18,12 @@ func interactive() bool {
 	return err == nil && fi.Mode()&os.ModeCharDevice != 0
 }
 
+// stdoutIsTerminal reports whether output goes to a terminal.
+func stdoutIsTerminal() bool {
+	fi, err := os.Stdout.Stat()
+	return err == nil && fi.Mode()&os.ModeCharDevice != 0
+}
+
 // termHeight reads $LINES, defaulting to a conservative 24 rows.
 func termHeight() int {
 	h, err := strconv.Atoi(os.Getenv("LINES"))

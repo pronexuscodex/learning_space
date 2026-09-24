@@ -163,6 +163,14 @@ func (a *App) printMenu() {
 		mode = sty.Bold(sty.Yellow("ON"))
 	}
 	a.println("  " + edge("│ ") + item("c", "Classic Mode "+mode+sty.Gray(" · learn like it's 1985: struggle, predict, type it in")))
+	a.mu.Lock()
+	tidy := a.reg.TidyScreen
+	a.mu.Unlock()
+	tidyMode := sty.Gray("off")
+	if tidy {
+		tidyMode = sty.Bold(sty.Green("on"))
+	}
+	a.println("  " + edge("│ ") + padRight(item("t", "Tidy screen "+tidyMode), 32) + item("?", "Keys & shortcuts") + sty.Gray("  · Ctrl+L clears the screen"))
 	a.println("  " + edge("└"+strings.Repeat("─", 70)))
 }
 
@@ -674,6 +682,7 @@ func (a *App) setCompileStatus() error {
 
 // commitAndExit persists state and terminates the process.
 func (a *App) commitAndExit() {
+	restoreTerminal()
 	if err := a.commit(); err != nil {
 		fmt.Fprintf(os.Stderr, "✗ commit failed: %v\n  (in-memory changes were NOT saved)\n", err)
 		os.Exit(1)
@@ -682,11 +691,55 @@ func (a *App) commitAndExit() {
 	os.Exit(0)
 }
 
+// showShortcuts lists every key the academy understands.
+func (a *App) showShortcuts() {
+	a.println(heading("KEYS & SHORTCUTS", sty.Cyan, a.width))
+	a.println("")
+	row := func(key, what string) { a.printf("    %s %s\n", sty.Bold(sty.Cyan(padRight(key, 14))), what) }
+	a.printf("  %s\n", sty.Bold("While typing (any prompt)"))
+	row("Ctrl+L", "clear the screen and redraw, keeping what you have typed")
+	row("Backspace", "delete the previous character")
+	row("Ctrl+U", "erase the whole line")
+	row("Ctrl+W", "erase the previous word")
+	row("Ctrl+D", "end input: commits your work and exits (on an empty line)")
+	row("Ctrl+C", "commit your work and exit")
+	row("q  or  :q", "cancel the current prompt (q for numbers, :q for text)")
+	a.println("")
+	a.printf("  %s\n", sty.Bold("Main menu"))
+	row("0 – 9", "the menu options")
+	row("r", "Daily Review (same as 9)")
+	row("c", "Classic Mode on/off")
+	row("t", "tidy screen on/off: start every action on a clean screen")
+	row("clear / cls", "clear the screen now")
+	row("? / h", "this list")
+	a.println("")
+	a.printf("  %s\n", sty.Bold("Long screens"))
+	row("Enter", "next page")
+	row("q", "stop paging and continue")
+	a.println("")
+	if !a.con.raw {
+		for _, l := range wrap("Your terminal is in line mode (for example on Windows, or when input is piped), so Ctrl+L takes effect after you press Enter.", a.width-6, "  ") {
+			a.println(sty.Gray(l))
+		}
+	}
+}
+
 // run is the interactive loop. Ctrl-D (EOF) is treated as commit & exit.
 func (a *App) run() {
 	for {
 		a.printMenu()
+		a.con.onClear = a.printMenu // Ctrl+L redraws the menu on a clean screen
 		choice, err := a.con.readLine(sty.Bold(sty.Cyan("  academy")) + sty.Cyan(" › "))
+		a.con.onClear = nil
+
+		// Tidy screen: each chosen action starts on a clean screen, and its
+		// output (including its final message) stays visible above the menu.
+		a.mu.Lock()
+		tidy := a.reg.TidyScreen
+		a.mu.Unlock()
+		if tidy && a.con.screen && choice != "" {
+			fmt.Fprint(a.con.out, clearSeq)
+		}
 		if err != nil {
 			a.con.note("Input closed — committing.")
 			a.commitAndExit()
@@ -700,6 +753,22 @@ func (a *App) run() {
 			actionErr = a.dailyReview()
 		case "c":
 			actionErr = a.toggleClassicMode()
+		case "clear", "cls":
+			if a.con.screen {
+				fmt.Fprint(a.con.out, clearSeq)
+			}
+		case "t":
+			a.mutate(func(r *Registry) { r.TidyScreen = !r.TidyScreen })
+			a.mu.Lock()
+			on := a.reg.TidyScreen
+			a.mu.Unlock()
+			if on {
+				a.con.ok("Tidy screen on: every action now starts on a clean screen. Press t again to turn it off.")
+			} else {
+				a.con.ok("Tidy screen off: earlier output stays visible above the menu.")
+			}
+		case "?", "h", "help":
+			a.paged(true, a.showShortcuts)
 		case "1":
 			a.paged(true, a.viewLedger)
 		case "2":
@@ -724,13 +793,14 @@ func (a *App) run() {
 				a.commitAndExit()
 			}
 			if ok {
+				restoreTerminal()
 				a.con.note("Exited without saving.")
 				os.Exit(0)
 			}
 		case "":
 			// Blank line: just redraw the menu.
 		default:
-			a.con.warn("%q is not a menu option. Choose 0-9 or c.", choice)
+			a.con.warn("%q is not a menu option. Choose 0-9, c, t or ? for help.", choice)
 		}
 
 		switch {

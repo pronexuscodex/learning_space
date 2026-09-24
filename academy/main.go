@@ -244,6 +244,7 @@ type Registry struct {
 	Tracks        []Track               `json:"tracks"`
 	Reviews       map[string]ReviewCard `json:"reviews"`        // card ID → spaced-repetition state
 	ReviewHistory map[string]int        `json:"review_history"` // local date → cards reviewed that day
+	TidyScreen    bool                  `json:"tidy_screen"`    // start each action on a clean screen
 
 	// Classic Mode (see classic.go).
 	ClassicMode    bool                 `json:"classic_mode"`
@@ -811,7 +812,12 @@ func main() {
 		reg:   reg,
 		path:  path,
 		dirty: loaded.Seeded || loaded.Migrated || loaded.NewStages > 0,
-		con:   &console{in: bufio.NewReader(os.Stdin), out: os.Stdout},
+		con: &console{
+			in:     bufio.NewReader(os.Stdin),
+			out:    os.Stdout,
+			raw:    interactive() && rawInputSupported(int(os.Stdin.Fd())),
+			screen: stdoutIsTerminal(),
+		},
 		width: termWidth(),
 		pager: interactive(),
 	}

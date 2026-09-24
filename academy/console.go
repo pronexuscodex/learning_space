@@ -23,6 +23,10 @@ var errCancel = errors.New("cancelled")
 type console struct {
 	in  *bufio.Reader
 	out io.Writer
+
+	raw     bool   // read key by key (interactive terminal with raw-mode support)
+	screen  bool   // output is a terminal, so clearing the screen is meaningful
+	onClear func() // redraws the current screen after Ctrl+L (may be nil)
 }
 
 // Feedback lines, one visual vocabulary for the whole app.
@@ -70,20 +74,36 @@ func isCancel(s string) bool {
 }
 
 // readLine prints prompt and returns one sanitized line. It returns io.EOF
-// when input is exhausted (Ctrl-D / closed pipe).
+// when input is exhausted (Ctrl-D / closed pipe). Ctrl+L clears the screen.
 func (c *console) readLine(prompt string) (string, error) {
-	fmt.Fprint(c.out, prompt)
-	line, err := c.in.ReadString('\n')
-	if err != nil {
-		if errors.Is(err, io.EOF) && line != "" {
-			return sanitize(line), nil // final unterminated line
-		}
-		if errors.Is(err, io.EOF) {
-			fmt.Fprintln(c.out)
-		}
-		return "", err
+	if c.raw {
+		return c.readLineRaw(prompt)
 	}
-	return sanitize(line), nil
+	return c.readLineCooked(prompt)
+}
+
+// readLineCooked reads a whole line at once, as the terminal delivers it.
+// A line containing Ctrl+L (typed, then Enter) clears the screen and asks
+// again.
+func (c *console) readLineCooked(prompt string) (string, error) {
+	for {
+		fmt.Fprint(c.out, prompt)
+		line, err := c.in.ReadString('\n')
+		if err != nil {
+			if errors.Is(err, io.EOF) && line != "" {
+				return sanitize(line), nil // final unterminated line
+			}
+			if errors.Is(err, io.EOF) {
+				fmt.Fprintln(c.out)
+			}
+			return "", err
+		}
+		if strings.ContainsRune(line, keyCtrlL) {
+			c.clearScreen()
+			continue
+		}
+		return sanitize(line), nil
+	}
 }
 
 // promptText asks for free text. ":q" cancels. Required fields reject blank
