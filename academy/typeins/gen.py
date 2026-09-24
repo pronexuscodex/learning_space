@@ -17,6 +17,7 @@ out = {}
 for f in sorted(os.listdir(".")):
     if f.endswith(".py") and f[0] == "s":
         out[f] = run(f"python3 {f}")
+out["s00_cpu.c"] = run(f"gcc -Wall -Wextra -std=c17 -o {tb} s00_cpu.c && {tb}")
 out["s01_collatz.c"] = run(f"gcc -Wall -Wextra -std=c17 -o {tb} s01_collatz.c && {tb}")
 out["s05_bits.c"] = run(f"gcc -Wall -o {tb} s05_bits.c && {tb}")
 fork = run(f"gcc -Wall -o {tf} s06_fork.c && {tf}").splitlines()
@@ -26,6 +27,7 @@ out["s09_git.sh"] = run(f"sh {here}/s09_git.sh", cwd=d)
 
 # stage -> (file, saved name, run command, predict question, lesson)
 T = {
+ 0: ("s00_cpu.c", "cpu.c", "gcc -Wall -Wextra -std=c17 cpu.c -o cpu && ./cpu", "Trace the program on paper before running it: what number will it print, and how many instructions will the tiny CPU execute before it halts? (Hint: the loop body is 7 instructions.)", "The loop runs 5 times × 7 instructions = 35, plus 3 to print and halt: 38 steps, printing 15. Notice that the program and its data share the same memory (the von Neumann design), and that a loop is nothing but a conditional jump back to an earlier address. A real CPU does exactly this, billions of times per second."),
  1: ("s01_collatz.c", "collatz.c", "gcc -Wall -Wextra -std=c17 collatz.c -o collatz && ./collatz", "How many steps does 27 take to reach 1, and what is the highest value it reaches on the way? Write your guesses down first. Why is n a long rather than an int?", "Tiny rules can produce surprisingly long journeys: 27 climbs past 9,000 before falling to 1. Nobody has proved that every starting number reaches 1 (the Collatz conjecture). n is a long because some starting numbers climb far beyond what a 32-bit int can hold, and in C a signed overflow is undefined behaviour. The size line depends on your machine: 8 bytes on 64-bit Linux and macOS, 4 on Windows."),
  2: ("s02_bsearch.py", "bsearch.py", "python3 bsearch.py", "In a sorted list of one million numbers, how many guesses does binary search need to find 1? 500,000? A number that is not there?", "About log₂(1,000,000) ≈ 20 guesses at most, and the exact middle is found on the very first guess."),
  3: ("s03_sieve.py", "sieve.py", "python3 sieve.py", "Roughly how many primes are there below 10,000? (Hint: the prime number theorem says about n / ln n.)", "10,000 / ln 10,000 ≈ 1,086, a decent estimate of the true 1,229. The sieve was a favourite benchmark in early-1980s computer magazines."),

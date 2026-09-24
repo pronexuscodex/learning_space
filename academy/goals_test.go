@@ -30,15 +30,15 @@ func TestWeekToDate(t *testing.T) {
 
 func TestStageStatesAndPrereqs(t *testing.T) {
 	reg := seedRegistry()
-	_, s1 := reg.findStage(1)
-	_, s2 := reg.findStage(2)
+	_, s1 := reg.findStage(0)
+	_, s2 := reg.findStage(1)
 	if reg.stageState(s1) != StageReady || reg.stageState(s2) != StageLocked {
-		t.Fatalf("fresh: stage 1 %d, stage 2 %d", reg.stageState(s1), reg.stageState(s2))
+		t.Fatalf("fresh: stage 0 %d, stage 1 %d", reg.stageState(s1), reg.stageState(s2))
 	}
-	if m := reg.missingPrereqs(2); len(m) != 1 || m[0] != 1 {
-		t.Fatalf("stage 2 should need stage 1, got %v", m)
+	if m := reg.missingPrereqs(1); len(m) != 1 || m[0] != 0 {
+		t.Fatalf("stage 1 should need stage 0, got %v", m)
 	}
-	g, _ := guideFor(1)
+	g, _ := guideFor(0)
 	s1.setStudied(g.Concepts[0].Name, true)
 	if reg.stageState(s1) != StageInProgress {
 		t.Fatal("one concept understood should mean in progress")
@@ -47,7 +47,7 @@ func TestStageStatesAndPrereqs(t *testing.T) {
 		s1.setStudied(c.Name, true)
 	}
 	if reg.stageState(s1) != StageUnderstood || reg.stageState(s2) != StageReady {
-		t.Fatal("finishing stage 1 should open stage 2")
+		t.Fatal("finishing stage 0 should open stage 1")
 	}
 	s1.MasteryCheck = &MasteryCheck{Passed: true}
 	if reg.stageState(s1) != StageMastered {
@@ -163,5 +163,35 @@ func TestRefreshFromSeedKeepsProgress(t *testing.T) {
 	}
 	if n := reg.refreshFromSeed(seedRegistry()); n != 0 {
 		t.Fatal("a second refresh should change nothing")
+	}
+}
+
+func TestSchema2To3AddsStageZeroAndMovesGeneral(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, registryFileName)
+	reg := seedRegistry()
+	// Build a schema-2 file: no stage 0, and "general" stored as 0.
+	reg.SchemaVersion = 2
+	reg.Tracks[0].Stages = reg.Tracks[0].Stages[1:]
+	reg.MyResources = []MyResource{{ID: 1, Stage: 0, Kind: "Book", Title: "General book"}, {ID: 2, Stage: 5, Kind: "Book", Title: "Stage 5 book"}}
+	reg.StudySessions = []StudySession{{Start: time.Now(), Minutes: 25, Stage: 0}, {Start: time.Now(), Minutes: 10, Stage: 3}}
+	if err := atomicWriteJSON(path, reg); err != nil {
+		t.Fatal(err)
+	}
+	got, res, err := loadRegistry(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !res.Migrated || res.NewStages != 1 || got.SchemaVersion != schemaVersion {
+		t.Fatalf("result = %+v, schema %d", res, got.SchemaVersion)
+	}
+	if tr, s := got.findStage(0); s == nil || tr.ID != "F" || got.Tracks[0].Stages[0].ID != 0 {
+		t.Fatal("stage 0 should be added first in Track F")
+	}
+	if got.MyResources[0].Stage != NoStage || got.MyResources[1].Stage != 5 {
+		t.Fatalf("resources = %+v", got.MyResources)
+	}
+	if got.StudySessions[0].Stage != NoStage || got.StudySessions[1].Stage != 3 {
+		t.Fatalf("sessions = %+v", got.StudySessions)
 	}
 }

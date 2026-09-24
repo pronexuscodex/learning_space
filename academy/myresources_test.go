@@ -22,6 +22,7 @@ func TestAddResourceValidatesAndDedupes(t *testing.T) {
 		{Kind: "Book"},
 		{Kind: "Book", Title: strings.Repeat("x", maxNameLen+1)},
 		{Kind: "Book", Title: "x", Stage: 17},
+		{Kind: "Book", Title: "x", Stage: -5},
 		{Kind: "Spaceship", Title: "x"},
 		{Kind: "Book", Title: "x", URL: "ftp://example.org/x"},
 		{Kind: "Book", Title: "x", URL: "javascript:alert(1)"},
@@ -32,19 +33,19 @@ func TestAddResourceValidatesAndDedupes(t *testing.T) {
 			t.Errorf("accepted invalid resource %+v", b)
 		}
 	}
-	if id, _ := reg.addResource(MyResource{Kind: "Video", Title: "A talk"}, now); id != 2 {
+	if id, _ := reg.addResource(MyResource{Stage: NoStage, Kind: "Video", Title: "A talk"}, now); id != 2 {
 		t.Fatalf("next id = %d", id)
 	}
 	if got := reg.myResourcesFor(5); len(got) != 1 || got[0].Title != "Modern C" {
 		t.Fatalf("myResourcesFor(5) = %+v", got)
 	}
-	if got := reg.myResourcesFor(0); len(got) != 2 || got[0].Stage != 0 {
-		t.Fatalf("myResourcesFor(0) should list all, general first: %+v", got)
+	if got := reg.myResourcesFor(AllStages); len(got) != 2 || got[0].Stage != NoStage {
+		t.Fatalf("myResourcesFor(AllStages) should list all, general first: %+v", got)
 	}
 	if hits := reg.myResourceHits("modern book"); len(hits) != 1 || hits[0].Kind != HitMine || hits[0].Concept != 1 {
 		t.Fatalf("hits = %+v", hits)
 	}
-	docs := reg.myLibraryDocs(0)
+	docs := reg.myLibraryDocs(AllStages)
 	if len(docs) != 1 || docs[0].PDF != "https://example.org/modernc.pdf" {
 		t.Fatalf("library docs = %+v", docs)
 	}
@@ -57,7 +58,7 @@ func TestResourceFileRoundTrip(t *testing.T) {
 	src := seedRegistry()
 	now := time.Now()
 	src.addResource(MyResource{Stage: 2, Kind: "Course", Title: "Algorithms course", URL: "https://example.org/algo"}, now)
-	src.addResource(MyResource{Stage: 0, Kind: "Podcast", Title: "A podcast"}, now)
+	src.addResource(MyResource{Stage: NoStage, Kind: "Podcast", Title: "A podcast"}, now)
 	data, err := exportResources(src.MyResources)
 	if err != nil {
 		t.Fatal(err)

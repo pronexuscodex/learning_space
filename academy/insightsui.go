@@ -114,7 +114,11 @@ func (a *App) searchScreen() error {
 	a.printf("\n  %s\n", sty.Gray(fmt.Sprintf("%d match(es)%s", len(hits), map[bool]string{true: ", showing the best 15", false: ""}[len(hits) > 15])))
 	for i, h := range shown {
 		kind := map[string]func(string) string{HitConcept: sty.Blue, HitGlossary: sty.Cyan, HitResource: sty.Magenta, HitClassic: sty.Yellow, HitBlueprint: sty.Green, HitWord: sty.Cyan, HitMine: sty.Yellow}[h.Kind]
-		head := fmt.Sprintf("%s %s %s", kind(padRight(h.Kind, 9)), sty.Gray(fmt.Sprintf("Stage %-2d", h.Stage)), sty.Bold(h.Title))
+		where := fmt.Sprintf("Stage %-2d", h.Stage)
+		if h.Stage < 0 {
+			where = "general "
+		}
+		head := fmt.Sprintf("%s %s %s", kind(padRight(h.Kind, 9)), sty.Gray(where), sty.Bold(h.Title))
 		a.printf("  %s %s\n", sty.Cyan(fmt.Sprintf("%2d.", i+1)), truncate(stripANSI(head), a.cols()-7))
 		if h.Snippet != "" {
 			a.printf("      %s\n", sty.Gray(truncate(h.Snippet, a.cols()-8)))
@@ -195,13 +199,13 @@ func (a *App) focusTimer() error {
 	a.mu.Lock()
 	cur := a.reg.currentStage()
 	a.mu.Unlock()
-	def := 0
+	def := NoStage
 	if cur != nil {
 		def = cur.ID
 	}
 
-	label := "Stage to log it under (0 = general"
-	if def > 0 {
+	label := "Stage to log it under (g = general"
+	if def >= 0 {
 		label += fmt.Sprintf(", Enter = Stage %d", def)
 	}
 	label += ")"
@@ -217,15 +221,19 @@ func (a *App) focusTimer() error {
 		if s == "" {
 			break
 		}
+		if strings.EqualFold(s, "g") {
+			stage = NoStage
+			break
+		}
 		n, convErr := strconv.Atoi(s)
 		a.mu.Lock()
 		_, st := a.reg.findStage(n)
 		a.mu.Unlock()
-		if convErr == nil && (n == 0 || st != nil) {
+		if convErr == nil && st != nil {
 			stage = n
 			break
 		}
-		a.con.warn("Enter a stage number from 1 to 16, or 0 for general study.")
+		a.con.warn("Enter a stage number from 0 to 16, or g for general study.")
 	}
 
 	minutes := 25
@@ -282,7 +290,7 @@ func (a *App) focusTimer() error {
 		r.StudySessions = append(r.StudySessions, StudySession{Start: start.UTC().Truncate(time.Second), Minutes: logged, Stage: stage, Note: note})
 	})
 	where := "general study"
-	if stage > 0 {
+	if stage >= 0 {
 		where = fmt.Sprintf("Stage %d", stage)
 	}
 	a.mu.Lock()

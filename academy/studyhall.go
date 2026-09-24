@@ -316,6 +316,10 @@ func (a *App) renderConcept(c Concept, n, total int, glossary []Term, done []boo
 			paragraph("(diagram clipped: widen the terminal and press Ctrl+L to see it whole)", sty.Gray)
 		}
 	}
+	if c.UnderTheHood != "" {
+		section("🔧 Under the hood", sty.Red)
+		paragraph(c.UnderTheHood, plainText)
+	}
 	if c.MentalModel != "" {
 		section("◆ Mental model", sty.Yellow)
 		paragraph(c.MentalModel, sty.Yellow)

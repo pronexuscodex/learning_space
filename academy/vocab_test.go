@@ -22,7 +22,7 @@ func TestVocabularyIsComplete(t *testing.T) {
 		if !cats[w.Cat] {
 			t.Errorf("%q has unknown category %q", w.Word, w.Cat)
 		}
-		if w.Stage < 0 || w.Stage > 16 {
+		if w.Stage < NoStage || w.Stage > 16 {
 			t.Errorf("%q has stage %d", w.Word, w.Stage)
 		}
 		for _, n := range append([]string{w.Word}, w.Also...) {

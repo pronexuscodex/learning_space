@@ -34,7 +34,7 @@ func (a *App) renderWord(w Word, inDeck bool) {
 	a.println("")
 	a.println("  " + sty.Cyan("┏━ ") + sty.Bold(sty.Cyan(truncate(w.Word, width-5))))
 	meta := w.Cat
-	if w.Stage > 0 {
+	if w.Stage >= 0 {
 		meta += fmt.Sprintf(" · taught in Stage %d", w.Stage)
 	}
 	for _, l := range wrap(meta, width-6, "") {

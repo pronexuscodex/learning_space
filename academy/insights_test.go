@@ -10,8 +10,8 @@ func TestNextStepsFreshCampus(t *testing.T) {
 	reg := seedRegistry()
 	now := time.Date(2026, 9, 24, 10, 0, 0, 0, time.Local)
 	steps := reg.nextSteps(now)
-	if len(steps) != 2 || steps[0].Kind != SuggestConcept || steps[0].Stage != 1 || steps[0].Concept != 0 {
-		t.Fatalf("fresh campus should start with Stage 1's first concept, got %+v", steps)
+	if len(steps) != 2 || steps[0].Kind != SuggestConcept || steps[0].Stage != 0 || steps[0].Concept != 0 {
+		t.Fatalf("fresh campus should start with Stage 0's first concept, got %+v", steps)
 	}
 	if steps[1].Kind != SuggestFocus {
 		t.Fatalf("an idle day should suggest a focus session, got %+v", steps[1])
@@ -22,8 +22,8 @@ func TestNextStepsOrderAndLimit(t *testing.T) {
 	reg := seedRegistry()
 	reg.ClassicMode = true
 	now := time.Date(2026, 9, 24, 10, 0, 0, 0, time.Local)
-	_, s := reg.findStage(1)
-	g, _ := guideFor(1)
+	_, s := reg.findStage(0)
+	g, _ := guideFor(0)
 	s.setStudied(g.Concepts[0].Name, true) // unlocks due review cards
 
 	steps := reg.nextSteps(now)
@@ -46,7 +46,7 @@ func TestNextStepsOrderAndLimit(t *testing.T) {
 	}
 	found := false
 	for _, st := range reg.nextSteps(now) {
-		found = found || (st.Kind == SuggestMastery && st.Stage == 1)
+		found = found || (st.Kind == SuggestMastery && st.Stage == 0)
 	}
 	if !found {
 		t.Fatal("a fully understood stage should suggest its mastery check")
@@ -55,8 +55,8 @@ func TestNextStepsOrderAndLimit(t *testing.T) {
 
 func TestCurrentStageRespectsPrereqs(t *testing.T) {
 	reg := seedRegistry()
-	if cs := reg.currentStage(); cs == nil || cs.ID != 1 {
-		t.Fatalf("current stage = %+v, want Stage 1", cs)
+	if cs := reg.currentStage(); cs == nil || cs.ID != 0 {
+		t.Fatalf("current stage = %+v, want Stage 0", cs)
 	}
 	_, s := reg.findStage(3)
 	g, _ := guideFor(3)
@@ -75,7 +75,7 @@ func TestSearchRequiresEveryWordAndRanksTitles(t *testing.T) {
 		t.Fatal("expected matches for 'memory cache'")
 	}
 	for _, h := range hits[:min(5, len(hits))] {
-		if h.Title == "" || h.Stage == 0 {
+		if h.Title == "" || h.Stage < NoStage {
 			t.Fatalf("hit without title or stage: %+v", h)
 		}
 	}
@@ -113,7 +113,7 @@ func TestDailyMinutesAndWeekSummary(t *testing.T) {
 	now := time.Date(2026, 9, 24, 18, 0, 0, 0, time.Local)
 	reg.StudySessions = []StudySession{
 		{Start: now.Add(-time.Hour), Minutes: 25, Stage: 1},
-		{Start: now.AddDate(0, 0, -2), Minutes: 50, Stage: 0},
+		{Start: now.AddDate(0, 0, -2), Minutes: 50, Stage: NoStage},
 		{Start: now.AddDate(0, 0, -9), Minutes: 30, Stage: 2},
 		{Start: now.AddDate(0, 0, -40), Minutes: 99}, // outside the window
 	}

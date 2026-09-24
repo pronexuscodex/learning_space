@@ -642,10 +642,20 @@ GET A C COMPILER (ONE TIME, ABOUT 10 MINUTES)
 - Check it works: gcc --version, then compile and run hello.c from Stage 1's first concept.
 - No computer of your own? C Tutor (pythontutor.com/c.html) and Compiler Explorer (godbolt.org) run C in the browser.
 
+THE PATH
+The stages are numbered in the order that makes sense for a complete beginner:
+- Stage 0, How Computers Work: the whole machine in one tour (bits, the CPU, memory, programs, the operating system, devices, networks, booting). No programming yet.
+- Stage 1, Programming Fundamentals in C: write real programs, and see what each line does to the machine (every concept has an "Under the hood" section).
+- Stages 2 to 4: data structures and algorithms, the mathematics of computing, and how logic gates become a CPU.
+- Track A (Stages 5 to 8): compilers, operating systems, databases and networks, the systems everything runs on.
+- Track S (Stages 9 to 12): professional tools, security, the theory of computation and programming languages.
+- Track B (Stages 13 to 16): the mathematics of machine learning, then neural networks and AI infrastructure.
+The Roadmap [m] shows where you are and what each stage builds on. What's next [n] always picks a sensible next step.
+
 WHERE TO START
-- Complete beginner? Start at Stage 1, Programming Fundamentals in C, and follow Track F in order.
+- Complete beginner? Start at Stage 0, How Computers Work, then Stage 1, and follow Track F in order.
 - After Track F, take Tracks A and S in either order.
-- For AI, Stages 1 to 3 are enough preparation for Stage 13.
+- For AI, Stages 0 to 3 are enough preparation for Stage 13.
 - Each stage shows what it builds on. If those stages feel shaky, a quick visit back first pays off.
 - Stuck on a word? Open the Glossary in the stage's Study Hall.
 
@@ -676,7 +686,7 @@ understands this material on the first pass. You have unlimited time and
 no exams.
 
 BEYOND THE CORE
-Once the sixteen stages feel comfortable, these electives build on them:
+Once the seventeen stages feel comfortable, these electives build on them:
 - Computer graphics: Scratchapixel (scratchapixel.com)
 - Quantum computing: IBM Quantum Learning (learning.quantum.ibm.com)
 - Embedded systems and electronics: Arduino docs (docs.arduino.cc)

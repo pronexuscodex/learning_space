@@ -21,6 +21,11 @@ type Concept struct {
 	MentalModel string // the sentence to remember
 	TryIt       string // a small hands-on exercise
 
+	// UnderTheHood goes one level down: what the machine actually does
+	// (the bits, the instructions, the operating system) when this idea
+	// runs. Optional; lines indented by two spaces are shown as code.
+	UnderTheHood string
+
 	// Beginner layer. Set inline for newer stages, or merged in from
 	// explainers.go and exercises.go for the original ones.
 	Analogy   string     // the idea in everyday terms, no jargon
@@ -92,7 +97,7 @@ type StageGuide struct {
 
 // curriculum is every stage's guide, keyed by stage ID. Each track's
 // content lives in its own file.
-var curriculum = mergeGuides(foundationsGuides, systemsAndAIGuides, softwareGuides, dataGuides)
+var curriculum = mergeGuides(machineGuides, foundationsGuides, systemsAndAIGuides, softwareGuides, dataGuides)
 
 // mergeGuides combines per-file guide maps; a duplicate stage ID is a
 // programming error.

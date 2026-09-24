@@ -17,7 +17,7 @@ import (
 // MyResource is one resource the learner added.
 type MyResource struct {
 	ID    int       `json:"id"`
-	Stage int       `json:"stage"` // 0: general, not tied to a stage
+	Stage int       `json:"stage"` // NoStage (-1): general, not tied to a stage
 	Kind  string    `json:"kind"`
 	Title string    `json:"title"`
 	URL   string    `json:"url,omitempty"`
@@ -37,8 +37,8 @@ func validateResource(m MyResource) error {
 		return fmt.Errorf("the title is longer than %d characters", maxNameLen)
 	case len([]rune(m.Note)) > maxNotesLen:
 		return fmt.Errorf("the note is longer than %d characters", maxNotesLen)
-	case m.Stage < 0 || m.Stage > 16:
-		return fmt.Errorf("stage %d does not exist (use 1–16, or 0 for general)", m.Stage)
+	case m.Stage < NoStage || m.Stage > 16:
+		return fmt.Errorf("stage %d does not exist (use 0–16, or -1 for general)", m.Stage)
 	case !contains(resourceKinds, m.Kind):
 		return fmt.Errorf("kind %q is not one of %s", m.Kind, strings.Join(resourceKinds, ", "))
 	}
@@ -85,12 +85,12 @@ func (r *Registry) addResource(m MyResource, now time.Time) (int, error) {
 	return m.ID, nil
 }
 
-// myResourcesFor returns the learner's resources for a stage (0: all),
+// myResourcesFor returns the learner's resources for a stage (AllStages: all),
 // sorted by stage then title.
 func (r *Registry) myResourcesFor(stage int) []MyResource {
 	var out []MyResource
 	for _, m := range r.MyResources {
-		if stage == 0 || m.Stage == stage {
+		if stage == AllStages || m.Stage == stage {
 			out = append(out, m)
 		}
 	}

@@ -74,6 +74,23 @@ with warnings turned on, every time:
      │ assembler     assembly → machine code
      ▼ linker        + the C library (printf…)
   ./hello          the executable you run`,
+				UnderTheHood: `The executable gcc produces is an ELF file (on Linux): a header, your
+machine code in a section called .text, fixed data such as "Hello,
+world!\n" in .rodata, and a table of symbols. main is not where it
+starts. The real entry point is _start, a few instructions from the C
+runtime, which calls __libc_start_main, which sets things up and calls
+your main, then passes its return value to exit:
+
+  nm hello | grep -E ' _start| main'     # T _start, T main
+  strace ./hello                          # execve ... write(1, "Hello, world!\n", 14) ... exit_group(0)
+
+Your printf becomes a single write system call of 14 bytes to file
+descriptor 1 (standard output). printf itself does not talk to the
+screen; it fills a buffer, and the C library hands the buffer to the
+kernel. When output goes to a terminal the buffer is flushed at every
+newline; when it goes to a file or a pipe it is flushed only when full
+or at exit, which is why output order can surprise you when you
+redirect a program that also prints to stderr.`,
 				MentalModel: "Source is a recipe; the compiler cooks it into a program; you run the program, not the recipe.",
 				TryIt: `Save this as hello.c, compile it with gcc -Wall -Wextra -std=c17 -g hello.c -o hello, run ./hello, then remove the semicolon and read the error.
 
@@ -127,6 +144,19 @@ Always initialise your variables.`,
   address:  1000 1001 1002 1003   1004 ...
             [    int count = 3   ][ char grade = 'A' (65) ]
             └──── 4 bytes ──────┘ └─ 1 byte ─┘`,
+				UnderTheHood: `Here is what gcc -O0 makes of int count = 3; inside main (x86-64,
+Intel syntax):
+
+  mov DWORD PTR -8[rbp], 3     ; store the 4-byte value 3, 8 bytes below the frame pointer
+
+A local variable is just a slot on the stack at a fixed distance from
+the frame pointer (rbp); its name is gone after compiling. DWORD means
+4 bytes: the type decided the size. In memory, 3 is stored as the bytes
+03 00 00 00, lowest byte first, because x86 and ARM are little-endian,
+and -1 is ff ff ff ff, because negative numbers use two's complement.
+With optimisation (-O2) the variable often never touches memory at all:
+it lives only in a register, or disappears entirely if the compiler can
+work out the value in advance.`,
 				MentalModel: "A variable is a labelled box of a fixed size; the type says how to read the bits inside.",
 				TryIt:       `Print sizeof(char), sizeof(int), sizeof(long), sizeof(double), then 7 / 2, 7.0 / 2, (int)3.99 and 'A' + 1 (with %d), and explain each result.`,
 				Analogy: `Labelled jars of fixed sizes in a kitchen: a small jar for salt (a
@@ -172,6 +202,20 @@ let -Wall warn you about the rest.`,
               no
               ▼
             done`,
+				UnderTheHood: `The CPU has no if and no for. It has compare instructions, which set
+flags, and jumps, which change the program counter. gcc -O2 turns a loop
+that sums an array into, in essence:
+
+  loop:  add eax, DWORD PTR [rdi]   ; s += *a
+         add rdi, 4                 ; move to the next int (4 bytes)
+         cmp rdi, rdx               ; reached the end?
+         jne loop                   ; if not, jump back
+
+and it may turn a simple if into no jump at all: clamp(x), which returns
+100 when x > 100, becomes a compare and a cmovle ("conditional move"),
+because a jump the CPU guesses wrongly costs around 15–20 cycles. That
+guessing is branch prediction (Stage 4): loops whose conditions follow a
+pattern run much faster than ones that jump unpredictably.`,
 				MentalModel: "Sequence, choice and repetition: the three moves that build every program.",
 				TryIt:       `Write FizzBuzz in C: print 1 to 100, but "Fizz" for multiples of 3, "Buzz" for multiples of 5 and "FizzBuzz" for both. Use % and a for loop.`,
 				Analogy: `A recipe: "if the dough is sticky, add flour" is a decision, and "stir
@@ -224,6 +268,20 @@ again until every piece is obvious. A function that calls itself
   │ area:  width = 3 (copy)│  ← gone when area returns
   │        height = 4      │
   └────────────────────────┘`,
+				UnderTheHood: `On x86-64 Linux (the System V calling convention), the first six integer
+arguments travel in registers (rdi, rsi, rdx, rcx, r8, r9) and the
+result comes back in rax (eax for an int). With -O2,
+int add(int a, int b) { return a + b; } compiles to just:
+
+  lea eax, [rdi+rsi]    ; eax = a + b
+  ret                   ; return to the caller
+
+call pushes the return address onto the stack and jumps; ret pops it and
+jumps back. Without optimisation (-O0) each function also builds a stack
+frame (push rbp; mov rbp, rsp) and gives its locals slots in it, which
+is exactly what the debugger shows you with bt. Pass-by-value is simply
+this: the callee receives a copy of the value in a register or on the
+stack, and has no idea where the caller's variable lives.`,
 				MentalModel: "If you cannot name it, you have not understood it; if it is long, split it.",
 				TryIt:       "Write double c_to_f(double c) and double f_to_c(double f), and check with assert that converting there and back returns the original value (within 1e-9).",
 				Analogy: `A coffee machine: water and beans go in (inputs), you press one button,
@@ -270,6 +328,21 @@ lives on the stack and disappears when the function returns.`,
            │ x = 7    │◀─│ p = 1000 │
            └──────────┘  └──────────┘
             int x         int *p  (p points to x)`,
+				UnderTheHood: `A pointer is nothing more than a number: an address, 8 bytes on a
+64-bit machine. Dereferencing is a single load instruction.
+int get(int *p) { return *p; } becomes:
+
+  mov eax, DWORD PTR [rdi]   ; read 4 bytes from the address in rdi
+  ret
+
+The addresses you print are virtual: the CPU's memory-management unit
+translates them to physical RAM through page tables that the operating
+system maintains (Stage 6). They also change between runs, because the
+system loads the stack, heap and libraries at random positions (address
+space layout randomisation) to make attacks harder. A NULL dereference
+crashes because the kernel deliberately leaves the page at address 0
+unmapped: the CPU raises a fault, and the kernel sends your process
+SIGSEGV.`,
 				MentalModel: "A pointer is a street address: & asks where something lives, * goes there.",
 				TryIt:       `Print a variable's address with printf("%p\n", (void *)&x), then write swap(int *a, int *b), and watch both in Python Tutor's C mode (pythontutor.com/c.html), which draws pointers as arrows.`,
 				Analogy: `A house and its address. The house (the value) stays where it is; you
@@ -319,6 +392,20 @@ yourself in Stage 2.`,
   │ 'A' │ 'd' │ 'a' │ \0  │  ?  │  ?  │
   └─────┴─────┴─────┴─────┴─────┴─────┘
     [0]   [1]   [2]   [3]   [4]   [5]    strlen = 3, size = 6`,
+				UnderTheHood: `a[i] is arithmetic: the address of a plus i times the element size. For
+an int array, int at(int *a, long i) { return a[i]; } compiles to one
+instruction:
+
+  mov eax, DWORD PTR [rdi+rsi*4]   ; load from a + i*4
+
+No bounds check exists anywhere, which is why C is fast, and why an
+index past the end silently reads the neighbouring memory. A string
+literal such as "hi" is stored once in the read-only data section as the
+bytes 68 69 00; writing to it crashes. Structs are laid out in order,
+with padding so each field sits at an address its type prefers:
+struct { char c; int x; } takes 8 bytes, not 5, because x must start at
+a multiple of 4. Arrays of structs are contiguous, which makes them
+cache-friendly (Stage 5).`,
 				MentalModel: "An array is numbered lockers in a row; a string is the same, ending with an empty locker marked \\0.",
 				TryIt:       "Count how often each letter a–z appears in a line of text, using an int counts[26] array indexed by c - 'a', then print the five most common letters.",
 				Analogy: `A row of numbered lockers: you go straight to locker 7, but if you ask
@@ -359,10 +446,31 @@ Being "bulletproof" in C is a discipline, not a feature:
 - check every return value (fopen can return NULL, malloc can fail);
 - pass sizes with arrays, and prefer bounded functions such as snprintf;
 - compile with -Wall -Wextra, and while developing add -fsanitize=address,undefined, which makes most of these bugs crash loudly at the exact line.`,
-				Diagram: `  input ──▶ [ fgets into buf[64] ] ──▶ [ strtol: whole number? in range? ] ──▶ use it
-                  │ too long?                    │ no
-                  ▼                              ▼
-              reject, ask again            reject, ask again`,
+				Diagram: `  input
+    │ fgets into buf[64]          too long? → reject, ask again
+    ▼
+  strtol: a whole number? in range?    no → reject, ask again
+    │ yes
+    ▼
+  use it`,
+				UnderTheHood: `Undefined behaviour is not just "the program might crash". The compiler
+is allowed to assume it never happens, and optimises on that basis. This
+check for overflow:
+
+  int overflow_check(int x) { return x + 1 < x; }
+
+compiles with gcc -O2 to:
+
+  xor eax, eax     ; return 0, always
+  ret
+
+Signed overflow is undefined, so x + 1 < x "can never be true", and the
+check is deleted. (Write x == INT_MAX instead.) This is why "it worked
+in debug mode" proves nothing. The address sanitizer catches memory
+bugs by surrounding every array and allocation with poisoned "red
+zones" and checking every load and store against a shadow map of
+memory, at the cost of running about twice as slowly: a good trade
+while you develop and test.`,
 				MentalModel: "Never trust input, never assume a size, never ignore a return value.",
 				TryIt:       `Compile int a[3] = {0}; a[3] = 1; first normally, then with gcc -g -fsanitize=address,undefined, and compare what each run tells you.`,
 				Analogy: `A kitchen knife with no guard: in skilled hands it is the best tool
@@ -400,6 +508,17 @@ Your tools:
 - gdb (or lldb on macOS): run the program under a debugger, stop at a line (break), step through it (next, step), print variables (print x), and see the call stack after a crash (bt, for backtrace);
 - sanitizers (-fsanitize=address,undefined) to catch memory and undefined-behaviour bugs at the exact line;
 - explaining your code line by line out loud (rubber-duck debugging), which finds a surprising number of bugs.`,
+				UnderTheHood: `-g adds debug information (in a format called DWARF) that maps every
+machine-code address back to a file, a line and variable names. That is
+how gdb can say "main.c:12" when the CPU only knows an address.
+
+A breakpoint is a trick: gdb replaces the first byte of the instruction
+at that line with 0xCC, the int3 instruction. When the CPU reaches it,
+it traps into the kernel, which stops your program and wakes gdb
+(through the ptrace system call). gdb puts the original byte back,
+shows you the state, and continues when you ask. A backtrace (bt) is
+gdb walking the chain of stack frames, reading each saved return
+address and looking up which function and line it belongs to.`,
 				MentalModel: "The computer did exactly what you said; find where that differs from what you meant.",
 				TryIt:       "Compile a program that crashes with -g, run it under gdb (gdb ./program, then run), and after the crash type bt to see exactly which function and line it died in.",
 				Analogy: `A doctor diagnosing symptoms: gather evidence, form a hypothesis, test

@@ -288,7 +288,7 @@ func (a *App) headlineItem(it FeedItem) error {
 			a.con.ok("Opened in your browser. The academy keeps running here.")
 		}
 	case "Download the PDF to the Library":
-		doc := LibraryDoc{Kind: "Paper", Title: it.Title, Page: it.Link, PDF: pdf}
+		doc := LibraryDoc{Stage: NoStage, Kind: "Paper", Title: it.Title, Page: it.Link, PDF: pdf}
 		path := filepath.Join(libraryDir(a.path), doc.fileName())
 		if err := a.download(pdf, path); err == nil {
 			return a.offerOpen(path)

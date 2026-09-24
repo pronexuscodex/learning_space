@@ -48,7 +48,7 @@ func (a *App) renderMyResources(list []MyResource) {
 	for i, m := range list {
 		if m.Stage != last {
 			label := "General (no stage)"
-			if m.Stage > 0 {
+			if m.Stage >= 0 {
 				a.mu.Lock()
 				if _, s := a.reg.findStage(m.Stage); s != nil {
 					label = fmt.Sprintf("Stage %d · %s", m.Stage, s.Title)
@@ -66,7 +66,7 @@ func (a *App) renderMyResources(list []MyResource) {
 func (a *App) myResources() error {
 	for {
 		a.mu.Lock()
-		list := a.reg.myResourcesFor(0)
+		list := a.reg.myResourcesFor(AllStages)
 		a.mu.Unlock()
 		a.paged(false, func() { a.renderMyResources(list) })
 		a.println("")
@@ -79,7 +79,7 @@ func (a *App) myResources() error {
 		case s == "" || isCancel(s):
 			return nil
 		case s == "a":
-			err = a.addResourceFlow(0)
+			err = a.addResourceFlow(NoStage)
 		case s == "i":
 			err = a.importResourcesFlow()
 		case s == "e":
@@ -145,14 +145,18 @@ func (a *App) askResource(cur MyResource, editing bool) (MyResource, error) {
 
 	a.mu.Lock()
 	def := cur.Stage
-	if !editing && def == 0 {
+	if !editing && def == NoStage {
 		if s := a.reg.currentStage(); s != nil {
 			def = s.ID
 		}
 	}
 	a.mu.Unlock()
 	for {
-		s, err := a.con.readLine(promptLabel(fmt.Sprintf("Stage 1–16, or 0 for general (Enter = %d)", def), "q cancel"))
+		defLabel := "general"
+		if def >= 0 {
+			defLabel = fmt.Sprintf("Stage %d", def)
+		}
+		s, err := a.con.readLine(promptLabel(fmt.Sprintf("Stage 0–16, or g for general (Enter = %s)", defLabel), "q cancel"))
 		if err != nil {
 			return cur, err
 		}
@@ -163,11 +167,15 @@ func (a *App) askResource(cur MyResource, editing bool) (MyResource, error) {
 			cur.Stage = def
 			break
 		}
+		if strings.EqualFold(s, "g") {
+			cur.Stage = NoStage
+			break
+		}
 		if n, err := strconv.Atoi(s); err == nil && n >= 0 && n <= 16 {
 			cur.Stage = n
 			break
 		}
-		a.con.warn("Enter a number from 0 to 16.")
+		a.con.warn("Enter a stage from 0 to 16, or g for general.")
 	}
 	note, err := a.con.promptText(keep("Why is it good? A note for future you (Enter to skip)", cur.Note), maxNotesLen, false)
 	if err != nil {

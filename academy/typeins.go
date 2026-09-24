@@ -6,6 +6,62 @@ package main
 
 // typeIns holds one magazine-style listing per stage.
 var typeIns = map[int]TypeIn{
+	0: {
+		File:    "cpu.c",
+		Lang:    "C",
+		Run:     "gcc -Wall -Wextra -std=c17 cpu.c -o cpu && ./cpu",
+		Predict: "Trace the program on paper before running it: what number will it print, and how many instructions will the tiny CPU execute before it halts? (Hint: the loop body is 7 instructions.)",
+		Lesson:  "The loop runs 5 times × 7 instructions = 35, plus 3 to print and halt: 38 steps, printing 15. Notice that the program and its data share the same memory (the von Neumann design), and that a loop is nothing but a conditional jump back to an earlier address. A real CPU does exactly this, billions of times per second.",
+		Code: `/* TINY CPU -- a type-in in the spirit of 1980s magazine listings.
+ * A pretend computer with 32 memory cells and one register (acc).
+ * Instructions are numbers: opcode * 100 + address.
+ *   1xx LOAD  acc = mem[xx]     4xx STORE mem[xx] = acc
+ *   2xx ADD   acc += mem[xx]    5xx JNZ   jump to xx if acc != 0
+ *   3xx SUB   acc -= mem[xx]    600 PRINT acc      000 HALT
+ * The program below adds 5 + 4 + 3 + 2 + 1. */
+#include <stdio.h>
+
+int main(void) {
+    int mem[32] = {
+        120, 221, 420,      /* 0: sum = sum + n            */
+        121, 322, 421,      /* 3: n = n - 1                */
+        500,                /* 6: if n != 0 go back to 0   */
+        120, 600, 0,        /* 7: print sum, then halt     */
+    };
+    mem[20] = 0;            /* sum */
+    mem[21] = 5;            /* n   */
+    mem[22] = 1;            /* the constant 1 */
+
+    int pc = 0, acc = 0, steps = 0;
+    for (;;) {
+        int instr = mem[pc];            /* FETCH  */
+        int op = instr / 100;           /* DECODE */
+        int addr = instr % 100;
+        pc++;
+        steps++;
+        if (steps <= 7)
+            printf("step %d: pc=%d instr=%03d acc=%d\n", steps, pc - 1, instr, acc);
+        switch (op) {                   /* EXECUTE */
+        case 1: acc = mem[addr]; break;
+        case 2: acc += mem[addr]; break;
+        case 3: acc -= mem[addr]; break;
+        case 4: mem[addr] = acc; break;
+        case 5: if (acc != 0) pc = addr; break;
+        case 6: printf("OUTPUT: %d\n", acc); break;
+        case 0: printf("halted after %d steps\n", steps); return 0;
+        }
+    }
+}`,
+		Expected: `step 1: pc=0 instr=120 acc=0
+step 2: pc=1 instr=221 acc=0
+step 3: pc=2 instr=420 acc=5
+step 4: pc=3 instr=121 acc=5
+step 5: pc=4 instr=322 acc=5
+step 6: pc=5 instr=421 acc=4
+step 7: pc=6 instr=500 acc=4
+OUTPUT: 15
+halted after 38 steps`,
+	},
 	1: {
 		File:    "collatz.c",
 		Lang:    "C",

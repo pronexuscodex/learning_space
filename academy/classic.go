@@ -111,6 +111,17 @@ func (r *Registry) stuckLogged(ref string) bool {
 }
 
 var classicGuides = map[int]ClassicGuide{
+	0: {
+		Anchor: ClassicRead{"Code: The Hidden Language of Computer Hardware and Software", "Charles Petzold", 1999, "https://www.codehiddenlanguage.com/",
+			"The gentlest complete explanation of how a computer works ever written: from flashlights and Morse code, through relays and logic gates, to a working CPU and memory. The second edition (2022) has an interactive companion site.",
+			"Read it like a novel, a few chapters a week, and redraw each circuit yourself on paper. You will meet it again in Stage 4."},
+		Classic: ClassicRead{"A Mathematical Theory of Communication", "Claude E. Shannon", 1948, "https://people.math.harvard.edu/~ctm/home/text/others/shannon/entropy/entropy.pdf",
+			"The paper that founded information theory and made \"bit\" a unit of information. Every file, network and compression format rests on it.",
+			"Read the introduction and the first few sections for the big ideas (messages, channels, noise, the bit); skim the mathematics for now and come back after Stage 3."},
+		Source: ClassicRead{"Write your Own Virtual Machine (LC-3)", "Justin Meiners & Ryan Pendleton", 2018, "https://www.jmeiners.com/lc3-vm/",
+			"A complete simulator for a small real computer in about 250 lines of C, explained line by line, that runs real programs such as 2048.",
+			"Do this stage's type-in first. Then read the tutorial's sections on memory, registers and the instruction loop, and compare them with the tiny CPU you typed in."},
+	},
 	1: {
 		Anchor: ClassicRead{"The C Programming Language (2nd edition)", "Brian W. Kernighan & Dennis M. Ritchie", 1988, "",
 			"\"K&R\": 270 pages by the language's own designers, and still the model of how a programming book should be written. Every example is small, complete and real.",

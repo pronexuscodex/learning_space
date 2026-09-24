@@ -120,8 +120,8 @@ func TestAtomicWriteRoundTripAndLegacyLoad(t *testing.T) {
 	if err != nil {
 		t.Fatalf("legacy load: %v", err)
 	}
-	if !res.Migrated || res.NewStages != 14 {
-		t.Fatalf("result = %+v, want migrated with 14 new stages", res)
+	if !res.Migrated || res.NewStages != 15 {
+		t.Fatalf("result = %+v, want migrated with 15 new stages", res)
 	}
 	// Titles follow the curriculum; status and labs are the learner's own.
 	if _, s := old.findStage(5); s == nil || s.Title != "The Iron Layer (Low-Level Systems & Compilers)" || s.Status != StatusGraduated || len(s.Labs) != 1 || len(s.Literature) != 3 {
@@ -222,7 +222,7 @@ func TestTermsInMatchesWholeWordsAndPlurals(t *testing.T) {
 	}
 }
 
-// Every guide must belong to a seeded stage, and IDs must run 1..N.
+// Every guide must belong to a seeded stage, and IDs must run 0..N-1.
 func TestGuidesMatchSeedStages(t *testing.T) {
 	reg := seedRegistry()
 	n := 0
@@ -232,7 +232,7 @@ func TestGuidesMatchSeedStages(t *testing.T) {
 	if n != len(curriculum) {
 		t.Fatalf("%d seeded stages but %d guides", n, len(curriculum))
 	}
-	for id := 1; id <= n; id++ {
+	for id := 0; id < n; id++ {
 		if _, s := reg.findStage(id); s == nil {
 			t.Errorf("stage %d is not seeded", id)
 		}

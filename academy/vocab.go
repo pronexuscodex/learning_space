@@ -17,7 +17,7 @@ type Word struct {
 	Word    string
 	Also    []string // other names and spellings, used for search and detection
 	Cat     string
-	Stage   int    // the stage that teaches it most (0: everywhere)
+	Stage   int    // the stage that teaches it most (NoStage: everywhere)
 	Means   string // plain meaning, one to three sentences
 	Like    string // an everyday analogy
 	Example string // code or a usage example; may span lines

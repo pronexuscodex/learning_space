@@ -207,7 +207,7 @@ var achievements = []Achievement{
 			}
 			return false
 		}},
-	{"graduate", "Graduate", "Mastered all sixteen stages.",
+	{"graduate", "Graduate", "Mastered every stage, from How Computers Work to AI infrastructure.",
 		func(r *Registry, cs campusStats) bool {
 			return r.countStages(func(s *Stage) bool { return r.stageState(s) == StageMastered }) == len(r.stageOrder())
 		}},

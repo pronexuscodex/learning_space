@@ -181,37 +181,45 @@ func (a *App) printMenu() {
 	if tidy {
 		tidyMode = sty.Bold(sty.Green("on"))
 	}
-	type entry struct{ text, extra string } // extra is shown only when it fits
-	left := []entry{
-		{item("0", sty.Bold(sty.Green("Start Here"))), ""},
-		{item("1", "View Campus Ledger"), ""},
-		{item("2", "Enroll in a New Lab"), ""},
-		{item("3", "Log Study/Lab Hours"), ""},
-		{item("4", "Advance Academic Status"), ""},
-	}
-	right := []entry{
-		{item("9", review), ""},
-		{item("5", "Atomic Commit & Exit"), ""},
-		{item("6", sty.Bold("Study Hall")), hint("learn & practise")},
-		{item("7", "Checkpoint"), hint("save, keep going")},
-		{item("8", sty.Gray("Exit without saving")), ""},
-	}
-	extras := []entry{
-		{item("n", sty.Bold(sty.Green("What's next"))), hint("best next step")},
-		{item("/", "Search"), hint("find any topic")},
-		{item("f", "Focus timer"), hint("Pomodoro")},
-		{item("p", "Progress report"), hint("calendar & trends")},
-		{item("x", "Export notes"), hint("to Markdown")},
-		{item("m", "Roadmap"), hint("all 16 stages")},
-		{item("d", sty.Bold("Dictionary")), hint("every word explained")},
-		{item("l", sty.Bold("Library")), hint("download PDFs")},
-		{item("+", "My resources"), hint("add your own")},
-		{item("w", sty.Bold("Tech watch")), hint("keep up with trends")},
-		{item("g", "Weekly goals"), ""},
-		{item("a", "Achievements"), ""},
-		{item("c", "Classic Mode "+mode), ""},
-		{item("t", "Tidy screen "+tidyMode), ""},
-		{item("?", "Keys & shortcuts"), hint("Ctrl+L clears")},
+	type entry struct{ text, extra, short string } // extra is shown only when it fits; short is for narrow screens
+	groups := []struct {
+		title   string
+		color   func(string) string
+		entries []entry
+	}{
+		{"LEARN", sty.Green, []entry{
+			{item("0", sty.Bold(sty.Green("Start Here"))), hint("begin here"), "Start Here"},
+			{item("6", sty.Bold("Study Hall")), hint("learn & practise"), "Study Hall"},
+			{item("9", review), "", "Review"},
+			{item("n", sty.Bold(sty.Green("What's next"))), hint("best next step"), "What's next"},
+			{item("m", "Roadmap"), hint("all 17 stages"), "Roadmap"},
+			{item("d", sty.Bold("Dictionary")), hint("every word explained"), "Dictionary"},
+			{item("/", "Search"), hint("find any topic"), "Search"},
+		}},
+		{"PRACTISE & TRACK", sty.Cyan, []entry{
+			{item("f", "Focus timer"), hint("Pomodoro"), "Focus timer"},
+			{item("2", "Enroll in a New Lab"), "", "Enroll lab"},
+			{item("3", "Log Study/Lab Hours"), "", "Log hours"},
+			{item("4", "Advance Academic Status"), "", "Advance"},
+			{item("1", "View Campus Ledger"), "", "Ledger"},
+			{item("g", "Weekly goals"), "", "Goals"},
+			{item("p", "Progress report"), hint("calendar & trends"), "Progress"},
+			{item("a", "Achievements"), "", "Achievements"},
+		}},
+		{"RESOURCES", sty.Magenta, []entry{
+			{item("l", sty.Bold("Library")), hint("download PDFs"), "Library"},
+			{item("+", "My resources"), hint("your finds"), "My resources"},
+			{item("w", sty.Bold("Tech watch")), hint("keep up with trends"), "Tech watch"},
+			{item("x", "Export notes"), hint("to Markdown"), "Export"},
+		}},
+		{"SAVE & SETTINGS", sty.Yellow, []entry{
+			{item("7", "Checkpoint"), hint("save, keep going"), "Checkpoint"},
+			{item("5", "Atomic Commit & Exit"), "", "Commit & exit"},
+			{item("8", sty.Gray("Exit without saving")), "", "Quit, no save"},
+			{item("c", "Classic Mode "+mode), "", "Classic " + stripANSI(mode)},
+			{item("t", "Tidy screen "+tidyMode), "", "Tidy " + stripANSI(tidyMode)},
+			{item("?", "Keys & shortcuts"), hint("Ctrl+L clears"), "Keys"},
+		}},
 	}
 
 	edge := sty.Gray
@@ -224,31 +232,51 @@ func (a *App) printMenu() {
 		}
 		return truncate(stripANSI(e.text), room)
 	}
+	// One, two or three columns, depending on the width.
 	const colWidth = 32
-	if inner >= colWidth+34 { // two columns
-		for i := range left {
-			a.println("  " + edge("│ ") + padRight(show(left[i], colWidth-1), colWidth) + show(right[i], inner-colWidth))
-		}
-	} else {
-		for i := range left {
-			a.println("  " + edge("│ ") + show(left[i], inner))
-		}
-		for i := range right {
-			a.println("  " + edge("│ ") + show(right[i], inner))
-		}
+	columns := 1
+	switch {
+	case inner >= 3*colWidth:
+		columns = 3
+	case inner >= colWidth+34:
+		columns = 2
 	}
-	a.println("  " + edge("│"))
-	if inner >= colWidth+34 {
-		for i := 0; i < len(extras); i += 2 {
-			line := padRight(show(extras[i], colWidth-1), colWidth)
-			if i+1 < len(extras) {
-				line += show(extras[i+1], inner-colWidth)
+	narrow := columns == 1 && inner >= 2*17 // two compact columns with short labels
+	for gi, g := range groups {
+		if gi > 0 {
+			a.println("  " + edge("│"))
+		}
+		a.println("  " + edge("│ ") + g.color(sty.Bold(truncate(g.title, inner))))
+		if narrow {
+			half := inner / 2
+			for i := 0; i < len(g.entries); i += 2 {
+				key := func(e entry) string { return strings.SplitN(stripANSI(e.text), " ", 2)[0] }
+				cell := func(e entry, room int) string {
+					label := e.short
+					if key(e) == "[9]" && dueNow > 0 {
+						label += fmt.Sprintf(" (%d)", dueNow)
+					}
+					return sty.Cyan(key(e)) + " " + truncate(label, room-visibleLen(key(e))-1)
+				}
+				line := padRight(cell(g.entries[i], half-1), half)
+				if i+1 < len(g.entries) {
+					line += cell(g.entries[i+1], inner-half)
+				}
+				a.println("  " + edge("│ ") + line)
+			}
+			continue
+		}
+		for i := 0; i < len(g.entries); i += columns {
+			line := ""
+			for c := 0; c < columns && i+c < len(g.entries); c++ {
+				last := c == columns-1 || i+c == len(g.entries)-1
+				if last {
+					line += show(g.entries[i+c], inner-c*colWidth)
+				} else {
+					line += padRight(show(g.entries[i+c], colWidth-1), colWidth)
+				}
 			}
 			a.println("  " + edge("│ ") + line)
-		}
-	} else {
-		for _, e := range extras {
-			a.println("  " + edge("│ ") + show(e, inner))
 		}
 	}
 	a.println("  " + edge("└"+strings.Repeat("─", max(0, w-3))))
@@ -927,7 +955,7 @@ func (a *App) run() {
 		case "+", "my":
 			actionErr = a.myResources()
 		case "l":
-			actionErr = a.library(0)
+			actionErr = a.library(AllStages)
 		case "g":
 			actionErr = a.setGoals()
 		case "a":

@@ -48,7 +48,14 @@ const registryFileName = "academy_campus_registry.json"
 
 // schemaVersion is bumped whenever the JSON layout changes incompatibly.
 // Older files are upgraded on load by migrate(); see v1StageRenumber.
-const schemaVersion = 2
+const schemaVersion = 3
+
+// Stage sentinels. Stage 0 is a real stage (How Computers Work), so
+// "not tied to a stage" and "every stage" need values of their own.
+const (
+	NoStage   = -1 // stored: a resource, session or word not tied to one stage
+	AllStages = -2 // filters only: never stored
+)
 
 // v1StageRenumber maps schema-1 stage IDs (the original seven stages) to
 // their place in the 16-stage curriculum introduced by schema 2.
@@ -501,6 +508,11 @@ func seedRegistry() *Registry {
 				ID:   "F",
 				Name: "Foundations of Computing",
 				Stages: []Stage{
+					stage(0, "How Computers Work",
+						book("Code: The Hidden Language of Computer Hardware and Software", "Charles Petzold"),
+						book("The Elements of Computing Systems (Nand2Tetris)", "Noam Nisan & Shimon Schocken"),
+						book("Computer Science from the Bottom Up", "Ian Wienand"),
+					),
 					stage(1, "Programming Fundamentals in C",
 						book("The C Programming Language (K&R)", "Brian W. Kernighan & Dennis M. Ritchie"),
 						book("C Programming: A Modern Approach", "K. N. King"),
@@ -685,6 +697,22 @@ func (r *Registry) migrate() (bool, error) {
 			}
 		}
 		r.SchemaVersion = 2
+		_, err := r.migrate() // continue to the current schema
+		return true, err
+	case 2:
+		// Schema 3 added Stage 0 (How Computers Work), so "general, not tied
+		// to a stage", which used to be stored as 0, becomes NoStage.
+		for i := range r.MyResources {
+			if r.MyResources[i].Stage == 0 {
+				r.MyResources[i].Stage = NoStage
+			}
+		}
+		for i := range r.StudySessions {
+			if r.StudySessions[i].Stage == 0 {
+				r.StudySessions[i].Stage = NoStage
+			}
+		}
+		r.SchemaVersion = 3
 		return true, nil
 	default:
 		return false, fmt.Errorf("unsupported schema_version %d (this build understands up to %d)", r.SchemaVersion, schemaVersion)
@@ -922,7 +950,7 @@ func main() {
 	} else {
 		app.con.note("Loaded registry from %s", path)
 		if loaded.Migrated {
-			app.con.ok("Upgraded your registry to the 16-stage curriculum; your progress and labs are kept.")
+			app.con.ok("Upgraded your registry to the current curriculum; your progress and labs are kept.")
 		}
 		if loaded.NewStages > 0 {
 			app.con.ok("%d new stage(s) added to your campus. Commit (5 or 7) to save them.", loaded.NewStages)

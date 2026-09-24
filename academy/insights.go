@@ -16,7 +16,7 @@ import (
 type StudySession struct {
 	Start   time.Time `json:"start"`
 	Minutes float64   `json:"minutes"`
-	Stage   int       `json:"stage"` // 0: general study
+	Stage   int       `json:"stage"` // NoStage: general study
 	Note    string    `json:"note,omitempty"`
 }
 
@@ -466,7 +466,7 @@ func (r *Registry) exportMarkdown(now time.Time) string {
 			b.WriteString("\n")
 		}
 	}
-	if mine := r.myResourcesFor(0); len(mine) > 0 {
+	if mine := r.myResourcesFor(AllStages); len(mine) > 0 {
 		b.WriteString("## My resources\n\n")
 		for _, m := range mine {
 			line := "- "
@@ -476,7 +476,7 @@ func (r *Registry) exportMarkdown(now time.Time) string {
 				line += m.Title
 			}
 			line += " · " + m.Kind
-			if m.Stage > 0 {
+			if m.Stage >= 0 {
 				line += fmt.Sprintf(" · Stage %d", m.Stage)
 			}
 			if m.Note != "" {

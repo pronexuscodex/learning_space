@@ -32,7 +32,7 @@ func ownDownloads(dir string, catalogue []LibraryDoc) []LibraryDoc {
 			continue
 		}
 		title := strings.TrimSuffix(name, ".pdf")
-		out = append(out, LibraryDoc{Kind: "Yours", Title: title})
+		out = append(out, LibraryDoc{Stage: NoStage, Kind: "Yours", Title: title})
 	}
 	return out
 }
@@ -43,7 +43,7 @@ func (a *App) libraryEntries(stage int) []LibraryDoc {
 	all := libraryDocs()
 	var docs []LibraryDoc
 	for _, d := range all {
-		if stage == 0 || d.Stage == stage {
+		if stage == AllStages || d.Stage == stage {
 			docs = append(docs, d)
 		}
 	}
@@ -61,14 +61,14 @@ func (a *App) libraryEntries(stage int) []LibraryDoc {
 			docs = append(docs, d)
 		}
 	}
-	order := func(stage int) int { // general (stage 0) items go last
-		if stage == 0 {
+	order := func(stage int) int { // general items go last
+		if stage == NoStage {
 			return 1 << 10
 		}
 		return stage
 	}
 	sort.SliceStable(docs, func(i, j int) bool { return order(docs[i].Stage) < order(docs[j].Stage) })
-	if stage == 0 {
+	if stage == AllStages {
 		docs = append(docs, ownDownloads(libraryDir(a.path), append(all, mine...))...)
 	}
 	return docs
@@ -79,7 +79,7 @@ func (a *App) renderLibrary(stage int, docs []LibraryDoc) {
 	w := a.cols()
 	dir := libraryDir(a.path)
 	title := "LIBRARY · free books and papers, saved on your computer"
-	if stage > 0 {
+	if stage != AllStages {
 		title = fmt.Sprintf("LIBRARY · Stage %d", stage)
 	}
 	a.println(heading(title, sty.Magenta, w))
@@ -97,8 +97,8 @@ func (a *App) renderLibrary(stage int, docs []LibraryDoc) {
 	for i, d := range docs {
 		if d.Stage != lastStage {
 			label := fmt.Sprintf("Stage %d", d.Stage)
-			if d.Stage == 0 {
-				label = "Your own downloads"
+			if d.Stage == NoStage {
+				label = "General and your own downloads"
 			} else {
 				a.mu.Lock()
 				if _, st := a.reg.findStage(d.Stage); st != nil {

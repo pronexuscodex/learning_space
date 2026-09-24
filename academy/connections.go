@@ -14,7 +14,7 @@ type links struct {
 
 // stagePrereqs lists the stages each stage builds on.
 var stagePrereqs = map[int][]int{
-	1: {}, 2: {1}, 3: {1}, 4: {1, 3},
+	0: {}, 1: {0}, 2: {1}, 3: {1}, 4: {1, 3},
 	5: {1, 2, 4}, 6: {5}, 7: {2, 6}, 8: {6},
 	9: {1}, 10: {3, 8}, 11: {2, 3}, 12: {1, 5},
 	13: {3}, 14: {3, 13}, 15: {13, 14}, 16: {5, 6, 15},
@@ -22,6 +22,24 @@ var stagePrereqs = map[int][]int{
 
 // conceptLinks is keyed by Concept.Name.
 var conceptLinks = map[string]links{
+	// ---- Stage 0
+	"Bits & Bytes: Everything Is a Number": {[]string{"Binary & Number Representation", "Values, Types & Variables", "Integers & Floating Point in Bits"},
+		"CS50 Week 0 (representing text, colour, images and sound). Code by Charles Petzold, the chapters on binary and codes. Crash Course Computer Science, episode 4 (representing numbers and letters)."},
+	"The CPU at Work: Fetch, Decode, Execute": {[]string{"The CPU: Datapath & Instruction Cycle", "Logic Gates & Circuits", "Pipelining, Branch Prediction & Parallelism"},
+		"Crash Course Computer Science, episodes 7 to 9 (the CPU, instructions and programs). Nand2Tetris, projects 4 and 5. Build the LC-3 virtual machine in C."},
+	"Memory & Storage: Where Data Lives": {[]string{"The Memory Hierarchy & Locality", "Memory: Latches, Registers & RAM", "Virtual Memory & Paging"},
+		"Computer Science from the Bottom Up, the chapter on computer architecture. Look up \"Latency Numbers Every Programmer Should Know\" and redo the one-second scaling yourself."},
+	"From Source Code to Running Program": {[]string{"Your First C Program: Source, Compiler, Executable", "The Compilation Pipeline", "Processes & the Address Space"},
+		"Computer Science from the Bottom Up, the chapters on the toolchain and on how a program is loaded. Run strace on small programs and read every line."},
+	"The Operating System: The Machine's Manager": {[]string{"System Calls & Privilege", "Scheduling & Context Switches", "Processes & the Address Space"},
+		"Operating Systems: Three Easy Pieces (free), the introduction chapter. Crash Course Computer Science, episode 18 (operating systems)."},
+	"Input & Output: Keys, Screens & Interrupts": {[]string{"System Calls & Privilege", "Sockets & I/O Multiplexing"},
+		"Operating Systems: Three Easy Pieces, the chapter on I/O devices. The keyboard part of \"What happens when you type google.com\"."},
+	"Networks: How Computers Talk": {[]string{"The Layered Stack & Encapsulation", "HTTP, DNS & How the Web Works", "TCP: Handshake, Flow & Congestion Control"},
+		"\"What happens when you type google.com\", read slowly. Crash Course Computer Science, episodes 28 to 30 (networks and the internet)."},
+	"Booting: From Power Button to Login": {[]string{"System Calls & Privilege", "Processes & the Address Space"},
+		"Computer Science from the Bottom Up, the chapter on booting. Run systemd-analyze and dmesg on a Linux machine and explain every stage you see."},
+
 	// ---- Stage 1
 	"Your First C Program: Source, Compiler, Executable": {[]string{"The Compilation Pipeline", "The Command Line & Your Environment"},
 		"CS50: week 1 (C). Beej's Guide to C, chapters 1–2. Paste hello.c into Compiler Explorer (godbolt.org) to see the machine code it becomes."},
