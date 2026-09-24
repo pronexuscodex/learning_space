@@ -822,7 +822,23 @@ func main() {
 		pager: interactive(),
 	}
 
-	fmt.Print(banner())
+	app.con.cols = app.cols
+	layoutWidth = app.cols
+	if app.con.raw && app.con.screen {
+		if resized := watchResize(); resized != nil {
+			go func() {
+				for range resized {
+					// Let a burst of resize events (dragging a window edge) settle.
+					time.Sleep(80 * time.Millisecond)
+					for len(resized) > 0 {
+						<-resized
+					}
+					app.con.redrawForResize()
+				}
+			}()
+		}
+	}
+	fmt.Print(banner(app.cols()))
 	if loaded.Seeded {
 		app.con.note("No registry found. Seeded a new campus at %s", path)
 		app.con.ok("Welcome! New here? Press %s for the Start Here guide.", sty.Bold(sty.Green("0")))

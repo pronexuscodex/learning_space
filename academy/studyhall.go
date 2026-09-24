@@ -13,7 +13,7 @@ import (
 
 // studyHall picks a stage and loops over its learning menu.
 func (a *App) studyHall() error {
-	a.println(heading("STUDY HALL · learn, practise, build", sty.Blue, a.width))
+	a.println(heading("STUDY HALL · learn, practise, build", sty.Blue, a.cols()))
 	stageID, err := a.pickStage(nil)
 	if err != nil {
 		return err
@@ -99,13 +99,13 @@ func (a *App) renderStageSyllabus(stageID int, g StageGuide) {
 	}
 	a.mu.Unlock()
 
-	a.printf("\n  %s %s %s\n", color(sty.Bold(fmt.Sprintf("Stage %d", stageID))), sty.Gray("·"), sty.Bold(title))
-	for _, l := range wrap(g.Overview, a.width-4, "  ") {
+	a.printf("\n  %s %s %s\n", color(sty.Bold(fmt.Sprintf("Stage %d", stageID))), sty.Gray("·"), sty.Bold(truncate(title, a.cols()-14)))
+	for _, l := range wrap(g.Overview, a.cols()-4, "  ") {
 		a.println(sty.Italic(l))
 	}
 	if len(prereqs) > 0 {
 		a.println("")
-		for i, l := range wrap(strings.Join(prereqs, ", "), a.width-16, "") {
+		for i, l := range wrap(strings.Join(prereqs, ", "), a.cols()-16, "") {
 			lead := "              "
 			if i == 0 {
 				lead = sty.Bold(sty.Blue("🧱 Builds on")) + "  "
@@ -113,7 +113,7 @@ func (a *App) renderStageSyllabus(stageID int, g StageGuide) {
 			a.printf("  %s%s\n", lead, sty.Gray(l))
 		}
 		if weak > 0 {
-			for _, l := range wrap("Tip: you have covered less than half of some of these. A quick visit there first will make this stage easier.", a.width-16, "") {
+			for _, l := range wrap("Tip: you have covered less than half of some of these. A quick visit there first will make this stage easier.", a.cols()-16, "") {
 				a.printf("  %s%s\n", strings.Repeat(" ", 14), sty.Yellow(l))
 			}
 		}
@@ -121,7 +121,7 @@ func (a *App) renderStageSyllabus(stageID int, g StageGuide) {
 	if len(g.Outcomes) > 0 {
 		a.printf("\n  %s\n", sty.Bold(sty.Green("After this stage you'll be able to:")))
 		for _, o := range g.Outcomes {
-			for i, l := range wrap(o, a.width-8, "      ") {
+			for i, l := range wrap(o, a.cols()-8, "      ") {
 				if i == 0 {
 					l = "    " + sty.Green("✓") + " " + strings.TrimLeft(l, " ")
 				}
@@ -137,12 +137,28 @@ func (a *App) renderStageSyllabus(stageID int, g StageGuide) {
 			checkNote = sty.Yellow(fmt.Sprintf("mastery check %d/%d, not yet passed", check.Score, check.Total))
 		}
 	}
-	a.printf("\n  %s %s %s   %s\n", sty.Gray("Mastery "), bar(points, maxPoints, 20, sty.Green),
-		sty.Bold(fmt.Sprintf("%d/%d mastered", mastered, total)), checkNote)
-	a.printf("  %s\n", masteryLegend()+sty.Gray("   ●●● = exercises done"))
+	w := a.cols()
+	a.println("")
+	for _, l := range flow([]string{
+		sty.Gray("Mastery") + " " + bar(points, maxPoints, max(6, min(20, w-30)), sty.Green) + " " + sty.Bold(fmt.Sprintf("%d/%d mastered", mastered, total)),
+		checkNote,
+	}, "   ", w, "  ") {
+		a.println(l)
+	}
+	legend := make([]string, 0, len(masteryNames)+1)
+	for i, n := range masteryNames {
+		legend = append(legend, masteryBadge(i)+" "+sty.Gray(n))
+	}
+	legend = append(legend, sty.Gray("●●● = exercises done"))
+	for _, l := range flow(legend, "  ", w, "  ") {
+		a.println(l)
+	}
 	for i, c := range g.Concepts {
-		a.printf("    %s %s %s %s %s\n", masteryBadge(level[c.Name]), color(fmt.Sprintf("%d.", i+1)), dots[c.Name], sty.Bold(c.Name),
-			sty.Gray("— "+truncate(c.Summary, a.width-len([]rune(c.Name))-18)))
+		head := fmt.Sprintf("    %s %s %s %s", masteryBadge(level[c.Name]), color(fmt.Sprintf("%d.", i+1)), dots[c.Name], sty.Bold(truncate(c.Name, w-15)))
+		if room := w - visibleLen(head) - 3; room >= 16 {
+			head += " " + sty.Gray("— "+truncate(c.Summary, room))
+		}
+		a.println(head)
 	}
 	a.println("")
 }
@@ -228,7 +244,7 @@ func (a *App) studyConcept(stageID int, g StageGuide) error {
 // renderConcept prints a concept as a heavy-bordered reading card, going
 // from intuition (analogy, real life) to precision (details, diagram).
 func (a *App) renderConcept(c Concept, n, total int, glossary []Term, done []bool, note string, level int) {
-	w := a.width
+	w := a.cols()
 	edge := sty.Blue("┃")
 	blank := func() { a.printf("  %s\n", edge) }
 	section := func(title string, color func(string) string) {
@@ -243,9 +259,18 @@ func (a *App) renderConcept(c Concept, n, total int, glossary []Term, done []boo
 	plainText := func(s string) string { return s }
 
 	a.println("")
-	a.printf("  %s %s %s   %s %s\n", sty.Blue("┏━"), sty.Gray(fmt.Sprintf("Concept %d/%d ·", n, total)), sty.Bold(sty.Blue(c.Name)),
-		masteryBadge(level), sty.Gray(masteryNames[level]))
-	a.printf("  %s %s\n", edge, sty.Italic(c.Summary))
+	for i, l := range flow([]string{
+		sty.Gray(fmt.Sprintf("Concept %d/%d ·", n, total)),
+		sty.Bold(sty.Blue(truncate(c.Name, w-8))),
+		masteryBadge(level) + " " + sty.Gray(masteryNames[level]),
+	}, " ", w-4, "") {
+		lead := sty.Blue("┃")
+		if i == 0 {
+			lead = sty.Blue("┏━")
+		}
+		a.printf("  %s %s\n", lead, l)
+	}
+	paragraph(c.Summary, sty.Italic)
 
 	if c.Analogy != "" {
 		section("💬 In plain words", sty.Magenta)
@@ -259,8 +284,15 @@ func (a *App) renderConcept(c Concept, n, total int, glossary []Term, done []boo
 	paragraph(c.Body, plainText)
 	if c.Diagram != "" {
 		blank()
+		clipped := false
 		for _, l := range dedent(c.Diagram) {
+			if visibleLen(l) > w-6 {
+				l, clipped = truncate(l, w-6), true
+			}
 			a.printf("  %s   %s\n", edge, sty.Cyan(l))
+		}
+		if clipped {
+			paragraph("(diagram clipped: widen the terminal and press Ctrl+L to see it whole)", sty.Gray)
 		}
 	}
 	if c.MentalModel != "" {
@@ -284,13 +316,14 @@ func (a *App) renderConcept(c Concept, n, total int, glossary []Term, done []boo
 			}
 		}
 		blank()
-		a.printf("  %s %s\n", edge, sty.Gray("Hints and check-off: Study Hall → Exercise gym."))
+		paragraph("Hints and check-off: Study Hall → Exercise gym.", sty.Gray)
 	}
 	if l, ok := conceptLinks[c.Name]; ok {
 		if len(l.Related) > 0 {
 			section("🔗 Connects to", sty.Blue)
 			for _, name := range l.Related {
-				a.printf("  %s   %s %s\n", edge, sty.Blue("↔"), name+sty.Gray(fmt.Sprintf(" (Stage %d)", stageOfConcept(name))))
+				tag := fmt.Sprintf(" (Stage %d)", stageOfConcept(name))
+				a.printf("  %s   %s %s\n", edge, sty.Blue("↔"), truncate(name, w-10-len(tag))+sty.Gray(tag))
 			}
 		}
 		if l.Read != "" {
@@ -376,7 +409,7 @@ func (a *App) exerciseGym(stageID int, g StageGuide) error {
 			if s.hasDone(c.Name, i) {
 				mark = sty.Green("✔")
 			}
-			exOptions[i] = mark + " " + levelBadge(e.Level) + "\n        " + truncate(e.Task, a.width-12)
+			exOptions[i] = mark + " " + levelBadge(e.Level) + "\n        " + truncate(e.Task, a.cols()-12)
 		}
 		a.mu.Unlock()
 
@@ -400,7 +433,7 @@ func (a *App) exerciseGym(stageID int, g StageGuide) error {
 func (a *App) workExercise(stageID int, c Concept, i int) error {
 	e := c.Exercises[i]
 	key := exerciseKey(c.Name, i)
-	w := a.width
+	w := a.cols()
 	edge := sty.Magenta("┃")
 
 	a.mu.Lock()
@@ -565,7 +598,7 @@ func (a *App) showGlossary(g StageGuide) {
 		width = max(width, len([]rune(t.Word)))
 	}
 	for _, t := range g.Glossary {
-		for i, l := range wrap(t.Meaning, a.width-width-10, "") {
+		for i, l := range wrap(t.Meaning, a.cols()-width-10, "") {
 			lead := strings.Repeat(" ", width)
 			if i == 0 {
 				lead = padRight(t.Word, width)
@@ -578,9 +611,9 @@ func (a *App) showGlossary(g StageGuide) {
 
 // showStartHere prints the orientation guide for new learners.
 func (a *App) showStartHere() {
-	a.println(heading("START HERE · how to learn with this academy", sty.Green, a.width))
+	a.println(heading("START HERE · how to learn with this academy", sty.Green, a.cols()))
 	a.println("")
-	for _, l := range wrap(startHere, a.width-4, "  ") {
+	for _, l := range wrap(startHere, a.cols()-4, "  ") {
 		t := strings.TrimSpace(l)
 		if isHeadingLine(t) {
 			a.println("  " + sty.Bold(sty.Green(t)))
@@ -595,8 +628,9 @@ func (a *App) showStartHere() {
 // showResources prints the resource library grouped by kind.
 func (a *App) showResources(g StageGuide) {
 	a.println("")
-	a.printf("  %s  %s\n", sty.Bold(sty.Blue("RESOURCE LIBRARY")),
-		sty.Gray("links verified "+resourcesVerifiedOn+" · re-check any time with: academy -check-links"))
+	for _, l := range flow([]string{sty.Bold(sty.Blue("RESOURCE LIBRARY")), sty.Gray("links verified " + resourcesVerifiedOn), sty.Gray("re-check any time: academy -check-links")}, sty.Gray(" · "), a.cols(), "  ") {
+		a.println(l)
+	}
 	order := []string{"Course", "Book", "Video", "Article", "Paper", "Tool", "Site"}
 	for _, kind := range order {
 		first := true
@@ -608,11 +642,17 @@ func (a *App) showResources(g StageGuide) {
 				a.printf("\n  %s\n", sty.Magenta(sty.Bold(strings.ToUpper(kind)+"S")))
 				first = false
 			}
-			a.printf("    %s %s\n", sty.Blue("◇"), sty.Bold(r.Title))
+			for i, l := range wrap(r.Title, a.cols()-8, "") {
+				lead := "  "
+				if i == 0 {
+					lead = sty.Blue("◇") + " "
+				}
+				a.printf("    %s%s\n", lead, sty.Bold(l))
+			}
 			if r.URL != "" {
 				a.printf("      %s\n", sty.Under(sty.Cyan(r.URL)))
 			}
-			for _, l := range wrap(r.Note, a.width-8, "      ") {
+			for _, l := range wrap(r.Note, a.cols()-8, "      ") {
 				a.println(sty.Gray(l))
 			}
 		}
@@ -628,7 +668,7 @@ func (a *App) showBlueprints(stageID int, g StageGuide) error {
 	for i, b := range g.Blueprints {
 		names[i] = b.Name
 		a.printf("\n  %s %s\n", sty.Green(fmt.Sprintf("[%d]", i+1)), sty.Bold(b.Name))
-		for _, l := range wrap(b.Brief, a.width-8, "      ") {
+		for _, l := range wrap(b.Brief, a.cols()-8, "      ") {
 			a.println(l)
 		}
 		for m, step := range b.Milestones {
@@ -672,7 +712,7 @@ func (a *App) runQuiz(g StageGuide) error {
 	score, asked := 0, 0
 	for i, q := range g.Quiz {
 		a.printf("\n  %s\n", sty.Bold(sty.Magenta(fmt.Sprintf("Q%d/%d", i+1, len(g.Quiz)))))
-		for _, l := range wrap(q.Q, a.width-6, "  ") {
+		for _, l := range wrap(q.Q, a.cols()-6, "  ") {
 			a.println(sty.Bold(l))
 		}
 		s, err := a.con.readLine(promptLabel("Think, then press Enter to reveal", "q stop"))
@@ -682,7 +722,7 @@ func (a *App) runQuiz(g StageGuide) error {
 		if isCancel(s) {
 			break
 		}
-		for _, l := range wrap(q.A, a.width-8, "    ") {
+		for _, l := range wrap(q.A, a.cols()-8, "    ") {
 			a.println(sty.Green(l))
 		}
 		got, err := a.con.confirm("Did you get it?")

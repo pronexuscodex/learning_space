@@ -160,6 +160,24 @@ To cancel a prompt, type `q` at number prompts or `:q` at text prompts. Ctrl-D a
 
 On Linux, macOS and the BSDs, the academy reads keys one at a time (a small built-in line editor using termios from Go's standard library), so Ctrl+L works instantly and arrow keys are ignored instead of printing `^[[A`. The terminal is always restored on exit, including after Ctrl+C. Elsewhere (for example Windows), input stays line-based: press **Ctrl+L then Enter**, or type `clear`.
 
+## Resizing the terminal
+
+The layout follows your terminal's **live size**. It reads the size with an ioctl on Linux, macOS and the BSDs, and asks the console on Windows, falling back to `$COLUMNS`/`$LINES`.
+
+- **At the main menu the screen redraws itself as soon as you resize.** It keeps anything you have half-typed, and a whole burst of resize events while you drag a window edge produces a single redraw. Every other screen fits the new size the next time it is drawn, or immediately when you press **Ctrl+L**.
+- **Layouts adapt from 40 columns up:**
+  - The menu switches between two columns and one, and drops hints first.
+  - Dashboard stats flow onto more lines.
+  - Stage cards shrink their bars.
+  - Lab rows split into two lines.
+  - Long titles are cut with `…`, and paths and URLs wrap.
+  - Long questions wrap, with your input on the last line.
+  - Pages use the real terminal height.
+- **Content stays readable:** it stops widening at 110 columns.
+- **Code and diagrams:** code listings wrap long lines with a `↪` marker, so no code is ever hidden. ASCII diagrams are clipped with `…` and a note to widen the window.
+- **Input that wraps across rows** is still erased and redrawn correctly by Backspace, Ctrl+U and Ctrl+W.
+- **Checking it:** `tools/layout_check.py` drives every major screen through a real pseudo-terminal at any widths you give it and reports lines wider than the terminal. It currently finds none from 40 to 200 columns.
+
 ## Study Hall
 
 For every stage:
@@ -198,6 +216,7 @@ The tests check:
 - **Retention:** the scheduler's intervals grow and reset on a lapse; deck unlocking and due cards; each step of the mastery ladder.
 - **Classic Mode:** every stage has a complete classic corner with HTTPS links; the struggle clock's thresholds and early unlock; notebook and type-in progress survive a save round trip.
 - **Connections:** globally unique concept names; every concept has valid cross-links and a go-deeper pointer; prerequisites only point backwards; every resource uses HTTPS.
+- **Layout:** display widths (emoji, CJK and combining marks), wrap and flow never exceed the width, and long prompts wrap.
 - **Mechanics:** text wrapping, hour parsing, the atomic-write round trip and the activity streak.
 
 ## Source layout
@@ -218,6 +237,8 @@ One package, one build target:
 | `lineedit.go` | key-by-key line editor: Ctrl+L, Backspace, Ctrl+U/W, ignores escape sequences |
 | `term_*.go` | raw terminal mode via termios (Linux, macOS, BSD) and a line-mode fallback |
 | `pager.go` | pages long screens on interactive terminals |
+| `termsize_*.go`, `sigwinch_*.go` | live terminal size (ioctl / Windows console API) and resize notifications |
+| `tools/layout_check.py` | overflow checker: renders every screen at chosen widths in a pseudo-terminal |
 | `classic.go` | Classic Mode: classic corners, struggle clock, notebook |
 | `classicui.go` | Classic Mode screens: toggle, classic corner, type-in lab, notebook |
 | `typeins.go` | generated type-in listings with their real output (see `typeins/`) |

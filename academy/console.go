@@ -11,6 +11,7 @@ import (
 	"math"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 	"unicode"
 	"unicode/utf8"
@@ -27,26 +28,72 @@ type console struct {
 	raw     bool   // read key by key (interactive terminal with raw-mode support)
 	screen  bool   // output is a terminal, so clearing the screen is meaningful
 	onClear func() // redraws the current screen after Ctrl+L (may be nil)
+
+	// Live editor state, guarded by mu, so a terminal resize can redraw
+	// the screen and the half-typed line from another goroutine.
+	mu        sync.Mutex
+	editing   bool
+	curPrompt string
+	curBuf    []rune
+	shown     int
+	cols      func() int // current layout width (nil: 80)
+}
+
+// setOnClear installs (or removes, with nil) the redraw hook, under the
+// lock shared with the resize handler.
+func (c *console) setOnClear(f func()) {
+	c.mu.Lock()
+	c.onClear = f
+	c.mu.Unlock()
+}
+
+// width is the current layout width for messages.
+func (c *console) width() int {
+	if c.cols != nil {
+		return c.cols()
+	}
+	return 80
+}
+
+// say prints a status message with a marker, wrapped to the terminal.
+func (c *console) say(marker, text string, style func(string) string) {
+	for i, l := range wrap(text, c.width()-4, "") {
+		lead := "    "
+		if i == 0 {
+			lead = "  " + marker + " "
+		}
+		fmt.Fprintln(c.out, lead+style(l))
+	}
 }
 
 // Feedback lines, one visual vocabulary for the whole app.
 func (c *console) ok(format string, args ...any) {
-	fmt.Fprintf(c.out, "  %s %s\n", sty.Green("✓"), fmt.Sprintf(format, args...))
+	c.say(sty.Green("✓"), fmt.Sprintf(format, args...), func(s string) string { return s })
 }
 func (c *console) warn(format string, args ...any) {
-	fmt.Fprintf(c.out, "  %s %s\n", sty.Yellow("!"), sty.Yellow(fmt.Sprintf(format, args...)))
+	c.say(sty.Yellow("!"), fmt.Sprintf(format, args...), sty.Yellow)
 }
 func (c *console) fail(format string, args ...any) {
-	fmt.Fprintf(c.out, "  %s %s\n", sty.Red("✗"), sty.Red(fmt.Sprintf(format, args...)))
+	c.say(sty.Red("✗"), fmt.Sprintf(format, args...), sty.Red)
 }
 func (c *console) note(format string, args ...any) {
-	fmt.Fprintf(c.out, "  %s\n", sty.Dim("· "+fmt.Sprintf(format, args...)))
+	c.say(sty.Dim("·"), fmt.Sprintf(format, args...), sty.Dim)
 }
 
-// promptLabel renders "  Label (hint) › ".
+// layoutWidth reports the current layout width to package-level helpers
+// (set by main; 80 when unset).
+var layoutWidth = func() int { return 80 }
+
+// promptLabel renders "  Label (hint) › ". The hint is dropped when the
+// prompt would take more than about half of a narrow terminal's width.
 func promptLabel(label, hint string) string {
-	s := "  " + sty.Bold(label)
-	if hint != "" {
+	w := layoutWidth()
+	lines := wrap(label, w*2/3, "")
+	for i := range lines {
+		lines[i] = "  " + sty.Bold(lines[i])
+	}
+	s := strings.Join(lines, "\n") // long questions wrap; the input stays on the last line
+	if hint != "" && visibleLen(lines[len(lines)-1])+visibleLen(hint)+6 <= w*2/3 {
 		s += " " + sty.Gray("("+hint+")")
 	}
 	return s + sty.Cyan(" › ")
@@ -153,7 +200,18 @@ func (c *console) promptInt(label string, valid func(int) error) (int, error) {
 // promptChoice shows a numbered list and returns the chosen zero-based index.
 func (c *console) promptChoice(label string, options []string) (int, error) {
 	for i, opt := range options {
-		fmt.Fprintf(c.out, "    %s %s\n", sty.Cyan(fmt.Sprintf("[%d]", i+1)), opt)
+		num := fmt.Sprintf("[%d]", i+1)
+		for j, part := range strings.Split(opt, "\n") { // an option may span lines
+			room := c.width() - 5 - len(num)
+			if visibleLen(part) > room {
+				part = truncate(stripANSI(part), room)
+			}
+			if j == 0 {
+				fmt.Fprintf(c.out, "    %s %s\n", sty.Cyan(num), part)
+			} else {
+				fmt.Fprintf(c.out, "    %s %s\n", strings.Repeat(" ", len(num)), strings.TrimLeft(part, " "))
+			}
+		}
 	}
 	n, err := c.promptInt(label, func(n int) error {
 		if n < 1 || n > len(options) {

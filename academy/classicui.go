@@ -30,7 +30,7 @@ func (a *App) toggleClassicMode() error {
 	on := a.reg.ClassicMode
 	a.mu.Unlock()
 
-	a.println(heading("CLASSIC MODE · learn like it's 1985", sty.Yellow, a.width))
+	a.println(heading("CLASSIC MODE · learn like it's 1985", sty.Yellow, a.cols()))
 	a.println("")
 	rules := `Strong learners of the 1980s and 1990s had few books, no search engine
 and no answers on tap, so they read deeply, typed programs in by hand,
@@ -43,7 +43,7 @@ when it is truly needed.
 - Classic corner: every Study Hall has an anchor book to read cover to cover, a classic text from the field's history, and real source code to read.
 - Type-in lab: every stage has a short listing to predict, type in by hand (never paste), run, and compare with the real output.
 - Suggested habits: keep a paper notebook next to you, and work in offline blocks with only man pages and saved documentation.`
-	for _, l := range wrap(rules, a.width-4, "  ") {
+	for _, l := range wrap(rules, a.cols()-4, "  ") {
 		a.println(l)
 	}
 	a.println("")
@@ -67,14 +67,22 @@ when it is truly needed.
 
 // renderRead prints one classic-corner entry.
 func (a *App) renderRead(label string, color func(string) string, r ClassicRead) {
-	w := a.width
-	title := sty.Bold(r.Title)
+	w := a.cols()
 	meta := r.Author
 	if r.Year > 0 {
 		meta += fmt.Sprintf(", %d", r.Year)
 	}
-	a.printf("\n  %s %s\n", color(sty.Bold(label)), title)
-	a.printf("    %s\n", sty.Gray(meta))
+	a.println("")
+	for i, l := range wrap(r.Title, w-visibleLen(label)-4, "") {
+		if i == 0 {
+			a.printf("  %s %s\n", color(sty.Bold(label)), sty.Bold(l))
+		} else {
+			a.printf("  %s %s\n", strings.Repeat(" ", visibleLen(label)), sty.Bold(l))
+		}
+	}
+	for _, l := range wrap(meta, w-4, "    ") {
+		a.println(sty.Gray(l))
+	}
 	if r.URL != "" {
 		a.printf("    %s\n", sty.Under(sty.Cyan(r.URL)))
 	} else {
@@ -109,11 +117,13 @@ func (a *App) classicCorner(stageID int) error {
 		a.mu.Unlock()
 
 		a.println("")
-		a.printf("  %s", sty.Bold(sty.Yellow("CLASSIC CORNER · read deeply, type it in, predict first")))
+		head := []string{sty.Bold(sty.Yellow("CLASSIC CORNER")), sty.Yellow("read deeply, type it in, predict first")}
 		if on {
-			a.printf("   %s", classicBadge())
+			head = append(head, classicBadge())
 		}
-		a.println("")
+		for _, l := range flow(head, sty.Gray(" · "), a.cols(), "  ") {
+			a.println(l)
+		}
 		a.renderRead("📕 Anchor book", sty.Yellow, cg.Anchor)
 		a.renderRead("📜 Classic text", sty.Magenta, cg.Classic)
 		a.renderRead("🔎 Read the source", sty.Cyan, cg.Source)
@@ -149,11 +159,20 @@ func (a *App) classicCorner(stageID int) error {
 func (a *App) renderListing(code string) {
 	lines := strings.Split(code, "\n")
 	width := len(fmt.Sprint(len(lines)))
-	a.println("  " + sty.Gray("┌"+strings.Repeat("─", a.width-4)))
+	a.println("  " + sty.Gray("┌"+strings.Repeat("─", a.cols()-4)))
+	room := a.cols() - 5 - width // after "  │ " + number + " "
 	for i, l := range lines {
-		a.printf("  %s %s %s\n", sty.Gray("│"), sty.Gray(fmt.Sprintf("%*d", width, i+1)), sty.Green(l))
+		// Long lines wrap with a ↪ marker, like a printed listing, so no
+		// code is ever hidden; type the pieces as one line.
+		for j, part := range hardBreak(l, room) {
+			num := fmt.Sprintf("%*d", width, i+1)
+			if j > 0 {
+				num = strings.Repeat(" ", width-1) + "↪"
+			}
+			a.printf("  %s %s %s\n", sty.Gray("│"), sty.Gray(num), sty.Green(part))
+		}
 	}
-	a.println("  " + sty.Gray("└"+strings.Repeat("─", a.width-4)))
+	a.println("  " + sty.Gray("└"+strings.Repeat("─", a.cols()-4)))
 }
 
 // typeInLab walks through one type-in: predict, type, run, compare.
@@ -163,7 +182,7 @@ func (a *App) typeInLab(stageID int, ti TypeIn) error {
 	a.renderListing(ti.Code)
 
 	a.printf("\n  %s\n", sty.Bold("1. Predict first."))
-	for _, l := range wrap(ti.Predict, a.width-8, "     ") {
+	for _, l := range wrap(ti.Predict, a.cols()-8, "     ") {
 		a.println(l)
 	}
 	prediction, err := a.con.promptText("Your prediction (Enter to skip)", maxNotesLen, false)
@@ -173,7 +192,7 @@ func (a *App) typeInLab(stageID int, ti TypeIn) error {
 	a.addNote(stageID, "type-in", NotePrediction, prediction)
 
 	a.printf("\n  %s\n", sty.Bold("2. Type it in by hand."))
-	for _, l := range wrap(fmt.Sprintf("Save it as %s. Do not copy and paste: typing every character is how you read every character. Typos are part of the lesson.", ti.File), a.width-8, "     ") {
+	for _, l := range wrap(fmt.Sprintf("Save it as %s. Do not copy and paste: typing every character is how you read every character. Typos are part of the lesson.", ti.File), a.cols()-8, "     ") {
 		a.println(l)
 	}
 	a.printf("\n  %s\n", sty.Bold("3. Run it."))
@@ -191,7 +210,7 @@ func (a *App) typeInLab(stageID int, ti TypeIn) error {
 	for _, l := range strings.Split(ti.Expected, "\n") {
 		a.printf("     %s\n", sty.Cyan(l))
 	}
-	for _, l := range wrap(ti.Lesson, a.width-8, "     ") {
+	for _, l := range wrap(ti.Lesson, a.cols()-8, "     ") {
 		a.println(sty.Yellow(l))
 	}
 	observed, err := a.con.promptText("What happened? Did it match your prediction? Any typos? (Enter to skip)", maxNotesLen, false)
@@ -226,7 +245,7 @@ func (a *App) showNotebook(stageID int) {
 	}
 	for _, e := range entries {
 		a.printf("  %s %s %s\n", sty.Gray(formatTime(e.At)), sty.Bold(sty.Yellow(strings.ToUpper(e.Kind))), sty.Gray(e.Ref))
-		for _, l := range wrap(e.Text, a.width-8, "    ") {
+		for _, l := range wrap(e.Text, a.cols()-8, "    ") {
 			a.println(l)
 		}
 	}

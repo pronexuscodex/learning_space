@@ -21,7 +21,7 @@ type App struct {
 	path  string
 	dirty bool
 	con   *console
-	width int
+	width int  // fixed layout width when output is not a terminal
 	pager bool // page long screens (stdin is a terminal)
 }
 
@@ -43,6 +43,15 @@ func (a *App) mutate(fn func(r *Registry)) {
 	defer a.mu.Unlock()
 	fn(a.reg)
 	a.dirty = true
+}
+
+// cols is the layout width. On a terminal it is measured live, so after a
+// resize the next screen (or Ctrl+L) fits the new size.
+func (a *App) cols() int {
+	if a.con.screen {
+		return termWidth()
+	}
+	return a.width
 }
 
 func (a *App) printf(format string, args ...any) { fmt.Fprintf(a.con.out, format, args...) }
@@ -87,27 +96,28 @@ func (a *App) printDashboard() {
 	a.mu.Lock()
 	cs := a.reg.stats(time.Now(), 60)
 	dirty := a.dirty
+	classic := a.reg.ClassicMode
 	a.mu.Unlock()
+	w := a.cols()
 
 	stat := func(label, value string) string { return sty.Gray(label) + " " + sty.Bold(value) }
+	due := stat("Due", strconv.Itoa(cs.due))
+	if cs.due > 0 {
+		due = sty.Gray("Due") + " " + sty.Bold(sty.Yellow(strconv.Itoa(cs.due)))
+	}
 	a.println("")
-	sep := sty.Gray("  │  ")
-	a.println("  " + strings.Join([]string{
+	for _, l := range flow([]string{
 		stat("Hours", fmt.Sprintf("%.2f", cs.hours)),
 		stat("Labs", fmt.Sprintf("%d", cs.labs)) + sty.Gray(fmt.Sprintf(" (%d★)", cs.labsGrad)),
 		stat("Stages", fmt.Sprintf("%d/%d", cs.stagesGrad, cs.stages)),
 		stat("Texts", fmt.Sprintf("%d/%d", cs.textsRead, cs.texts)),
-	}, sep))
-	due := stat("Due for review", strconv.Itoa(cs.due))
-	if cs.due > 0 {
-		due = sty.Gray("Due for review") + " " + sty.Bold(sty.Yellow(strconv.Itoa(cs.due)))
-	}
-	a.println("  " + strings.Join([]string{
 		stat("Concepts", fmt.Sprintf("%d/%d", cs.conceptsStudied, cs.concepts)),
 		stat("Exercises", fmt.Sprintf("%d/%d", cs.exercisesDone, cs.exercises)),
 		stat("Mastered", fmt.Sprintf("%d/%d", cs.mastered, cs.concepts)),
 		due,
-	}, sep))
+	}, sty.Gray("  │  "), w, "  ") {
+		a.println(l)
+	}
 
 	// Campus progress weights long-term mastery most: each concept climbs
 	// four mastery levels, plus reading and graduated stages.
@@ -117,61 +127,97 @@ func (a *App) printDashboard() {
 	if cs.streak > 0 {
 		streak = sty.Bold(sty.Yellow(fmt.Sprintf("▲ %d-day streak", cs.streak)))
 	}
-	a.printf("  %s %s %s   %s %s  %s\n",
-		sty.Gray("Campus"), bar(done, total, 24, sty.Cyan), sty.Bold(pct(done, total)),
-		sty.Gray("Last 14d"), sparkline(cs.activity[len(cs.activity)-14:]), streak)
-	a.mu.Lock()
-	classic := a.reg.ClassicMode
-	a.mu.Unlock()
+	barWidth := max(10, min(24, w-20))
+	for _, l := range flow([]string{
+		sty.Gray("Campus") + " " + bar(done, total, barWidth, sty.Cyan) + " " + sty.Bold(pct(done, total)),
+		sty.Gray("Last 14d") + " " + sparkline(cs.activity[len(cs.activity)-14:]),
+		streak,
+	}, "   ", w, "  ") {
+		a.println(l)
+	}
 	if classic {
-		a.printf("  %s  %s\n", classicBadge(), sty.Gray("hints behind the struggle clock · notebook on · type-ins waiting in each Classic corner"))
+		for _, l := range flow([]string{classicBadge(), sty.Gray("hints behind the struggle clock"), sty.Gray("notebook on"), sty.Gray("type-ins in each Classic corner")}, sty.Gray(" · "), w, "  ") {
+			a.println(l)
+		}
 	}
 	if dirty {
 		a.printf("  %s\n", sty.Yellow("● uncommitted changes"))
 	}
 }
 
+// printMenu draws the dashboard and the menu. Wide terminals get two
+// columns; narrow ones get a single column, and hints are dropped first.
 func (a *App) printMenu() {
 	a.printDashboard()
-	item := func(key, label string) string { return sty.Cyan("["+key+"]") + " " + label }
-	rows := [][2]string{
-		{item("1", "View Campus Ledger"), item("5", "Atomic Commit & Exit")},
-		{item("2", "Enroll in a New Lab"), item("6", sty.Bold("Study Hall")+sty.Gray(" · learn & practise"))},
-		{item("3", "Log Study/Lab Hours"), item("7", "Checkpoint (save, keep going)")},
-		{item("4", "Advance Academic Status"), item("8", sty.Gray("Exit without saving"))},
-	}
-	edge := sty.Gray
-	a.println("  " + edge("┌─ ") + sty.Bold("MAIN MENU") + " " + edge(strings.Repeat("─", 58)))
+	w := a.cols()
 	a.mu.Lock()
 	dueNow := len(a.reg.dueCards(time.Now()))
+	classic := a.reg.ClassicMode
+	tidy := a.reg.TidyScreen
 	a.mu.Unlock()
+
+	item := func(key, label string) string { return sty.Cyan("["+key+"]") + " " + label }
+	hint := func(s string) string { return sty.Gray(" · " + s) }
 	review := sty.Bold(sty.Green("Daily Review"))
 	if dueNow > 0 {
 		review += " " + sty.Bold(sty.Yellow(fmt.Sprintf("(%d due)", dueNow)))
-	} else {
-		review += sty.Gray(" (nothing due)")
 	}
-	a.println("  " + edge("│ ") + padRight(item("0", sty.Bold(sty.Green("Start Here"))), 32) + item("9", review))
-	for _, r := range rows {
-		a.println("  " + edge("│ ") + padRight(r[0], 32) + r[1])
-	}
-	a.mu.Lock()
-	classic := a.reg.ClassicMode
-	a.mu.Unlock()
 	mode := sty.Gray("off")
 	if classic {
 		mode = sty.Bold(sty.Yellow("ON"))
 	}
-	a.println("  " + edge("│ ") + item("c", "Classic Mode "+mode+sty.Gray(" · learn like it's 1985: struggle, predict, type it in")))
-	a.mu.Lock()
-	tidy := a.reg.TidyScreen
-	a.mu.Unlock()
 	tidyMode := sty.Gray("off")
 	if tidy {
 		tidyMode = sty.Bold(sty.Green("on"))
 	}
-	a.println("  " + edge("│ ") + padRight(item("t", "Tidy screen "+tidyMode), 32) + item("?", "Keys & shortcuts") + sty.Gray("  · Ctrl+L clears the screen"))
-	a.println("  " + edge("└"+strings.Repeat("─", 70)))
+	type entry struct{ text, extra string } // extra is shown only when it fits
+	left := []entry{
+		{item("0", sty.Bold(sty.Green("Start Here"))), ""},
+		{item("1", "View Campus Ledger"), ""},
+		{item("2", "Enroll in a New Lab"), ""},
+		{item("3", "Log Study/Lab Hours"), ""},
+		{item("4", "Advance Academic Status"), ""},
+	}
+	right := []entry{
+		{item("9", review), ""},
+		{item("5", "Atomic Commit & Exit"), ""},
+		{item("6", sty.Bold("Study Hall")), hint("learn & practise")},
+		{item("7", "Checkpoint"), hint("save, keep going")},
+		{item("8", sty.Gray("Exit without saving")), ""},
+	}
+	extras := []entry{
+		{item("c", "Classic Mode "+mode), hint("struggle, predict, type it in")},
+		{item("t", "Tidy screen "+tidyMode), ""},
+		{item("?", "Keys & shortcuts"), hint("Ctrl+L clears the screen")},
+	}
+
+	edge := sty.Gray
+	inner := w - 4 // room after "  │ "
+	title := "┌─ " + sty.Bold("MAIN MENU") + " "
+	a.println("  " + edge("┌─ ") + sty.Bold("MAIN MENU") + " " + edge(strings.Repeat("─", max(0, w-2-visibleLen(title)))))
+	show := func(e entry, room int) string {
+		if visibleLen(e.text+e.extra) <= room {
+			return e.text + e.extra
+		}
+		return truncate(stripANSI(e.text), room)
+	}
+	const colWidth = 32
+	if inner >= colWidth+34 { // two columns
+		for i := range left {
+			a.println("  " + edge("│ ") + padRight(show(left[i], colWidth-1), colWidth) + show(right[i], inner-colWidth))
+		}
+	} else {
+		for i := range left {
+			a.println("  " + edge("│ ") + show(left[i], inner))
+		}
+		for i := range right {
+			a.println("  " + edge("│ ") + show(right[i], inner))
+		}
+	}
+	for _, e := range extras {
+		a.println("  " + edge("│ ") + show(e, inner))
+	}
+	a.println("  " + edge("└"+strings.Repeat("─", max(0, w-3))))
 }
 
 // ---------------------------------------------------------------------------
@@ -181,7 +227,7 @@ func (a *App) printMenu() {
 func (a *App) viewLedger() {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	w := a.width
+	w := a.cols()
 
 	var grand float64
 	for ti := range a.reg.Tracks {
@@ -199,37 +245,53 @@ func (a *App) viewLedger() {
 			}
 			a.renderStageCard(s, color)
 		}
-		a.printf("\n  %s %s %d/%d stages graduated · %s\n",
-			color(sty.Bold("Track "+t.ID)), bar(grad, len(t.Stages), 16, color),
-			grad, len(t.Stages), sty.Bold(fmt.Sprintf("%.2fh", roundHours(trackHours))))
+		a.println("")
+		for _, l := range flow([]string{
+			color(sty.Bold("Track "+t.ID)) + " " + bar(grad, len(t.Stages), min(16, max(6, w-30)), color),
+			fmt.Sprintf("%d/%d stages graduated", grad, len(t.Stages)),
+			sty.Bold(fmt.Sprintf("%.2fh", roundHours(trackHours))),
+		}, sty.Gray(" · "), w, "  ") {
+			a.println(l)
+		}
 		grand += trackHours
 	}
 
 	cs := a.reg.stats(time.Now(), 60)
 	a.println("\n" + sty.Gray(strings.Repeat("─", w)))
-	a.printf("  %s %s across %d lab(s)   %s %s   %s %s\n",
-		sty.Gray("Campus total"), sty.Bold(fmt.Sprintf("%.2fh", roundHours(grand))), a.reg.labCount(),
-		sty.Gray("Last 14d"), sparkline(cs.activity[len(cs.activity)-14:]),
-		sty.Gray("last commit"), formatTime(a.reg.LastCommit))
+	for _, l := range flow([]string{
+		sty.Gray("Campus total") + " " + sty.Bold(fmt.Sprintf("%.2fh", roundHours(grand))) + fmt.Sprintf(" across %d lab(s)", a.reg.labCount()),
+		sty.Gray("Last 14d") + " " + sparkline(cs.activity[len(cs.activity)-14:]),
+		sty.Gray("last commit") + " " + formatTime(a.reg.LastCommit),
+	}, "   ", w, "  ") {
+		a.println(l)
+	}
 }
 
-// renderStageCard prints one stage as a left-bordered card. Caller holds mu.
+// renderStageCard prints one stage as a left-bordered card that fits the
+// current width. Caller holds mu.
 func (a *App) renderStageCard(s *Stage, color func(string) string) {
-	w := a.width
+	w := a.cols()
+	inner := w - 4 // room after "  │ "
 	edge := color("│")
 	line := func(content string) { a.println("  " + edge + " " + content) }
+	flowed := func(sep string, items ...string) {
+		for _, l := range flow(items, sep, inner, "") {
+			line(l)
+		}
+	}
 
 	read, total := literatureProgress(s)
 	studied, concepts := conceptProgress(s)
 	exDone, exTotal := exerciseProgress(s)
+	barW := max(6, min(20, inner-16))
 
 	a.println("")
 	a.printf("  %s %s %s %s\n", color("╭─"), color(sty.Bold(fmt.Sprintf("Stage %d", s.ID))),
-		sty.Gray("·"), sty.Bold(truncate(s.Title, w-18)))
-	line(statusPill(s.Status) + sty.Gray(fmt.Sprintf("   %.2fh logged · %d lab(s)", stageHours(s), len(s.Labs))))
-	line(padRight(sty.Gray("Reading"), 10) + bar(read, total, 20, sty.Green) + " " + fmt.Sprintf("%d/%d", read, total))
-	line(padRight(sty.Gray("Concepts"), 10) + bar(studied, concepts, 20, sty.Blue) + " " + fmt.Sprintf("%d/%d", studied, concepts))
-	line(padRight(sty.Gray("Exercises"), 10) + bar(exDone, exTotal, 20, sty.Magenta) + " " + fmt.Sprintf("%d/%d", exDone, exTotal))
+		sty.Gray("·"), sty.Bold(truncate(s.Title, w-16)))
+	flowed("   ", statusPill(s.Status), sty.Gray(fmt.Sprintf("%.2fh logged · %d lab(s)", stageHours(s), len(s.Labs))))
+	line(padRight(sty.Gray("Reading"), 10) + bar(read, total, barW, sty.Green) + " " + fmt.Sprintf("%d/%d", read, total))
+	line(padRight(sty.Gray("Concepts"), 10) + bar(studied, concepts, barW, sty.Blue) + " " + fmt.Sprintf("%d/%d", studied, concepts))
+	line(padRight(sty.Gray("Exercises"), 10) + bar(exDone, exTotal, barW, sty.Magenta) + " " + fmt.Sprintf("%d/%d", exDone, exTotal))
 	if g, ok := guideFor(s.ID); ok {
 		var glyphs strings.Builder
 		for _, c := range g.Concepts {
@@ -244,9 +306,9 @@ func (a *App) renderStageCard(s *Stage, color func(string) string) {
 		}
 		typeIn := ""
 		if s.TypeInDone {
-			typeIn = sty.Green("  ⌨ type-in ✓")
+			typeIn = sty.Green("⌨ type-in ✓")
 		}
-		line(padRight(sty.Gray("Mastery"), 10) + padRight(glyphs.String(), 20) + " " + fmt.Sprintf("%d/%d", mastered, total) + "  " + check + typeIn)
+		flowed("  ", padRight(sty.Gray("Mastery"), 10)+glyphs.String()+" "+fmt.Sprintf("%d/%d", mastered, total), check, typeIn)
 	}
 
 	for _, lit := range s.Literature {
@@ -254,24 +316,36 @@ func (a *App) renderStageCard(s *Stage, color func(string) string) {
 		if lit.Read {
 			mark = sty.Green("✔")
 		}
-		line("  " + mark + " " + truncate(lit.Title+" — "+lit.Author, w-22) + sty.Gray(" · "+lit.Kind))
+		line("  " + mark + " " + truncate(lit.Title+" — "+lit.Author, inner-4-len(lit.Kind)-3) + sty.Gray(" · "+lit.Kind))
 	}
 
 	if len(s.Labs) == 0 {
-		line(sty.Gray("  ▸ no labs yet — enroll one [2] or pick a blueprint in the Study Hall [6]"))
+		for i, l := range wrap("no labs yet — enroll one [2] or pick a blueprint in the Study Hall [6]", inner-4, "") {
+			lead := "    "
+			if i == 0 {
+				lead = "  ▸ "
+			}
+			line(sty.Gray(lead + l))
+		}
 	} else {
 		line(sty.Bold("Labs"))
 	}
 	for _, l := range s.Labs {
-		line(fmt.Sprintf("  %s %s %s %s  %s  %s",
-			color("▸"),
-			sty.Gray(padRight(fmt.Sprintf("#%d", l.ID), 4)),
-			sty.Bold(padRight(truncate(l.Name, 28), 28)),
-			sty.Bold(fmt.Sprintf("%7.2fh", l.HoursLogged)),
-			padRight(compileBadge(l.CompilationStatus), 16),
-			statusMark(l.Status)))
+		id := sty.Gray(padRight(fmt.Sprintf("#%d", l.ID), 4))
+		hours := sty.Bold(fmt.Sprintf("%.2fh", l.HoursLogged))
+		if inner >= 72 { // one row: name, hours, build, status
+			nameW := min(28, inner-46)
+			line(fmt.Sprintf("  %s %s %s %s  %s  %s", color("▸"), id,
+				sty.Bold(padRight(truncate(l.Name, nameW), nameW)), padRight(hours, 8),
+				padRight(compileBadge(l.CompilationStatus), 16), statusMark(l.Status)))
+		} else { // narrow: name on one row, details on the next
+			line(fmt.Sprintf("  %s %s %s", color("▸"), id, sty.Bold(truncate(l.Name, inner-10))))
+			for _, d := range flow([]string{hours, compileBadge(l.CompilationStatus), statusMark(l.Status)}, sty.Gray(" · "), inner, "        ") {
+				line(d)
+			}
+		}
 		if l.Architecture != "" {
-			line(sty.Gray("      ↳ " + truncate(l.Architecture, w-14)))
+			line(sty.Gray("      ↳ " + truncate(l.Architecture, inner-8)))
 		}
 	}
 	a.println("  " + color("╰─"))
@@ -292,12 +366,13 @@ func formatTime(t time.Time) string {
 func (a *App) listStages(track *Track) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
+	w := a.cols()
 	for _, t := range a.reg.Tracks {
 		if track != nil && t.ID != track.ID {
 			continue
 		}
 		color := trackColor(t.ID)
-		a.printf("    %s\n", color(sty.Bold("Track "+t.ID+" · "+t.Name)))
+		a.printf("    %s\n", color(sty.Bold(truncate("Track "+t.ID+" · "+t.Name, w-6))))
 		for si := range t.Stages {
 			s := &t.Stages[si]
 			studied, concepts := conceptProgress(s)
@@ -306,9 +381,13 @@ func (a *App) listStages(track *Track) {
 			if s.Status == StatusGraduated {
 				mark = sty.Green("★")
 			}
+			counts := fmt.Sprintf("concepts %d/%d · ex %d/%d", studied, concepts, exDone, exTotal)
+			titleW := w - 14 - len(counts) - 1
+			if titleW < 24 { // too narrow for the counts: give the title the room
+				titleW, counts = w-14, ""
+			}
 			a.printf("      %s %s %s %s\n", color(padRight(fmt.Sprintf("[%d]", s.ID), 4)), mark,
-				padRight(truncate(s.Title, 50), 50),
-				sty.Gray(fmt.Sprintf("concepts %d/%d · ex %d/%d", studied, concepts, exDone, exTotal)))
+				padRight(truncate(s.Title, titleW), titleW), sty.Gray(counts))
 		}
 	}
 }
@@ -321,16 +400,22 @@ func (a *App) listLabs() bool {
 		a.con.note("No labs enrolled yet. Use [2] or a Study Hall blueprint to enroll one.")
 		return false
 	}
+	w := a.cols()
 	for _, t := range a.reg.Tracks {
 		color := trackColor(t.ID)
 		for _, s := range t.Stages {
 			for _, l := range s.Labs {
-				a.printf("    %s %s %s %s  %s\n",
-					color(padRight(fmt.Sprintf("#%d", l.ID), 4)),
-					padRight(truncate(l.Name, 32), 32),
-					sty.Gray(fmt.Sprintf("stage %d", s.ID)),
-					sty.Bold(fmt.Sprintf("%8.2fh", l.HoursLogged)),
-					statusMark(l.Status))
+				nameW := max(12, min(32, w-36))
+				for i, row := range flow([]string{
+					color(padRight(fmt.Sprintf("#%d", l.ID), 4)) + " " + padRight(truncate(l.Name, nameW), nameW),
+					sty.Gray(fmt.Sprintf("stage %d", s.ID)) + " " + sty.Bold(fmt.Sprintf("%.2fh", l.HoursLogged)),
+					statusMark(l.Status),
+				}, "  ", w-4, "") {
+					if i > 0 {
+						row = "     " + row
+					}
+					a.printf("    %s\n", row)
+				}
 			}
 		}
 	}
@@ -436,7 +521,7 @@ func (a *App) addLab(stageID int, name, notes string, hours float64) (int, error
 }
 
 func (a *App) enrollLab() error {
-	a.println(heading("ENROLL IN A NEW LAB", sty.Green, a.width))
+	a.println(heading("ENROLL IN A NEW LAB", sty.Green, a.cols()))
 	track, err := a.pickTrack()
 	if err != nil {
 		return err
@@ -486,7 +571,7 @@ func (a *App) enrollLab() error {
 // ---------------------------------------------------------------------------
 
 func (a *App) logHours() error {
-	a.println(heading("LOG STUDY / LAB HOURS", sty.Yellow, a.width))
+	a.println(heading("LOG STUDY / LAB HOURS", sty.Yellow, a.cols()))
 	labID, err := a.pickLab()
 	if err != nil {
 		return err
@@ -517,7 +602,7 @@ func (a *App) logHours() error {
 // ---------------------------------------------------------------------------
 
 func (a *App) advanceStatus() error {
-	a.println(heading("ADVANCE ACADEMIC STATUS", sty.Magenta, a.width))
+	a.println(heading("ADVANCE ACADEMIC STATUS", sty.Magenta, a.cols()))
 	choice, err := a.con.promptChoice("Action", []string{
 		"Toggle a Stage  (Active Research ⇄ Mastered/Graduated)",
 		"Toggle a Lab    (Active Research ⇄ Mastered/Graduated)",
@@ -693,9 +778,17 @@ func (a *App) commitAndExit() {
 
 // showShortcuts lists every key the academy understands.
 func (a *App) showShortcuts() {
-	a.println(heading("KEYS & SHORTCUTS", sty.Cyan, a.width))
+	a.println(heading("KEYS & SHORTCUTS", sty.Cyan, a.cols()))
 	a.println("")
-	row := func(key, what string) { a.printf("    %s %s\n", sty.Bold(sty.Cyan(padRight(key, 14))), what) }
+	row := func(key, what string) {
+		for i, l := range wrap(what, a.cols()-20, "") {
+			k := ""
+			if i == 0 {
+				k = key
+			}
+			a.printf("    %s %s\n", sty.Bold(sty.Cyan(padRight(k, 14))), l)
+		}
+	}
 	a.printf("  %s\n", sty.Bold("While typing (any prompt)"))
 	row("Ctrl+L", "clear the screen and redraw, keeping what you have typed")
 	row("Backspace", "delete the previous character")
@@ -718,7 +811,7 @@ func (a *App) showShortcuts() {
 	row("q", "stop paging and continue")
 	a.println("")
 	if !a.con.raw {
-		for _, l := range wrap("Your terminal is in line mode (for example on Windows, or when input is piped), so Ctrl+L takes effect after you press Enter.", a.width-6, "  ") {
+		for _, l := range wrap("Your terminal is in line mode (for example on Windows, or when input is piped), so Ctrl+L takes effect after you press Enter.", a.cols()-6, "  ") {
 			a.println(sty.Gray(l))
 		}
 	}
@@ -728,9 +821,9 @@ func (a *App) showShortcuts() {
 func (a *App) run() {
 	for {
 		a.printMenu()
-		a.con.onClear = a.printMenu // Ctrl+L redraws the menu on a clean screen
+		a.con.setOnClear(a.printMenu) // Ctrl+L and resizes redraw the menu on a clean screen
 		choice, err := a.con.readLine(sty.Bold(sty.Cyan("  academy")) + sty.Cyan(" › "))
-		a.con.onClear = nil
+		a.con.setOnClear(nil)
 
 		// Tidy screen: each chosen action starts on a clean screen, and its
 		// output (including its final message) stays visible above the menu.

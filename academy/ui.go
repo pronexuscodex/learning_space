@@ -9,7 +9,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"unicode/utf8"
+	"unicode"
 )
 
 // Style emits ANSI SGR sequences only when enabled.
@@ -62,13 +62,26 @@ func trackColor(id string) func(string) string {
 	}
 }
 
-// termWidth reads $COLUMNS, defaulting to 80 and clamping to a readable range.
+// Layout width limits: below minWidth the terminal wraps our lines; above
+// maxWidth text gets hard to read, so we stop growing.
+const (
+	minWidth = 40
+	maxWidth = 110
+)
+
+// termWidth returns the width to lay content out in: the terminal's live
+// width (so a resize takes effect on the next screen), else $COLUMNS,
+// else 80, clamped to [minWidth, maxWidth].
 func termWidth() int {
-	w, err := strconv.Atoi(os.Getenv("COLUMNS"))
-	if err != nil || w <= 0 {
-		w = 80
+	w, _, ok := terminalSize(int(os.Stdout.Fd()))
+	if !ok {
+		if env, err := strconv.Atoi(os.Getenv("COLUMNS")); err == nil && env > 0 {
+			w = env
+		} else {
+			w = 80
+		}
 	}
-	return max(60, min(w, 110))
+	return max(minWidth, min(w-1, maxWidth)) // -1: never touch the last column, which makes some terminals wrap
 }
 
 // stripANSI removes SGR escape sequences so visible width can be measured.
@@ -90,8 +103,29 @@ func stripANSI(s string) string {
 	return b.String()
 }
 
-// visibleLen is the number of runes a string occupies on screen.
-func visibleLen(s string) int { return utf8.RuneCountInString(stripANSI(s)) }
+// runeWidth is how many terminal columns a rune occupies: 2 for wide
+// characters (CJK and most emoji), 0 for combining marks, else 1.
+func runeWidth(r rune) int {
+	switch {
+	case unicode.Is(unicode.Mn, r) || r == 0x200d || (r >= 0xfe00 && r <= 0xfe0f):
+		return 0
+	case r >= 0x1100 && r <= 0x115f, r >= 0x2e80 && r <= 0xa4cf, r >= 0xac00 && r <= 0xd7a3,
+		r >= 0xf900 && r <= 0xfaff, r >= 0xfe30 && r <= 0xfe4f, r >= 0xff00 && r <= 0xff60,
+		r >= 0xffe0 && r <= 0xffe6, r >= 0x1f300 && r <= 0x1f64f, r >= 0x1f680 && r <= 0x1f6ff,
+		r >= 0x1f900 && r <= 0x1faff, r >= 0x20000 && r <= 0x3fffd:
+		return 2
+	}
+	return 1
+}
+
+// visibleLen is the number of terminal columns a string occupies.
+func visibleLen(s string) int {
+	n := 0
+	for _, r := range stripANSI(s) {
+		n += runeWidth(r)
+	}
+	return n
+}
 
 // padRight pads s with spaces to n visible columns.
 func padRight(s string, n int) string {
@@ -101,16 +135,69 @@ func padRight(s string, n int) string {
 	return s
 }
 
-// truncate shortens plain text to n runes, ending with an ellipsis.
+// truncate shortens plain text to n columns, ending with an ellipsis.
 func truncate(s string, n int) string {
 	if n <= 0 {
 		return ""
 	}
-	r := []rune(s)
-	if len(r) <= n {
+	if visibleLen(s) <= n {
 		return s
 	}
-	return string(r[:n-1]) + "…"
+	var b strings.Builder
+	w := 0
+	for _, r := range s {
+		if w+runeWidth(r) > n-1 {
+			break
+		}
+		b.WriteRune(r)
+		w += runeWidth(r)
+	}
+	return b.String() + "…"
+}
+
+// flow lays items out left to right, separated by sep, starting a new
+// line (with indent) whenever the next item would pass width.
+func flow(items []string, sep string, width int, indent string) []string {
+	var lines []string
+	line := ""
+	for _, it := range items {
+		if it == "" {
+			continue
+		}
+		switch {
+		case line == "":
+			line = indent + it
+		case visibleLen(line)+visibleLen(sep)+visibleLen(it) <= width:
+			line += sep + it
+		default:
+			lines = append(lines, line)
+			line = indent + it
+		}
+	}
+	if line != "" {
+		lines = append(lines, line)
+	}
+	return lines
+}
+
+// hardBreak splits a word that is wider than width into pieces.
+func hardBreak(word string, width int) []string {
+	if width < 1 || visibleLen(word) <= width {
+		return []string{word}
+	}
+	var parts []string
+	var b strings.Builder
+	w := 0
+	for _, r := range word {
+		if w+runeWidth(r) > width {
+			parts = append(parts, b.String())
+			b.Reset()
+			w = 0
+		}
+		b.WriteRune(r)
+		w += runeWidth(r)
+	}
+	return append(parts, b.String())
 }
 
 // bar renders a width-cell progress bar for done/total.
@@ -207,15 +294,17 @@ func wrap(text string, width int, indent string) []string {
 			logical = strings.TrimPrefix(logical, "- ")
 		}
 		line, prefix := "", first
-		for _, word := range strings.Fields(logical) {
-			if line != "" && visibleLen(prefix)+utf8.RuneCountInString(line)+1+utf8.RuneCountInString(word) > width {
-				lines = append(lines, prefix+line)
-				line, prefix = "", rest
-			}
-			if line == "" {
-				line = word
-			} else {
-				line += " " + word
+		for _, long := range strings.Fields(logical) {
+			for _, word := range hardBreak(long, width-visibleLen(rest)) {
+				if line != "" && visibleLen(prefix)+visibleLen(line)+1+visibleLen(word) > width {
+					lines = append(lines, prefix+line)
+					line, prefix = "", rest
+				}
+				if line == "" {
+					line = word
+				} else {
+					line += " " + word
+				}
 			}
 		}
 		if line != "" {
@@ -246,14 +335,17 @@ func dedent(block string) []string {
 	return lines
 }
 
-// banner is the startup logo.
-func banner() string {
+// banner is the startup logo; the subtitle wraps on narrow terminals.
+func banner(width int) string {
 	art := []string{
 		"   ▄▀█ █▀▀ ▄▀█ █▀▄ █▀▀ █▀▄▀█ █▄█",
 		"   █▀█ █▄▄ █▀█ █▄▀ ██▄ █░▀░█ ░█░",
 	}
-	return "\n" + sty.Bold(sty.Cyan(art[0])) + "\n" + sty.Bold(sty.Magenta(art[1])) + "\n" +
-		sty.Dim("   Systems & AI · Campus Registry · zero dependencies") + "\n"
+	sub := ""
+	for _, l := range wrap("Systems & AI · Campus Registry · zero dependencies", width-3, "   ") {
+		sub += sty.Dim(l) + "\n"
+	}
+	return "\n" + sty.Bold(sty.Cyan(art[0])) + "\n" + sty.Bold(sty.Magenta(art[1])) + "\n" + sub
 }
 
 // heading renders a double-ruled section title in the given colour.

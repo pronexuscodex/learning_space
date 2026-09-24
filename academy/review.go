@@ -38,7 +38,7 @@ func masteryLegend() string {
 // dailyReview runs a spaced-repetition session over every due card,
 // interleaved across stages.
 func (a *App) dailyReview() error {
-	a.println(heading("DAILY REVIEW · remember what you learned", sty.Green, a.width))
+	a.println(heading("DAILY REVIEW · remember what you learned", sty.Green, a.cols()))
 	a.mu.Lock()
 	now := time.Now()
 	due := a.reg.dueCards(now)
@@ -55,7 +55,7 @@ func (a *App) dailyReview() error {
 	}
 
 	a.printf("  %s\n", sty.Bold(fmt.Sprintf("%d card(s) due out of %d.", len(due), unlocked)))
-	for _, l := range wrap("Recall each answer before you reveal it; that effort is what builds memory.", a.width-4, "  ") {
+	for _, l := range wrap("Recall each answer before you reveal it; that effort is what builds memory.", a.cols()-4, "  ") {
 		a.println(l)
 	}
 	a.printf("  %s\n", sty.Gray("Grade honestly: 1 forgot · 2 hard · 3 good · 4 easy. q stops (progress is kept)."))
@@ -110,7 +110,7 @@ func (a *App) reviewCard(card Card, n, total int) (int, error) {
 	}
 	a.mu.Unlock()
 
-	w := a.width
+	w := a.cols()
 	edge := sty.Green("┃")
 	a.println("")
 	source := fmt.Sprintf("Stage %d", card.StageID)
@@ -203,7 +203,7 @@ func (a *App) masteryCheck(stageID int) error {
 	score := 0
 	for i, c := range cards {
 		a.printf("\n  %s %s\n", sty.Bold(sty.Green(fmt.Sprintf("Q%d/%d", i+1, len(cards)))), sty.Gray(c.Kind))
-		for _, l := range wrap(c.Q, a.width-6, "  ") {
+		for _, l := range wrap(c.Q, a.cols()-6, "  ") {
 			a.println(sty.Bold(l))
 		}
 		attempt, err := a.con.readLine(promptLabel("Your answer", "Enter to reveal, q abandons the check"))
@@ -214,7 +214,7 @@ func (a *App) masteryCheck(stageID int) error {
 			a.con.note("Check abandoned; nothing recorded.")
 			return nil
 		}
-		for _, l := range wrap(c.A, a.width-8, "    ") {
+		for _, l := range wrap(c.A, a.cols()-8, "    ") {
 			a.println(sty.Cyan(l))
 		}
 		got, err := a.con.confirm("Did you get the essentials right?")

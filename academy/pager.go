@@ -24,13 +24,15 @@ func stdoutIsTerminal() bool {
 	return err == nil && fi.Mode()&os.ModeCharDevice != 0
 }
 
-// termHeight reads $LINES, defaulting to a conservative 24 rows.
+// termHeight returns the terminal's live height, else $LINES, else 24.
 func termHeight() int {
-	h, err := strconv.Atoi(os.Getenv("LINES"))
-	if err != nil || h < 10 {
-		return 24
+	if _, h, ok := terminalSize(int(os.Stdout.Fd())); ok && h >= 10 {
+		return h
 	}
-	return h
+	if h, err := strconv.Atoi(os.Getenv("LINES")); err == nil && h >= 10 {
+		return h
+	}
+	return 24
 }
 
 // paged renders a screen and shows it one page at a time. With finalPause,
