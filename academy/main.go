@@ -246,6 +246,8 @@ type Registry struct {
 	ReviewHistory map[string]int        `json:"review_history"` // local date → cards reviewed that day
 	TidyScreen    bool                  `json:"tidy_screen"`    // start each action on a clean screen
 	StudySessions []StudySession        `json:"study_sessions"` // focus-timer sessions
+	Goals         Goals                 `json:"goals"`          // weekly targets (zero: none)
+	Achievements  map[string]time.Time  `json:"achievements"`   // achievement ID → when earned
 
 	// Classic Mode (see classic.go).
 	ClassicMode    bool                 `json:"classic_mode"`
@@ -797,6 +799,8 @@ func main() {
 	pathFlag := flag.String("registry", "", "path to the JSON registry (default: "+registryFileName+" beside the binary)")
 	noColor := flag.Bool("no-color", false, "disable ANSI colours (also honours NO_COLOR)")
 	checkLinks := flag.Bool("check-links", false, "verify every resource URL over the network, then exit")
+	listBackupsFlag := flag.Bool("backups", false, "list the automatic backups of the registry, then exit")
+	restoreFlag := flag.String("restore", "", "restore the registry from a backup (a number from -backups, or a file path), then exit")
 	flag.Parse()
 
 	sty = Style{on: colorEnabled(*noColor)}
@@ -818,11 +822,17 @@ func main() {
 		os.Exit(1)
 	}
 
+	if *listBackupsFlag || *restoreFlag != "" {
+		os.Exit(backupCommand(path, *listBackupsFlag, *restoreFlag))
+	}
+
 	reg, loaded, err := loadRegistry(path)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "✗ %v\n  Refusing to start so the existing file is not overwritten.\n", err)
 		os.Exit(1)
 	}
+
+	reg.awardAchievements(time.Now()) // silently backfill earlier milestones
 
 	app := &App{
 		reg:   reg,

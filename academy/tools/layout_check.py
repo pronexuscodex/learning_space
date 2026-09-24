@@ -33,6 +33,9 @@ KEYS = [
   "f\r", "\r", "1\r", "a goal that is rather long for a narrow terminal\r", "p", "p", "s", # focus timer, stop at once
   "p\r", "\r"*3,            # progress report (paged)
   "x\r",                    # export notes
+  "g\r", "\r", "\r", "\r",   # weekly goals: accept the suggestions
+  "m\r", "\r"*3, "2\r", "9\r",  # roadmap → open stage 2's Study Hall → back
+  "a\r", "\r"*3,            # achievements
   "5\r",                    # commit & exit
 ]
 

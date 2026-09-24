@@ -18,6 +18,11 @@ func (a *App) studyHall() error {
 	if err != nil {
 		return err
 	}
+	return a.studyHallFor(stageID)
+}
+
+// studyHallFor opens the Study Hall of one stage.
+func (a *App) studyHallFor(stageID int) error {
 	guide, ok := guideFor(stageID)
 	if !ok {
 		a.con.note("No Study Hall material for stage %d yet.", stageID)

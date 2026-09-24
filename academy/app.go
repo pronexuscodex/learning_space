@@ -30,6 +30,10 @@ func (a *App) commit() error {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	a.reg.LastCommit = time.Now().UTC().Truncate(time.Second)
+	if err := backupRegistry(a.path, time.Now()); err != nil {
+		// A failed backup must not block saving the learner's work.
+		a.con.warn("Could not back up the previous registry: %v", err)
+	}
 	if err := atomicWriteJSON(a.path, a.reg); err != nil {
 		return err
 	}
@@ -143,6 +147,9 @@ func (a *App) printDashboard() {
 	if dirty {
 		a.printf("  %s\n", sty.Yellow("● uncommitted changes"))
 	}
+	for _, l := range a.goalsLine() {
+		a.println(l)
+	}
 	if h := a.nextHint(); h != "" {
 		a.println("  " + h)
 	}
@@ -194,6 +201,9 @@ func (a *App) printMenu() {
 		{item("f", "Focus timer"), hint("Pomodoro")},
 		{item("p", "Progress report"), hint("calendar & trends")},
 		{item("x", "Export notes"), hint("to Markdown")},
+		{item("m", "Roadmap"), hint("all 16 stages")},
+		{item("g", "Weekly goals"), ""},
+		{item("a", "Achievements"), ""},
 		{item("c", "Classic Mode "+mode), ""},
 		{item("t", "Tidy screen "+tidyMode), ""},
 		{item("?", "Keys & shortcuts"), hint("Ctrl+L clears")},
@@ -825,6 +835,9 @@ func (a *App) showShortcuts() {
 	row("f", "focus timer: a timed study session that is logged")
 	row("p", "progress report: activity calendar, weekly trend, weak cards")
 	row("x", "export all your notes and progress to a Markdown file")
+	row("m", "roadmap: every stage's state and what it builds on; open any Study Hall")
+	row("g", "weekly goals: minutes, days and review cards, tracked on the dashboard")
+	row("a", "achievements")
 	row("c", "Classic Mode on/off")
 	row("t", "tidy screen on/off: start every action on a clean screen")
 	row("clear / cls", "clear the screen now")
@@ -896,6 +909,12 @@ func (a *App) run() {
 			a.paged(true, a.progressReport)
 		case "x":
 			actionErr = a.exportNotes()
+		case "m":
+			actionErr = a.roadmap()
+		case "g":
+			actionErr = a.setGoals()
+		case "a":
+			a.paged(true, a.showAchievements)
 		case "1":
 			a.paged(true, a.viewLedger)
 		case "2":
@@ -927,7 +946,7 @@ func (a *App) run() {
 		case "":
 			// Blank line: just redraw the menu.
 		default:
-			a.con.warn("%q is not a menu option. Choose 0-9, n, /, f, p, x, c, t or ? for help.", choice)
+			a.con.warn("%q is not a menu option. Choose 0-9, a letter from the menu, or ? for help.", choice)
 		}
 
 		switch {
@@ -939,5 +958,6 @@ func (a *App) run() {
 		case actionErr != nil:
 			a.con.fail("%v", actionErr)
 		}
+		a.announceAchievements()
 	}
 }

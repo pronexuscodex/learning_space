@@ -643,6 +643,8 @@ A SIMPLE STUDY RHYTHM
 - Take the stage's quiz at the end of the week, and its Mastery Check when every concept is understood.
 - Finish each stage with one real-world exercise or lab blueprint. Building is where it sticks.
 - Log your hours. The streak and the activity chart are there to keep you going.
+- Set weekly goals [g] you can keep on a bad week, and watch them on the dashboard. Consistency beats intensity.
+- The Roadmap [m] shows every stage, what each builds on, and where you are.
 - Not sure what to do? Press n for What's next: it picks your best next step and starts it for you.
 - Study in focused blocks with the Focus timer [f]: 25 minutes on one task, phone away, then a short break. Sessions are logged automatically.
 - Once a week, open the Progress report [p] to see your calendar, your trend against last week, and the cards you forget most.

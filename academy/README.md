@@ -119,6 +119,8 @@ Requires Go 1.22+. Nothing is downloaded, because there are no dependencies.
 
 On first run, the program creates `academy_campus_registry.json` next to the binary. To put the file somewhere else, pass `-registry path/to/file.json`. (With `go run .`, the file goes in the current directory, because the temporary build directory would be deleted.)
 
+Other flags: `-no-color`, `-check-links` (verify every resource URL), `-backups` (list automatic backups) and `-restore N` (restore one).
+
 **Upgrading from the 7-stage version:** your existing registry file is migrated automatically. The original stages move to their new numbers (1→5, 2→6, 3→7, 4→8, 5→13, 6→15, 7→16), your labs, hours, readings and concept progress are kept, and the nine new stages are added. Commit once to save the upgraded file.
 
 ## Menu
@@ -132,6 +134,9 @@ On first run, the program creates `academy_campus_registry.json` next to the bin
 | f | **Focus timer**: a live countdown (`p` pause, `s` stop, bell when done) logged as a study session under a stage |
 | p | **Progress report**: a GitHub-style activity calendar, the last 7 days against the 7 before, time and mastery per track, deck health and your most-forgotten cards |
 | x | **Export notes**: writes `academy_notes.md` next to the registry with your progress, own-words explanations, notebook and labs |
+| m | **Roadmap**: all 16 stages by track, each marked locked · ready · in progress · understood · mastered, with concept progress, "you are here", and which stages a locked one still needs; open any stage's Study Hall from it |
+| g | **Weekly goals**: study minutes, study days and review cards per week (Monday to Sunday), tracked on the dashboard: cyan on track, yellow behind, green done |
+| a | **Achievements**: 20 milestones (first concept, 7- and 30-day streaks, 100 and 1,000 reviews, a mastered concept, a passed mastery check, a whole track, graduation…), announced the moment you earn them |
 | c | **Classic Mode** on/off: struggle clock, lab notebook, classic corners and type-ins |
 | t | **Tidy screen** on/off: every action starts on a clean screen |
 | ? | **Keys & shortcuts** (also `h` or `help`) · `clear` / `cls` clears the screen |
@@ -144,7 +149,7 @@ On first run, the program creates `academy_campus_registry.json` next to the bin
 | 7 | Checkpoint: commit and keep working |
 | 8 | Exit without saving (asks for confirmation) |
 
-Above the menu, a dashboard shows hours, labs, stages, texts, concepts, exercises, **mastered concepts** and **cards due for review**, plus mastery-weighted campus progress, a 14-day activity sparkline, and a study streak (logged hours, focus sessions and review days all count). Below it, a **➜ Next** line names your best next step; press `n` to start it.
+Above the menu, a dashboard shows hours, labs, stages, texts, concepts, exercises, **mastered concepts** and **cards due for review**, plus mastery-weighted campus progress, a 14-day activity sparkline, and a study streak (logged hours, focus sessions and review days all count). If you have set weekly goals, a **This week** line tracks them. Below it, a **➜ Next** line names your best next step; press `n` to start it.
 
 Long screens (the ledger, Start Here, glossaries, resources, concept cards, the notebook) are shown one terminal page at a time: press **Enter** for the next page or **q** to return to the menu. Paging switches on only when you are typing at a real terminal (it uses `$LINES` if set, else 24 rows); piped or scripted input is unaffected.
 
@@ -223,6 +228,7 @@ The tests check:
 - **Connections:** globally unique concept names; every concept has valid cross-links and a go-deeper pointer; prerequisites only point backwards; every resource uses HTTPS.
 - **Layout:** display widths (emoji, CJK and combining marks), wrap and flow never exceed the width, and long prompts wrap.
 - **Guidance:** What's next ordering and its four-step limit, prerequisites, search AND semantics and ranking, snippets, daily minutes and the weekly comparison, focus sessions in stats, and the Markdown export.
+- **Goals, roadmap and achievements:** the calendar week's minutes, days and cards; the on-track rule; each stage state and its missing prerequisites; achievements awarded exactly once; backups deduplicated, rotated to 10, restored, and bad backups refused without touching the registry.
 - **Mechanics:** text wrapping, hour parsing, the atomic-write round trip and the activity streak.
 
 ## Source layout
@@ -249,6 +255,8 @@ One package, one build target:
 | `classicui.go` | Classic Mode screens: toggle, classic corner, type-in lab, notebook |
 | `insights.go` | What's next, search, study sessions, activity history, Markdown export |
 | `insightsui.go` | screens for the above, including the live focus timer and progress report |
+| `goals.go` | weekly goals, roadmap stage states, achievements, rotating backups and restore |
+| `goalsui.go` | goals, roadmap and achievements screens |
 | `typeins.go` | generated type-in listings with their real output (see `typeins/`) |
 | `curriculum.go` | types, plus Tracks A and B (stages 5–8, 13, 15, 16) |
 | `curriculum_foundations.go` | Track F (stages 1–4) |
@@ -260,6 +268,7 @@ One package, one build target:
 ## Data safety
 
 - **Atomic writes:** the program writes a temporary file in the same directory, fsyncs it, renames it over the registry, then fsyncs the directory. A crash leaves either the old file or the new one, never a half-written file.
+- **Automatic backups:** before each commit, the previous registry is copied to `academy_backups/` beside it (identical copies are skipped, and the newest 10 are kept). `./academy -backups` lists them; `./academy -restore 2` (or `-restore path/to/file.json`) restores one after checking that it loads cleanly, and backs up the file it replaces first, so a restore can be undone the same way. Restore while the academy is closed.
 - **Corrupt-file guard:** if the registry won't parse or fails validation, the program refuses to start rather than overwrite it.
 - **Input rigor:** the program removes control characters, trims whitespace, and rejects input that is too long instead of cutting it off. It re-prompts when a number can't be parsed. Hours must be finite, non-negative, and at most 24 per log entry. Duplicate lab names within a stage are rejected, and so are unknown menu options.
 
@@ -295,6 +304,8 @@ One package, one build target:
     "Hash Tables :: key idea": { "due": "2026-09-27T00:00:00+02:00", "interval_days": 3, "ease": 2.5, "reps": 2, "lapses": 0, "last_reviewed": "2026-09-24T14:48:41+02:00" }
   },
   "review_history": { "2026-09-24": 4 },
+  "goals": { "minutes": 150, "days": 5, "cards": 70 },
+  "achievements": { "first-concept": "2026-09-24T11:05:00Z" },
   "study_sessions": [{ "start": "2026-09-24T14:00:00Z", "minutes": 25, "stage": 2, "note": "hash table exercise" }]
 }
 ```

@@ -513,6 +513,29 @@ func (a *App) progressReport() {
 			a.printf("    %s %s %s\n", sty.Yellow(fmt.Sprintf("%d×", a.reg.Reviews[c.ID].Lapses)), truncate(name, w-24), sty.Gray("· "+c.Kind))
 		}
 	}
+
+	// Goals and achievements.
+	if g := a.reg.Goals; g != (Goals{}) {
+		wp := a.reg.weekToDate(now)
+		a.printf("\n  %s %s\n", sty.Bold("This week's goals"), sty.Gray(fmt.Sprintf("(day %d of 7)", wp.dayOf)))
+		goal := func(label string, done float64, goal int) {
+			if goal <= 0 {
+				return
+			}
+			state := sty.Yellow("behind")
+			switch {
+			case done >= float64(goal):
+				state = sty.Green("✓ done")
+			case onTrack(done, goal, wp.dayOf):
+				state = sty.Cyan("on track")
+			}
+			a.printf("    %s %s %s\n", padRight(label, 15), sty.Bold(padRight(fmt.Sprintf("%.0f/%d", done, goal), 11)), state)
+		}
+		goal("Study minutes", wp.minutes, g.Minutes)
+		goal("Study days", float64(wp.days), g.Days)
+		goal("Review cards", float64(wp.cards), g.Cards)
+	}
+	a.printf("\n  %s %s %s\n", sty.Bold("Achievements"), sty.Yellow(fmt.Sprintf("%d of %d", len(a.reg.Achievements), len(achievements))), sty.Gray("(press a)"))
 	a.println("")
 }
 
