@@ -202,6 +202,7 @@ func (a *App) printMenu() {
 		{item("p", "Progress report"), hint("calendar & trends")},
 		{item("x", "Export notes"), hint("to Markdown")},
 		{item("m", "Roadmap"), hint("all 16 stages")},
+		{item("l", sty.Bold("Library")), hint("download PDFs")},
 		{item("g", "Weekly goals"), ""},
 		{item("a", "Achievements"), ""},
 		{item("c", "Classic Mode "+mode), ""},
@@ -835,6 +836,7 @@ func (a *App) showShortcuts() {
 	row("f", "focus timer: a timed study session that is logged")
 	row("p", "progress report: activity calendar, weekly trend, weak cards")
 	row("x", "export all your notes and progress to a Markdown file")
+	row("l", "library: download free books and papers as PDFs and open them")
 	row("m", "roadmap: every stage's state and what it builds on; open any Study Hall")
 	row("g", "weekly goals: minutes, days and review cards, tracked on the dashboard")
 	row("a", "achievements")
@@ -911,6 +913,8 @@ func (a *App) run() {
 			actionErr = a.exportNotes()
 		case "m":
 			actionErr = a.roadmap()
+		case "l":
+			actionErr = a.library(0)
 		case "g":
 			actionErr = a.setGoals()
 		case "a":

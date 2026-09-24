@@ -27,15 +27,16 @@ KEYS = [
   "4\r", "\r"*2,            # resources
   "5\r", "n\r",             # blueprints
   "8\r", "1\r", "\r", "n\r", "3\r",  # classic corner → type-in lab listing → skip prediction → not run → back
-  "9\r",                    # back to main
+  "10\r",                   # back to main
   "n\r", "q\r",             # what's next, then cancel
   "/\r", "memory cache\r", "1\r", "\r"*3, "n\r",  # search → open first hit (a concept) → don't mark
   "f\r", "\r", "1\r", "a goal that is rather long for a narrow terminal\r", "p", "p", "s", # focus timer, stop at once
   "p\r", "\r"*3,            # progress report (paged)
   "x\r",                    # export notes
   "g\r", "\r", "\r", "\r",   # weekly goals: accept the suggestions
-  "m\r", "\r"*3, "2\r", "9\r",  # roadmap → open stage 2's Study Hall → back
+  "m\r", "\r"*3, "2\r", "10\r",  # roadmap → open stage 2's Study Hall → back
   "a\r", "\r"*3,            # achievements
+  "l\r", "1\r", "q\r",  # library → try downloading the first PDF → back
   "5\r",                    # commit & exit
 ]
 

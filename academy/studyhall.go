@@ -44,6 +44,7 @@ func (a *App) studyHallFor(stageID int) error {
 			fmt.Sprintf("Self-check quiz %s", sty.Gray(fmt.Sprintf("(%d questions)", len(guide.Quiz)))),
 			fmt.Sprintf("%s %s", sty.Bold("Mastery check"), sty.Gray(fmt.Sprintf("(mixed exam, %d%% to pass)", int(masteryPassMark*100)))),
 			fmt.Sprintf("%s %s", sty.Bold("Classic corner"), sty.Gray("(anchor book, classic text, real source, type-in lab)")),
+			fmt.Sprintf("%s %s", sty.Bold("PDF library"), sty.Gray(fmt.Sprintf("(%d free books and papers to download)", len(a.libraryEntries(stageID))))),
 			"Back to main menu",
 		})
 		if err != nil {
@@ -66,6 +67,8 @@ func (a *App) studyHallFor(stageID int) error {
 			err = a.masteryCheck(stageID)
 		case 7:
 			err = a.classicCorner(stageID)
+		case 8:
+			err = a.library(stageID)
 		default:
 			return nil
 		}
@@ -662,6 +665,11 @@ func (a *App) showResources(g StageGuide) {
 			}
 			if r.URL != "" {
 				a.printf("      %s\n", sty.Under(sty.Cyan(r.URL)))
+			}
+			if hasPDF(r.URL) {
+				for _, l := range wrap("⬇ PDF: download it in this stage's PDF library [9]", a.cols()-8, "      ") {
+					a.println(sty.Magenta(l))
+				}
 			}
 			for _, l := range wrap(r.Note, a.cols()-8, "      ") {
 				a.println(sty.Gray(l))

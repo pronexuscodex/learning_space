@@ -800,6 +800,7 @@ func main() {
 	noColor := flag.Bool("no-color", false, "disable ANSI colours (also honours NO_COLOR)")
 	checkLinks := flag.Bool("check-links", false, "verify every resource URL over the network, then exit")
 	listBackupsFlag := flag.Bool("backups", false, "list the automatic backups of the registry, then exit")
+	fetchLibraryFlag := flag.Bool("fetch-library", false, "download every free PDF in the library for offline study, then exit")
 	restoreFlag := flag.String("restore", "", "restore the registry from a backup (a number from -backups, or a file path), then exit")
 	flag.Parse()
 
@@ -822,6 +823,9 @@ func main() {
 		os.Exit(1)
 	}
 
+	if *fetchLibraryFlag {
+		os.Exit(fetchLibrary(path, os.Stdout))
+	}
 	if *listBackupsFlag || *restoreFlag != "" {
 		os.Exit(backupCommand(path, *listBackupsFlag, *restoreFlag))
 	}

@@ -119,7 +119,7 @@ Requires Go 1.22+. Nothing is downloaded, because there are no dependencies.
 
 On first run, the program creates `academy_campus_registry.json` next to the binary. To put the file somewhere else, pass `-registry path/to/file.json`. (With `go run .`, the file goes in the current directory, because the temporary build directory would be deleted.)
 
-Other flags: `-no-color`, `-check-links` (verify every resource URL), `-backups` (list automatic backups) and `-restore N` (restore one).
+Other flags: `-no-color`, `-check-links` (verify every resource URL), `-backups` (list automatic backups), `-restore N` (restore one) and `-fetch-library` (download every PDF in the Library for offline study).
 
 **Upgrading from the 7-stage version:** your existing registry file is migrated automatically. The original stages move to their new numbers (1→5, 2→6, 3→7, 4→8, 5→13, 6→15, 7→16), your labs, hours, readings and concept progress are kept, and the nine new stages are added. Commit once to save the upgraded file.
 
@@ -134,6 +134,7 @@ Other flags: `-no-color`, `-check-links` (verify every resource URL), `-backups`
 | f | **Focus timer**: a live countdown (`p` pause, `s` stop, bell when done) logged as a study session under a stage |
 | p | **Progress report**: a GitHub-style activity calendar, the last 7 days against the 7 before, time and mastery per track, deck health and your most-forgotten cards |
 | x | **Export notes**: writes `academy_notes.md` next to the registry with your progress, own-words explanations, notebook and labs |
+| l | **Library**: download free books and papers as PDFs without leaving the academy, then open them in your PDF viewer (see below) |
 | m | **Roadmap**: all 16 stages by track, each marked locked · ready · in progress · understood · mastered, with concept progress, "you are here", and which stages a locked one still needs; open any stage's Study Hall from it |
 | g | **Weekly goals**: study minutes, study days and review cards per week (Monday to Sunday), tracked on the dashboard: cyan on track, yellow behind, green done |
 | a | **Achievements**: 20 milestones (first concept, 7- and 30-day streaks, 100 and 1,000 reviews, a mastered concept, a passed mastery check, a whole track, graduation…), announced the moment you earn them |
@@ -203,12 +204,34 @@ For every stage:
 - **Self-check quiz:** flashcards with self-scoring.
 - **Mastery check:** a 12-question interleaved exam, passed at 80%.
 - **Classic corner:** anchor book, classic text, real source code, the type-in lab and your lab notebook.
+- **PDF library:** this stage's downloadable books and papers (the same as the main Library, filtered).
 
 Concepts link across stages. For example, logic gates (Stage 4) become the CPU; the memory hierarchy (Stage 5) returns as the roofline model (Stage 16); and paging (Stage 6) returns as PagedAttention.
 
 ![Mastery](docs/mastery.png)
 
 ![Ledger](docs/ledger.png)
+
+## Library: PDFs without leaving the academy
+
+Press **`l`** on the main menu (or open a stage's **PDF library** in the Study Hall). The Library lists every free, legally hosted PDF in the curriculum, by stage:
+
+- **Whole textbooks whose authors publish the PDF:** *Think Python*, Jeff Erickson's *Algorithms*, *Mathematics for Computer Science* (MIT), *Beej's Guide to Network Programming*, *Mathematics for Machine Learning*, *Linear Algebra Done Right* (4th ed., open access) and *An Introduction to Statistical Learning* (Python edition).
+- **Papers:** arXiv papers (the `arxiv.org/abs/…` page becomes its PDF), such as *Attention Is All You Need*, FlashAttention and PagedAttention.
+- **Classic texts:** Dijkstra, Thompson, Ritchie & Thompson, Codd, Saltzer–Reed–Clark, Brooks, LeCun et al., and more.
+
+Choose a number to download it, with a live progress bar, into `academy_library/` beside your registry. Then open it in your system PDF viewer (`xdg-open`, `open` or the Windows default app) while the academy keeps running. A saved document can be opened, downloaded again or deleted. **`u`** saves a PDF from any https link you give it (an arXiv `abs` link works too), and **`o`** opens the library folder. Resources and classic readings with a PDF are marked **⬇ PDF** throughout the Study Hall.
+
+To prepare for offline study (Classic Mode's "offline blocks"), run `./academy -fetch-library` once: it downloads everything not yet saved and reports anything that failed.
+
+Downloads are careful:
+- only `https://` links, including every redirect;
+- the file must start with the PDF signature `%PDF-`, whatever the server claims, so an HTML "this page moved" response is refused instead of saved;
+- 200 MB limit;
+- the file streams into a temporary file that is renamed into place only once it is complete, so an interrupted download never leaves a broken file (leftovers are cleaned up next time);
+- `HTTPS_PROXY` and the other standard proxy settings are honoured.
+
+The academy cannot show PDF pages inside a terminal, so it hands them to your PDF viewer. On a machine without one (a server over SSH), it prints the file's path instead.
 
 ## Colours
 
@@ -229,6 +252,7 @@ The tests check:
 - **Layout:** display widths (emoji, CJK and combining marks), wrap and flow never exceed the width, and long prompts wrap.
 - **Guidance:** What's next ordering and its four-step limit, prerequisites, search AND semantics and ranking, snippets, daily minutes and the weekly comparison, focus sessions in stats, and the Markdown export.
 - **Goals, roadmap and achievements:** the calendar week's minutes, days and cards; the on-track rule; each stage state and its missing prerequisites; achievements awarded exactly once; backups deduplicated, rotated to 10, restored, and bad backups refused without touching the registry.
+- **Library:** PDF address detection (including arXiv), a catalogue of unique, HTTPS, stage-filed documents, and downloads against a local HTTPS server: success with progress reporting, and refusal of non-PDF responses, HTTP errors, redirects to plain `http`, and oversized files, never leaving a partial file behind.
 - **Mechanics:** text wrapping, hour parsing, the atomic-write round trip and the activity streak.
 
 ## Source layout
@@ -257,6 +281,8 @@ One package, one build target:
 | `insightsui.go` | screens for the above, including the live focus timer and progress report |
 | `goals.go` | weekly goals, roadmap stage states, achievements, rotating backups and restore |
 | `goalsui.go` | goals, roadmap and achievements screens |
+| `library.go` | PDF catalogue, safe HTTPS downloader, system viewer, `-fetch-library` |
+| `libraryui.go` | Library screen: download, open, re-download, delete, your own links |
 | `typeins.go` | generated type-in listings with their real output (see `typeins/`) |
 | `curriculum.go` | types, plus Tracks A and B (stages 5–8, 13, 15, 16) |
 | `curriculum_foundations.go` | Track F (stages 1–4) |

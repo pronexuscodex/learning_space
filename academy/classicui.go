@@ -85,6 +85,11 @@ func (a *App) renderRead(label string, color func(string) string, r ClassicRead)
 	}
 	if r.URL != "" {
 		a.printf("    %s\n", sty.Under(sty.Cyan(r.URL)))
+		if hasPDF(r.URL) {
+			for _, l := range wrap("⬇ PDF: download it from the Study Hall's PDF library [9] or the Library [l]", a.cols()-6, "    ") {
+				a.println(sty.Magenta(l))
+			}
+		}
 	} else {
 		a.printf("    %s\n", sty.Gray("no free official copy; try a library, or a used copy"))
 	}
