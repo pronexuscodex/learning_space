@@ -6,8 +6,10 @@ Usage (Linux/macOS): go build -o academy . && python3 tools/monkey.py [sessions]
 
 Each session starts the app on a fresh registry, sends random keys (menu
 keys, numbers, answers, long and Unicode text, editing keys, escape
-sequences, terminal resizes), and restarts it whenever it exits. Network
-features fail fast offline; that is fine, they must fail gracefully.
+sequences, terminal resizes), and restarts it whenever it exits. The app
+runs offline: its proxy points at a closed port, so downloads and feeds
+fail at once, as they must, gracefully. (With a real network, a random key
+can start a large download from a slow server, which is not a hang.)
 """
 import os, pty, sys, time, select, random, signal, tempfile, fcntl, termios, struct, re
 
@@ -38,6 +40,10 @@ def set_size(fd, rows, cols):
 def session(rng, keys, reg):
     pid, fd = pty.fork()
     if pid == 0:
+        for k in ("HTTPS_PROXY", "https_proxy", "HTTP_PROXY", "http_proxy", "ALL_PROXY", "all_proxy"):
+            os.environ[k] = "http://127.0.0.1:9"  # the discard port: connection refused
+        for k in ("NO_PROXY", "no_proxy"):
+            os.environ.pop(k, None)
         os.execv(BIN, ["academy", "-registry", reg])
     set_size(fd, rng.choice([24, 40, 60]), rng.choice([40, 60, 80, 120]))
     out = bytearray()

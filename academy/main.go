@@ -1036,12 +1036,17 @@ func main() {
 	}
 
 	// Commit on Ctrl-C / SIGTERM as well, so an interrupt never loses work.
+	// During a download, Ctrl-C cancels just the download.
 	sigs := make(chan os.Signal, 1)
 	signal.Notify(sigs, os.Interrupt, syscall.SIGTERM)
 	go func() {
-		<-sigs
-		fmt.Println("\nInterrupt received — committing.")
-		app.commitAndExit()
+		for sig := range sigs {
+			if sig == os.Interrupt && app.interruptOp() {
+				continue
+			}
+			fmt.Println("\nInterrupt received — committing.")
+			app.commitAndExit()
+		}
 	}()
 
 	app.run()

@@ -20,6 +20,7 @@ import (
 	"runtime"
 	"sort"
 	"strings"
+	"sync/atomic"
 	"time"
 )
 
@@ -188,6 +189,7 @@ var (
 	errNotPDF    = errors.New("the server did not send a PDF (the file may have moved; open the link in a browser)")
 	errTooLarge  = errors.New("the file is larger than the 200 MB limit")
 	errBadStatus = errors.New("the server refused the download")
+	errCancelled = errors.New("cancelled")
 )
 
 // newDownloadClient is an HTTP client that follows at most 10 redirects,
@@ -216,11 +218,15 @@ type progressReader struct {
 	done, total int64
 	report      progressFunc
 	last        time.Time
+	alive       *atomic.Int64 // time of the last byte, for the stall watchdog
 }
 
 func (p *progressReader) Read(b []byte) (int, error) {
 	n, err := p.r.Read(b)
 	p.done += int64(n)
+	if n > 0 && p.alive != nil {
+		p.alive.Store(time.Now().UnixNano())
+	}
 	if p.report != nil && (time.Since(p.last) > 100*time.Millisecond || err == io.EOF) {
 		p.last = time.Now()
 		p.report(p.done, p.total)
@@ -228,11 +234,51 @@ func (p *progressReader) Read(b []byte) (int, error) {
 	return n, err
 }
 
+// stallTimeout ends a download when the server sends nothing for this long,
+// so a stalled server never keeps the learner waiting for the full timeout.
+var stallTimeout = 30 * time.Second
+
 // downloadPDF fetches link into dest. The file is streamed into a
 // temporary file in the same folder and renamed into place only after it
 // has been checked to be a complete PDF, so an interrupted or bad download
-// never leaves a broken file behind.
-func downloadPDF(ctx context.Context, client *http.Client, link, dest string, limit int64, progress progressFunc) (n int64, err error) {
+// never leaves a broken file behind. Cancelling ctx with a cause (such as
+// errCancelled) makes that cause the error.
+func downloadPDF(ctx context.Context, client *http.Client, link, dest string, limit int64, progress progressFunc) (int64, error) {
+	ctx, cancel := context.WithCancelCause(ctx)
+	defer cancel(nil)
+	var alive atomic.Int64
+	alive.Store(time.Now().UnixNano())
+	stall := stallTimeout
+	done := make(chan struct{})
+	defer close(done)
+	go func() {
+		tick := time.NewTicker(stall / 10)
+		defer tick.Stop()
+		for {
+			select {
+			case <-done:
+				return
+			case <-tick.C:
+				if time.Since(time.Unix(0, alive.Load())) > stall {
+					cancel(fmt.Errorf("the server sent nothing for %s; try again later", stall))
+					return
+				}
+			}
+		}
+	}()
+	n, err := fetchPDF(ctx, client, link, dest, limit, progress, &alive)
+	if err != nil && ctx.Err() != nil {
+		if cause := context.Cause(ctx); cause != nil && !errors.Is(cause, context.Canceled) {
+			if errors.Is(cause, context.DeadlineExceeded) {
+				return 0, errors.New("the download took too long")
+			}
+			return 0, cause
+		}
+	}
+	return n, err
+}
+
+func fetchPDF(ctx context.Context, client *http.Client, link, dest string, limit int64, progress progressFunc, alive *atomic.Int64) (n int64, err error) {
 	u, err := url.Parse(link)
 	if err != nil || u.Scheme != "https" || u.Host == "" {
 		return 0, errNotHTTPS
@@ -283,7 +329,7 @@ func downloadPDF(ctx context.Context, client *http.Client, link, dest string, li
 		}
 	}()
 
-	body := &progressReader{r: io.MultiReader(bytes.NewReader(head), resp.Body), total: resp.ContentLength, report: progress}
+	body := &progressReader{r: io.MultiReader(bytes.NewReader(head), resp.Body), total: resp.ContentLength, report: progress, alive: alive}
 	n, err = io.Copy(tmp, io.LimitReader(body, limit+1))
 	if err != nil {
 		return 0, fmt.Errorf("download interrupted: %w", err)

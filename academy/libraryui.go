@@ -238,7 +238,7 @@ func (a *App) download(link, path string) error {
 	if u, err := url.Parse(link); err == nil {
 		host = u.Host
 	}
-	a.con.note("Downloading from %s …", host)
+	a.con.note("Downloading from %s … (Ctrl+C cancels)", host)
 	var progress progressFunc
 	if a.con.screen {
 		progress = func(done, total int64) {
@@ -250,12 +250,20 @@ func (a *App) download(link, path string) error {
 			fmt.Fprint(a.con.out, "\r\x1b[K  "+truncateStyled(line, w-3))
 		}
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
+	ctx, stop := context.WithCancelCause(context.Background())
+	defer stop(nil)
+	a.onInterrupt(func() { stop(errCancelled) })
+	defer a.onInterrupt(nil)
+	ctx, cancel := context.WithTimeout(ctx, 15*time.Minute)
 	defer cancel()
 	start := time.Now()
 	n, err := downloadPDF(ctx, newDownloadClient(), link, path, maxDownloadSize, progress)
 	if progress != nil {
 		fmt.Fprint(a.con.out, "\r\x1b[K")
+	}
+	if errors.Is(err, errCancelled) {
+		a.con.warn("Download cancelled. Nothing was saved.")
+		return err
 	}
 	if err != nil {
 		a.con.fail("Download failed: %v", err)

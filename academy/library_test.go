@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestPDFURL(t *testing.T) {
@@ -146,5 +147,50 @@ func TestOwnDownloadsAndPartials(t *testing.T) {
 	cleanPartials(dir)
 	if _, err := os.Stat(filepath.Join(dir, ".academy-download-123.part")); !os.IsNotExist(err) {
 		t.Fatal("partial download should be removed")
+	}
+}
+
+func TestDownloadStallAndCancel(t *testing.T) {
+	// The server sends the PDF signature, then nothing.
+	srv := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Length", "100000")
+		w.Write([]byte("%PDF-1.7\n"))
+		w.(http.Flusher).Flush()
+		<-r.Context().Done()
+	}))
+	srv.Config.ErrorLog = log.New(io.Discard, "", 0)
+	srv.StartTLS()
+	defer srv.Close()
+	client := srv.Client()
+	dir := t.TempDir()
+	lib := filepath.Join(dir, "lib")
+
+	defer func(old time.Duration) { stallTimeout = old }(stallTimeout)
+	stallTimeout = 300 * time.Millisecond
+	start := time.Now()
+	_, err := downloadPDF(context.Background(), client, srv.URL+"/slow.pdf", filepath.Join(lib, "a.pdf"), 1<<20, nil)
+	if err == nil || !strings.Contains(err.Error(), "sent nothing") {
+		t.Fatalf("stalled download: got %v, want a stall error", err)
+	}
+	if d := time.Since(start); d > 3*time.Second {
+		t.Errorf("stall detected after %s", d)
+	}
+
+	// Ctrl+C cancels with errCancelled, long before the stall timeout.
+	stallTimeout = time.Minute
+	ctx, cancel := context.WithCancelCause(context.Background())
+	time.AfterFunc(200*time.Millisecond, func() { cancel(errCancelled) })
+	start = time.Now()
+	_, err = downloadPDF(ctx, client, srv.URL+"/slow.pdf", filepath.Join(lib, "b.pdf"), 1<<20, nil)
+	if !errors.Is(err, errCancelled) {
+		t.Fatalf("cancelled download: got %v, want errCancelled", err)
+	}
+	if d := time.Since(start); d > 3*time.Second {
+		t.Errorf("cancel took %s", d)
+	}
+
+	// Neither left anything behind.
+	if left, _ := os.ReadDir(lib); len(left) != 0 {
+		t.Errorf("files left in the library: %v", left)
 	}
 }

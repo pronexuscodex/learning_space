@@ -6,7 +6,12 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+- Ctrl+C during a Library download now cancels just that download, instead of quitting the app.
+- A download stops with a clear message when the server sends nothing for 30 seconds, instead of waiting up to 15 minutes.
+
 ### Changed
+- CI: the random-input "monkey" test runs offline, so a slow website can no longer make it fail.
 - Release archives are reproducible: every file carries the commit's timestamp, a fixed owner and a fixed order, so rebuilding a commit gives the same checksums.
 - Publishing a release from the website no longer builds it twice; the second workflow run stops when the files are already attached.
 

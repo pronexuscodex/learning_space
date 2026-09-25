@@ -23,6 +23,30 @@ type App struct {
 	con   *console
 	width int  // fixed layout width when output is not a terminal
 	pager bool // page long screens (stdin is a terminal)
+
+	opMu      sync.Mutex
+	interrupt func() // set while Ctrl+C should cancel an operation, not quit
+}
+
+// onInterrupt makes Ctrl+C call f instead of committing and quitting, until
+// it is called again with nil.
+func (a *App) onInterrupt(f func()) {
+	a.opMu.Lock()
+	a.interrupt = f
+	a.opMu.Unlock()
+}
+
+// interruptOp cancels the running operation, if there is one.
+func (a *App) interruptOp() bool {
+	a.opMu.Lock()
+	f := a.interrupt
+	a.interrupt = nil
+	a.opMu.Unlock()
+	if f == nil {
+		return false
+	}
+	f()
+	return true
 }
 
 // commit atomically persists the registry to disk.
