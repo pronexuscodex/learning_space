@@ -8,12 +8,12 @@
     "architecture": {
         "64bit": {
             "url": "https://github.com/pronexuscodex/learning_space/releases/download/v1.1.0/academy-v1.1.0-windows-amd64.zip",
-            "hash": "b7ea8f0be0928268c1638ef8a2cd3053aa72e19a15bcbb32f88358a233603eac",
+            "hash": "54fe85228eb45cfaabc6aac1ecab7efe7605049750be640c80a099e0ec89ccf9",
             "extract_dir": "academy-v1.1.0-windows-amd64"
         },
         "arm64": {
             "url": "https://github.com/pronexuscodex/learning_space/releases/download/v1.1.0/academy-v1.1.0-windows-arm64.zip",
-            "hash": "5fae4753c4500e6f9b03052add2823ecbae97c0b20d822c5723ad5c296fe1cab",
+            "hash": "d6efee38b8823632dafbd4a4dd836dfb2a0511fdb3be78970d04e1248d596dd7",
             "extract_dir": "academy-v1.1.0-windows-arm64"
         }
     },

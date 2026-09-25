@@ -8,22 +8,22 @@ class Academy < Formula
   on_macos do
     on_arm do
       url "https://github.com/pronexuscodex/learning_space/releases/download/v1.1.0/academy-v1.1.0-darwin-arm64.tar.gz"
-      sha256 "1282239884fc83e8e3841d2312ed667785e3c489a1a84223f3817a5a86d74565"
+      sha256 "14a117abbcd4b32a1b79ff61e7c32ba7eb24eb6b753237ba5ec13ed1ac80be3b"
     end
     on_intel do
       url "https://github.com/pronexuscodex/learning_space/releases/download/v1.1.0/academy-v1.1.0-darwin-amd64.tar.gz"
-      sha256 "c41bdaa1dba404a5ce49898811af14473a3f4cc065273edd2268d5e713a263ff"
+      sha256 "f493c1877314c9c396ae4be2d3d2dcd46b2d48d978d495954b6c8e9b7cbf9ccb"
     end
   end
 
   on_linux do
     on_arm do
       url "https://github.com/pronexuscodex/learning_space/releases/download/v1.1.0/academy-v1.1.0-linux-arm64.tar.gz"
-      sha256 "4640098fb425691a60aeeccb84c41bcaa858fa5b9691dd5b156284657416a099"
+      sha256 "28765883e806d1b53c14bdeec54829bbf4e57851613d674a375705bc4ee06414"
     end
     on_intel do
       url "https://github.com/pronexuscodex/learning_space/releases/download/v1.1.0/academy-v1.1.0-linux-amd64.tar.gz"
-      sha256 "8a2bb472d00f4176e5d7a060a31d4f10e3311d3c6a85f921a5a3836d165c970f"
+      sha256 "1971ace269bd7789b0a59ca6252a830e31191311cdbe1d953f43d586e447150d"
     end
   end
 
