@@ -4,6 +4,12 @@ All notable changes to the Systems & AI Academy are listed here. The
 format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 versions follow [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Changed
+- Release archives are reproducible: every file carries the commit's timestamp, a fixed owner and a fixed order, so rebuilding a commit gives the same checksums.
+- Publishing a release from the website no longer builds it twice; the second workflow run stops when the files are already attached.
+
 ## [1.1.0] - 2026-09-25
 
 ### Added

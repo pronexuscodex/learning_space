@@ -20,7 +20,28 @@ permissions:
   contents: write
 
 jobs:
+  # Publishing on the website fires two runs: one for the release, one for
+  # the tag it creates. Whichever comes second finds SHA256SUMS already
+  # attached and stops here. To rebuild a release, delete its SHA256SUMS.
+  check:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      built: ${{ steps.assets.outputs.built }}
+    steps:
+      - id: assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' 2>/dev/null | grep -qx SHA256SUMS; then
+            echo "$GITHUB_REF_NAME already has its files; nothing to do."
+            echo "built=true" >> "$GITHUB_OUTPUT"
+          fi
+
   release:
+    needs: check
+    if: needs.check.outputs.built != 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: write

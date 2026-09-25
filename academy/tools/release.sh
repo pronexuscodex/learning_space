@@ -7,7 +7,9 @@
 # each holding the executable, README.md, CHANGELOG.md and LICENSE (when
 # present), plus dist/SHA256SUMS. Needs only Go, tar, zip and sha256sum
 # (or shasum on macOS). Builds are static (CGO_ENABLED=0), reproducible
-# (-trimpath) and stripped (-s -w).
+# (-trimpath) and stripped (-s -w), and so are the archives: every file
+# gets the commit's timestamp (or $SOURCE_DATE_EPOCH), a fixed owner and a
+# fixed order, so building the same commit twice gives identical checksums.
 set -eu
 
 VERSION=${1:?usage: tools/release.sh vX.Y.Z}
@@ -17,6 +19,14 @@ v[0-9]*.[0-9]*.[0-9]*) ;;
 esac
 
 cd "$(dirname "$0")/.."
+EPOCH=${SOURCE_DATE_EPOCH:-$(git log -1 --format=%ct 2>/dev/null || date +%s)}
+STAMP=$(date -u -d "@$EPOCH" +%Y%m%d%H%M.%S 2>/dev/null || date -u -r "$EPOCH" +%Y%m%d%H%M.%S)
+export TZ=UTC # touch -t and zip store local times
+if tar --version 2>/dev/null | grep -q GNU; then
+	TAR_FLAGS="--format=ustar --owner=0 --group=0 --numeric-owner"
+else
+	TAR_FLAGS="--format=ustar --uid 0 --gid 0 --numeric-owner" # bsdtar (macOS)
+fi
 TARGETS="linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64 windows/arm64 freebsd/amd64"
 OUT=dist
 rm -rf "$OUT"
@@ -40,10 +50,16 @@ for target in $TARGETS; do
 	if [ ! -f LICENSE ] && [ -f ../LICENSE ]; then
 		cp ../LICENSE "$dir/"
 	fi
+	chmod 755 "$dir" "$dir/$exe"
+	chmod 644 "$dir"/*.md "$dir/LICENSE" 2>/dev/null || true
+	touch -t "$STAMP" "$dir" "$dir"/*
+	files=$(cd "$OUT" && ls -d "$name" "$name"/* | LC_ALL=C sort)
 	if [ "$os" = windows ]; then
-		(cd "$OUT" && zip -qr "$name.zip" "$name")
+		# -X: no extra attributes; -D: no directory entries.
+		(cd "$OUT" && zip -qXD "$name.zip" $files)
 	else
-		tar -C "$OUT" -czf "$OUT/$name.tar.gz" "$name"
+		# -n: gzip without the file name and time.
+		(cd "$OUT" && tar $TAR_FLAGS --no-recursion -cf - $files | gzip -n9 > "$name.tar.gz")
 	fi
 	rm -rf "$dir"
 done

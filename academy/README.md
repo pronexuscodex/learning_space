@@ -622,6 +622,8 @@ The **Release** workflow (`.github/workflows/release.yml`) then:
 
 No terminal? Publish from the website instead: **Releases → Draft a new release**, type a new tag such as `v1.0.0`, paste the changelog section as the description, and click **Publish release**. The same workflow then builds the archives and attaches them to that release, usually within a few minutes.
 
+Publishing from the website starts the workflow twice (once for the release, once for its new tag); the second run sees the files already attached and stops. To rebuild a release's files, delete its `SHA256SUMS` asset and re-run the workflow. The archives are reproducible: building the same commit again gives the same checksums.
+
 To try the same build locally, run `tools/release.sh v0.0.0` and look in `dist/`.
 
 Other tools in `tools/`:
