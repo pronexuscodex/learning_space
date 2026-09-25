@@ -8,6 +8,12 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ### Added
 - An app icon: a CPU chip with a terminal prompt, in the app's colours. The Windows `academy.exe` now shows it in Explorer and the taskbar; the READMEs and a GitHub social-preview card use it too. `tools/icons.py` regenerates every size from the SVG.
+- Install with Homebrew (macOS, Linux) or Scoop (Windows). This repository is the tap and the bucket, and each release updates them automatically.
+- Signed build-provenance attestations for every release archive, checkable with `gh attestation verify`.
+- `ACADEMY_HOME` sets the folder for the registry, backups and PDFs.
+
+### Changed
+- Package-manager installs (Homebrew, Scoop, winget, Nix) keep your progress in a per-user data folder instead of next to the binary, because upgrades replace the install folder. Downloaded copies still keep it next to the binary, as before.
 
 ## [1.0.1] - 2026-09-24
 

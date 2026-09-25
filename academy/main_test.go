@@ -241,3 +241,36 @@ func TestGuidesMatchSeedStages(t *testing.T) {
 		}
 	}
 }
+
+func TestRegistryPathFor(t *testing.T) {
+	noEnv := func(string) string { return "" }
+	data := func() (string, error) { return filepath.FromSlash("/home/me/.local/share"), nil }
+	cases := []struct {
+		name, exe, home, want string
+	}{
+		{"downloaded copy", "/home/me/bin/academy", "", "/home/me/bin"},
+		{"ACADEMY_HOME wins", "/home/me/bin/academy", "/srv/study", "/srv/study"},
+		{"Homebrew on macOS", "/opt/homebrew/Cellar/academy/1.1.0/bin/academy", "", "/home/me/.local/share/academy"},
+		{"Homebrew on Linux", "/home/linuxbrew/.linuxbrew/Cellar/academy/1.1.0/bin/academy", "", "/home/me/.local/share/academy"},
+		{"Scoop", "C:/Users/me/scoop/apps/academy/current/academy.exe", "", "/home/me/.local/share/academy"},
+		{"winget", "C:/Users/me/AppData/Local/Microsoft/WinGet/Packages/academy/academy.exe", "", "/home/me/.local/share/academy"},
+		{"go run", filepath.Join(os.TempDir(), "go-build123", "b001", "exe", "academy"), "", "/work"},
+	}
+	for _, c := range cases {
+		getenv := noEnv
+		if c.home != "" {
+			home := filepath.FromSlash(c.home)
+			getenv = func(k string) string {
+				if k == "ACADEMY_HOME" {
+					return home
+				}
+				return ""
+			}
+		}
+		got := registryPathFor(filepath.FromSlash(c.exe), filepath.FromSlash("/work"), getenv, data)
+		want := filepath.Join(filepath.FromSlash(c.want), registryFileName)
+		if got != want {
+			t.Errorf("%s: got %s, want %s", c.name, got, want)
+		}
+	}
+}

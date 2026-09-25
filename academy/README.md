@@ -36,6 +36,24 @@ New here? Build it (below), run it, and press **`0`** for the *Start Here* guide
 
 ## Install
 
+### With a package manager (from version 1.1.0)
+
+**macOS and Linux, with [Homebrew](https://brew.sh):**
+
+```sh
+brew tap pronexuscodex/academy https://github.com/pronexuscodex/learning_space
+brew install pronexuscodex/academy/academy
+```
+
+**Windows, with [Scoop](https://scoop.sh):**
+
+```powershell
+scoop bucket add academy https://github.com/pronexuscodex/learning_space
+scoop install academy/academy
+```
+
+Then run `academy`. Update later with `brew upgrade academy` or `scoop update academy`. Package-manager installs usually avoid the unknown-developer warnings described below, and they keep your progress in a per-user folder that upgrades never touch (see [Where your progress lives](#where-your-progress-lives)).
+
 ### Download a release (no Go needed)
 
 1. Download the archive for your system from the [Releases page](https://github.com/pronexuscodex/learning_space/releases):
@@ -58,6 +76,12 @@ New here? Build it (below), run it, and press **`0`** for the *Start Here* guide
    ```
 
    On Windows, run `Get-FileHash academy-*.zip` in PowerShell and compare the result with the line in `SHA256SUMS`.
+
+   From version 1.1.0 you can also check who built it. Every archive has a signed build-provenance attestation, which proves that the release workflow built it from this repository's code:
+
+   ```sh
+   gh attestation verify academy-v1.1.0-linux-amd64.tar.gz --repo pronexuscodex/learning_space
+   ```
 
 3. Unpack it and run it from a terminal:
 
@@ -88,7 +112,19 @@ It needs Go 1.22 or later, and nothing else: there are no dependencies to downlo
 
 ### Where your progress lives
 
-On first run, the program creates `academy_campus_registry.json` next to the binary. To put the file somewhere else, pass `-registry path/to/file.json`. (With `go run .`, the file goes in the current directory, because the temporary build directory would be deleted.)
+Your progress is one file, `academy_campus_registry.json`. Backups, downloaded PDFs and exports go in the same folder. The program creates the file on first run, in this folder:
+
+| How you run it | Folder |
+|---|---|
+| `-registry path/to/file.json` | the folder of that file |
+| `ACADEMY_HOME` is set | `$ACADEMY_HOME` |
+| Installed with Homebrew on macOS | `~/Library/Application Support/academy` |
+| Installed with Homebrew on Linux | `~/.local/share/academy` (or `$XDG_DATA_HOME/academy`) |
+| Installed with Scoop or winget | `%LocalAppData%\academy` |
+| A downloaded or self-built binary | next to the binary |
+| `go run .` | the current directory, because the temporary build folder would be deleted |
+
+Package managers replace their install folder on every upgrade, which is why those installs keep your data elsewhere. To move from a downloaded copy to a package-manager install, move your registry and its folders into the new location, or set `ACADEMY_HOME` to the old folder.
 
 Other flags: `-no-color`, `-check-links` (verify every resource URL), `-backups` (list automatic backups), `-restore N` (restore one) and `-fetch-library` (download every PDF in the Library for offline study).
 
@@ -580,7 +616,9 @@ For maintainers:
 The **Release** workflow (`.github/workflows/release.yml`) then:
 - runs vet and the race-enabled tests;
 - builds all seven targets with `tools/release.sh`, stamping the version into the binary;
-- publishes a GitHub release with the archives, `SHA256SUMS`, and that version's changelog section as the release notes. A tag with a hyphen, such as `v1.1.0-rc.1`, is published as a pre-release.
+- records a signed build-provenance attestation for every archive;
+- publishes a GitHub release with the archives, `SHA256SUMS`, and that version's changelog section as the release notes. A tag with a hyphen, such as `v1.1.0-rc.1`, is published as a pre-release;
+- runs `tools/packages.py`, which rewrites `Formula/academy.rb` (Homebrew) and `bucket/academy.json` (Scoop) at the repository root with the new download links and checksums, and commits them to the default branch. Pre-releases are skipped, and an older tag never replaces a newer version.
 
 No terminal? Publish from the website instead: **Releases → Draft a new release**, type a new tag such as `v1.0.0`, paste the changelog section as the description, and click **Publish release**. The same workflow then builds the archives and attaches them to that release, usually within a few minutes.
 
@@ -588,6 +626,7 @@ To try the same build locally, run `tools/release.sh v0.0.0` and look in `dist/`
 
 Other tools in `tools/`:
 - `layout_check.py`: renders every screen in a pseudo-terminal at chosen widths and reports overflowing lines.
+- `packages.py`: writes the Homebrew formula and the Scoop manifest from a release's `SHA256SUMS`; the release workflow runs it for you.
 - `monkey.py`: sends thousands of random keys and fails on any crash or hang.
 - `screenshots.py`: regenerates `docs/*.png` from the real app, using a demo registry and headless Chromium.
 - `icons.py`: regenerates every icon asset from `assets/icon.svg` and `assets/icon-small.svg` (the pin-less version used at 16–32 px), using headless Chromium:

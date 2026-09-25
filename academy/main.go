@@ -37,6 +37,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 	"syscall"
@@ -622,24 +623,88 @@ func seedRegistry() *Registry {
 // Storage layer
 // ---------------------------------------------------------------------------
 
-// defaultRegistryPath places the registry next to the executable. When the
-// binary lives in a temporary build directory (as with `go run`), it falls
-// back to the current working directory so data is not lost on exit.
+// defaultRegistryPath chooses where the registry lives when -registry is
+// not given:
+//
+//  1. in $ACADEMY_HOME, when that is set;
+//  2. in a per-user data folder, when a package manager (Homebrew, Scoop,
+//     winget, Nix) installed the binary, because it replaces that folder on
+//     every upgrade;
+//  3. next to the executable, so a downloaded copy is self-contained;
+//  4. in the current directory, when the binary lives in a temporary build
+//     directory (as with `go run`), so data is not lost on exit.
 func defaultRegistryPath() string {
-	if exe, err := os.Executable(); err == nil {
+	exe, err := os.Executable()
+	if err == nil {
 		if resolved, err := filepath.EvalSymlinks(exe); err == nil {
 			exe = resolved
 		}
+	}
+	wd, _ := os.Getwd()
+	path := registryPathFor(exe, wd, os.Getenv, userDataDir)
+	// A data folder may not exist yet; the registry's own folder is created
+	// on demand so the first commit can write there.
+	os.MkdirAll(filepath.Dir(path), 0o755)
+	return path
+}
+
+// packageManaged lists path fragments of folders a package manager owns.
+var packageManaged = []string{"/Cellar/", "/homebrew/", "/linuxbrew/", "/nix/store/", "/scoop/apps/", "/winget/packages/"}
+
+func isPackageManaged(dir string) bool {
+	d := strings.ToLower(filepath.ToSlash(dir)) + "/"
+	for _, frag := range packageManaged {
+		if strings.Contains(d, strings.ToLower(frag)) {
+			return true
+		}
+	}
+	return false
+}
+
+// registryPathFor is defaultRegistryPath with its inputs passed in, for tests.
+func registryPathFor(exe, wd string, getenv func(string) string, dataDir func() (string, error)) string {
+	if home := getenv("ACADEMY_HOME"); home != "" {
+		return filepath.Join(home, registryFileName)
+	}
+	if exe != "" {
 		dir := filepath.Dir(exe)
+		if isPackageManaged(dir) {
+			if data, err := dataDir(); err == nil {
+				return filepath.Join(data, "academy", registryFileName)
+			}
+		}
 		tmp := filepath.Clean(os.TempDir())
 		if !strings.HasPrefix(dir, tmp) && !strings.Contains(dir, "go-build") {
 			return filepath.Join(dir, registryFileName)
 		}
 	}
-	if wd, err := os.Getwd(); err == nil {
+	if wd != "" {
 		return filepath.Join(wd, registryFileName)
 	}
 	return registryFileName
+}
+
+// userDataDir is the per-user folder for application data:
+// ~/.local/share (or $XDG_DATA_HOME) on Linux and BSD,
+// ~/Library/Application Support on macOS and %LocalAppData% on Windows.
+func userDataDir() (string, error) {
+	switch runtime.GOOS {
+	case "windows":
+		if d := os.Getenv("LocalAppData"); d != "" {
+			return d, nil
+		}
+		return os.UserConfigDir()
+	case "darwin", "ios", "plan9":
+		return os.UserConfigDir()
+	}
+	if d := os.Getenv("XDG_DATA_HOME"); filepath.IsAbs(d) {
+		return d, nil
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(home, ".local", "share"), nil
 }
 
 // loadResult says what loadRegistry had to do beyond reading the file.
@@ -867,7 +932,7 @@ func roundHours(h float64) float64 { return math.Round(h*100) / 100 }
 // ---------------------------------------------------------------------------
 
 func main() {
-	pathFlag := flag.String("registry", "", "path to the JSON registry (default: "+registryFileName+" beside the binary)")
+	pathFlag := flag.String("registry", "", "path to the JSON registry (default: in $ACADEMY_HOME if set; otherwise beside the binary, or in a per-user data folder when a package manager installed it)")
 	noColor := flag.Bool("no-color", false, "disable ANSI colours (also honours NO_COLOR)")
 	checkLinks := flag.Bool("check-links", false, "verify every resource URL over the network, then exit")
 	listBackupsFlag := flag.Bool("backups", false, "list the automatic backups of the registry, then exit")

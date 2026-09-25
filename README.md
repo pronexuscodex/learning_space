@@ -7,6 +7,7 @@
 A terminal study companion for self-learners. It covers the core of a computer science degree plus modern AI in 17 stages, starting from how computers work and C. It includes spaced repetition, real exercises, a programmer's dictionary, a PDF library and tech watch, all in one dependency-free executable.
 
 - **Download:** [Releases](https://github.com/pronexuscodex/learning_space/releases), for Linux, macOS, Windows and FreeBSD.
+- **Or install it:** `brew install pronexuscodex/academy/academy` after `brew tap pronexuscodex/academy https://github.com/pronexuscodex/learning_space`, or `scoop install academy/academy` after `scoop bucket add academy https://github.com/pronexuscodex/learning_space` ([details](academy/README.md#install)).
 - **Read more:** [academy/README.md](academy/README.md).
 - **What's new:** [academy/CHANGELOG.md](academy/CHANGELOG.md).
 

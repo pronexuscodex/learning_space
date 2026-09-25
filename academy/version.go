@@ -77,6 +77,7 @@ Examples:
   academy -backups                         list automatic backups
   academy -restore 1                       restore the newest backup
   academy -fetch-library                   download every free PDF for offline study
+  ACADEMY_HOME=~/study academy             keep the registry, backups and PDFs in ~/study
 
 Inside the app, press 0 for Start Here and ? for every key.
 `)

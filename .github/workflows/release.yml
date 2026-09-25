@@ -22,6 +22,10 @@ permissions:
 jobs:
   release:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write      # to sign the provenance attestation
+      attestations: write  # to store it
     defaults:
       run:
         working-directory: academy
@@ -37,6 +41,13 @@ jobs:
           go test -race ./...
       - name: Build archives
         run: tools/release.sh "$GITHUB_REF_NAME"
+      # A signed record that this workflow built these exact files from this
+      # commit. Check a download with:
+      #   gh attestation verify academy-v1.1.0-linux-amd64.tar.gz --repo pronexuscodex/learning_space
+      - name: Record build provenance
+        uses: actions/attest-build-provenance@v3
+        with:
+          subject-checksums: academy/dist/SHA256SUMS
       - name: Release notes from CHANGELOG.md
         run: |
           version=${GITHUB_REF_NAME#v}
@@ -60,3 +71,37 @@ jobs:
               --title "Systems & AI Academy $GITHUB_REF_NAME" \
               --notes-file notes.md $flags
           fi
+
+  # Point the Homebrew formula and the Scoop manifest at the new archives,
+  # on the default branch, which is where `brew tap` and `scoop bucket add`
+  # read them from. Pre-releases (tags with a hyphen) are skipped.
+  packages:
+    needs: release
+    if: ${{ !contains(github.ref_name, '-') }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+      - name: Update Formula/academy.rb and bucket/academy.json
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download "$GITHUB_REF_NAME" --pattern SHA256SUMS --dir "$RUNNER_TEMP"
+          python3 academy/tools/packages.py "$GITHUB_REF_NAME" "$RUNNER_TEMP/SHA256SUMS"
+          git add Formula bucket
+          if git diff --cached --quiet; then
+            echo "Already up to date."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Update the Homebrew formula and Scoop manifest to $GITHUB_REF_NAME"
+          for attempt in 1 2 3; do
+            git push origin HEAD && exit 0
+            sleep $((attempt * 5))
+            git pull --rebase origin "${{ github.event.repository.default_branch }}"
+          done
+          exit 1
