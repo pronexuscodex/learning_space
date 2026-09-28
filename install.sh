@@ -163,13 +163,15 @@ EOF
 			icon_key="<key>CFBundleIconFile</key><string>Academy</string>"
 		fi
 	fi
+	# Info.plist is XML: "&" must be written "&amp;".
+	plist_name=$(printf '%s' "$APP_NAME" | sed 's/&/\&amp;/g')
 	cat >"$MAC_APP/Contents/Info.plist" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
 	<key>CFBundleName</key><string>Academy</string>
-	<key>CFBundleDisplayName</key><string>$APP_NAME</string>
+	<key>CFBundleDisplayName</key><string>$plist_name</string>
 	<key>CFBundleIdentifier</key><string>io.github.pronexuscodex.academy</string>
 	<key>CFBundleExecutable</key><string>Academy</string>
 	<key>CFBundlePackageType</key><string>APPL</string>
