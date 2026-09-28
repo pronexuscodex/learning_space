@@ -194,3 +194,16 @@ func TestDownloadStallAndCancel(t *testing.T) {
 		t.Errorf("files left in the library: %v", left)
 	}
 }
+
+// Every stage's "PDF library" entry must lead somewhere: no empty screens.
+func TestEveryStageHasLibraryPDFs(t *testing.T) {
+	count := map[int]int{}
+	for _, d := range libraryDocs() {
+		count[d.Stage]++
+	}
+	for id := range curriculum {
+		if count[id] == 0 {
+			t.Errorf("stage %d has no downloadable PDF in its library", id)
+		}
+	}
+}

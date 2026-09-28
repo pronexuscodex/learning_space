@@ -423,7 +423,9 @@ func exerciseDots(s *Stage, c Concept) string {
 func (a *App) exerciseGym(stageID int, g StageGuide) error {
 	for {
 		a.println("")
-		a.printf("  %s\n", sty.Bold(sty.Magenta("EXERCISE GYM · try first, then peek at the hint")))
+		for _, l := range wrap("EXERCISE GYM · try first, then peek at the hint", a.cols()-4, "  ") {
+			a.println(sty.Bold(sty.Magenta(l)))
+		}
 		a.mu.Lock()
 		_, s := a.reg.findStage(stageID)
 		options := make([]string, len(g.Concepts))
@@ -483,7 +485,15 @@ func (a *App) workExercise(stageID int, c Concept, i int) error {
 	a.mu.Unlock()
 
 	a.println("")
-	a.printf("  %s %s %s\n", sty.Magenta("┏━"), levelBadge(e.Level), sty.Gray("· "+c.Name))
+	head := fmt.Sprintf("  %s %s", sty.Magenta("┏━"), levelBadge(e.Level))
+	// Keep a margin for symbols some terminals draw two columns wide; on a
+	// narrow screen the concept name gets its own line instead.
+	if room := w - visibleLen(head) - 3; room >= 16 {
+		a.printf("%s %s\n", head, sty.Gray(truncate("· "+c.Name, room)))
+	} else {
+		a.println(head)
+		a.printf("  %s %s\n", edge, sty.Gray(truncate(c.Name, w-6)))
+	}
 	for _, l := range wrap(e.Task, w-6, "") {
 		a.printf("  %s %s\n", edge, l)
 	}
@@ -499,7 +509,7 @@ func (a *App) workExercise(stageID int, c Concept, i int) error {
 		if !seen {
 			opened = time.Now()
 			a.mutate(func(r *Registry) { r.ExerciseOpened[key] = opened })
-			a.printf("  %s %s\n", classicBadge(), sty.Yellow(fmt.Sprintf("Struggle clock started: the hint unlocks in %d minutes.", struggleMinutes[e.Level])))
+			a.con.say(classicBadge(), fmt.Sprintf("Struggle clock started: the hint unlocks in %d minutes.", struggleMinutes[e.Level]), sty.Yellow)
 			plan, err := a.con.promptText("Before you start: your plan or prediction (Enter to skip)", maxNotesLen, false)
 			if err != nil {
 				return err
@@ -668,7 +678,7 @@ func (a *App) showStartHere() {
 // showResources prints the resource library grouped by kind.
 func (a *App) showResources(stageID int, g StageGuide) {
 	a.println("")
-	for _, l := range flow([]string{sty.Bold(sty.Blue("RESOURCE LIBRARY")), sty.Gray("links verified " + resourcesVerifiedOn), sty.Gray("re-check any time: academy -check-links")}, sty.Gray(" · "), a.cols(), "  ") {
+	for _, l := range flow([]string{sty.Bold(sty.Blue("RESOURCE LIBRARY")), sty.Gray("links verified " + resourcesVerifiedOn), sty.Gray("check links: academy -check-links")}, sty.Gray(" · "), a.cols(), "  ") {
 		a.println(l)
 	}
 	order := []string{"Course", "Book", "Video", "Article", "Paper", "Tool", "Site"}
@@ -726,7 +736,13 @@ func (a *App) showBlueprints(stageID int, g StageGuide) error {
 			a.println(l)
 		}
 		for m, step := range b.Milestones {
-			a.printf("      %s %s\n", sty.Gray(fmt.Sprintf("%d.", m+1)), sty.Gray(step))
+			num := fmt.Sprintf("%d. ", m+1)
+			for j, l := range wrap(step, a.cols()-8-len(num), "") {
+				if j > 0 {
+					num = strings.Repeat(" ", len(num))
+				}
+				a.printf("      %s%s\n", sty.Gray(num), sty.Gray(l))
+			}
 		}
 	}
 	a.println("")

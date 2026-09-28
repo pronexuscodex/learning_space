@@ -62,7 +62,16 @@ def run(cols, rows=60):
                 try: out += os.read(fd, 1 << 16)
                 except OSError: return
     read(1.0)
+    pause = re.compile(r"Enter for more · q to stop ──\s*$")
     for k in KEYS:
+        # A long screen may pause ("Enter for more"). If the script is not
+        # about to press Enter anyway, press it first, as a person would,
+        # so the keys stay in step with the screens.
+        for _ in range(10):
+            tail = ANSI.sub("", out[-400:].decode("utf-8", "replace"))
+            if k == "\r" or not pause.search(tail):
+                break
+            os.write(fd, b"\r"); read(0.25)
         os.write(fd, k.encode()); read(0.25)
     read(1.0)
     text = ANSI.sub("", out.decode("utf-8", "replace")).replace("\r\n", "\n")

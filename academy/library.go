@@ -50,7 +50,16 @@ var freeBooks = []LibraryDoc{
 	{8, "Book", "Beej's Guide to Network Programming", "https://beej.us/guide/bgnet/", "https://beej.us/guide/bgnet/pdf/bgnet_usl_c_1.pdf"},
 	{13, "Book", "Mathematics for Machine Learning", "https://mml-book.github.io/", "https://mml-book.github.io/book/mml-book.pdf"},
 	{13, "Book", "Linear Algebra Done Right (4th edition)", "https://linear.axler.net/", "https://linear.axler.net/LADR4e.pdf"},
-	{14, "Book", "An Introduction to Statistical Learning (Python edition)", "https://www.statlearning.com/", "https://hastie.su.domains/ISLP/ISLP_website.pdf"},
+	{14, "Book", "Think Stats (2nd edition)", "https://greenteapress.com/wp/think-stats-2e/", "https://greenteapress.com/thinkstats2/thinkstats2.pdf"},
+	{4, "Classic", "First Draft of a Report on the EDVAC", "https://archive.org/details/vnedvac", "https://web.mit.edu/sts.035/www/PDFs/edvac.pdf"},
+	{10, "Book", "Crypto 101", "https://www.crypto101.io/", "https://www.crypto101.io/Crypto101.pdf"},
+	{11, "Classic", "On Computable Numbers, with an Application to the Entscheidungsproblem", "https://www.cs.virginia.edu/~robins/Turing_Paper_1936.pdf", "https://www.cs.virginia.edu/~robins/Turing_Paper_1936.pdf"},
+	{12, "Paper", "Why Functional Programming Matters", "https://www.cse.chalmers.se/~rjmh/Papers/whyfp.html", "https://www.cse.chalmers.se/~rjmh/Papers/whyfp.pdf"},
+	{17, "Paper", "NIST SP 800-218: Secure Software Development Framework", "https://csrc.nist.gov/pubs/sp/800/218/final", "https://nvlpubs.nist.gov/nistpubs/SpecialPublications/NIST.SP.800-218.pdf"},
+	{18, "Paper", "NIST SP 800-207: Zero Trust Architecture", "https://csrc.nist.gov/pubs/sp/800/207/final", "https://nvlpubs.nist.gov/nistpubs/SpecialPublications/NIST.SP.800-207.pdf"},
+	{18, "Paper", "NIST SP 800-63B: Digital Identity Guidelines", "https://pages.nist.gov/800-63-3/sp800-63b.html", "https://nvlpubs.nist.gov/nistpubs/SpecialPublications/NIST.SP.800-63b.pdf"},
+	{18, "Classic", "BeyondCorp: A New Approach to Enterprise Security", "https://research.google/pubs/beyondcorp-a-new-approach-to-enterprise-security/", "https://research.google.com/pubs/archive/43231.pdf"},
+	{20, "Paper", "NIST SP 800-61 Rev. 3: Incident Response Recommendations", "https://csrc.nist.gov/pubs/sp/800/61/r3/final", "https://nvlpubs.nist.gov/nistpubs/SpecialPublications/NIST.SP.800-61r3.pdf"},
 }
 
 // pdfURL returns the direct PDF address for a link, if it has one: links

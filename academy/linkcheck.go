@@ -5,6 +5,7 @@ package main
 // confirm that every resource URL still resolves.
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"net/http"
@@ -24,6 +25,7 @@ type linkResult struct {
 	URL    string
 	Status int
 	Err    error
+	PDF    bool // a Library download: the file itself must be a PDF
 }
 
 // ok reports whether the link resolved to a successful page.
@@ -53,6 +55,9 @@ func allResourceLinks() []linkResult {
 				}
 			}
 		}
+	}
+	for _, d := range libraryDocs() {
+		out = append(out, linkResult{Stage: d.Stage, Title: "PDF: " + d.Title, URL: d.PDF, PDF: true})
 	}
 	sort.Slice(out, func(i, j int) bool {
 		if out[i].Stage != out[j].Stage {
@@ -89,6 +94,29 @@ func checkLink(client *http.Client, url string) (int, error) {
 	return 0, fmt.Errorf("no response")
 }
 
+// checkPDF fetches the start of a Library file and checks that it really
+// is a PDF, not an HTML error page served with a 200 status.
+func checkPDF(client *http.Client, url string) (int, error) {
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return 0, err
+	}
+	req.Header.Set("User-Agent", "academy-link-check/1.0")
+	resp, err := client.Do(req)
+	if err != nil {
+		return 0, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return resp.StatusCode, nil
+	}
+	head := make([]byte, 5)
+	if _, err := io.ReadFull(resp.Body, head); err != nil || !bytes.Equal(head, []byte("%PDF-")) {
+		return resp.StatusCode, errNotPDF
+	}
+	return resp.StatusCode, nil
+}
+
 // runLinkCheck checks every resource link concurrently, prints a report,
 // and returns the number of failures.
 func runLinkCheck(out io.Writer) int {
@@ -103,7 +131,11 @@ func runLinkCheck(out io.Writer) int {
 			defer wg.Done()
 			sem <- struct{}{}
 			defer func() { <-sem }()
-			l.Status, l.Err = checkLink(client, l.URL)
+			if l.PDF {
+				l.Status, l.Err = checkPDF(client, l.URL)
+			} else {
+				l.Status, l.Err = checkLink(client, l.URL)
+			}
 		}(&links[i])
 	}
 	wg.Wait()
