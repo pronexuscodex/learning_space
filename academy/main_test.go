@@ -120,8 +120,8 @@ func TestAtomicWriteRoundTripAndLegacyLoad(t *testing.T) {
 	if err != nil {
 		t.Fatalf("legacy load: %v", err)
 	}
-	if !res.Migrated || res.NewStages != 15 {
-		t.Fatalf("result = %+v, want migrated with 15 new stages", res)
+	if want := len(curriculum) - 2; !res.Migrated || res.NewStages != want { // it had 2 of the stages
+		t.Fatalf("result = %+v, want migrated with %d new stages", res, want)
 	}
 	// Titles follow the curriculum; status and labs are the learner's own.
 	if _, s := old.findStage(5); s == nil || s.Title != "The Iron Layer (Low-Level Systems & Compilers)" || s.Status != StatusGraduated || len(s.Labs) != 1 || len(s.Literature) != 3 {
@@ -137,8 +137,12 @@ func TestAtomicWriteRoundTripAndLegacyLoad(t *testing.T) {
 	for _, tr := range old.Tracks {
 		ids = append(ids, tr.ID)
 	}
-	if strings.Join(ids, "") != "FASB" {
-		t.Fatalf("track order = %v, want F A S B", ids)
+	var want []string
+	for _, tr := range seedRegistry().Tracks {
+		want = append(want, tr.ID)
+	}
+	if strings.Join(ids, " ") != strings.Join(want, " ") {
+		t.Fatalf("track order = %v, want %v (the curriculum's order)", ids, want)
 	}
 	for _, id := range []int{2, 3, 4, 6, 7, 8} {
 		if _, s := old.findStage(id); s == nil {

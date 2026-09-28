@@ -156,7 +156,7 @@ func (a *App) askResource(cur MyResource, editing bool) (MyResource, error) {
 		if def >= 0 {
 			defLabel = fmt.Sprintf("Stage %d", def)
 		}
-		s, err := a.con.readLine(promptLabel(fmt.Sprintf("Stage 0–16, or g for general (Enter = %s)", defLabel), "q cancel"))
+		s, err := a.con.readLine(promptLabel(fmt.Sprintf("Stage 0–%d, or g for general (Enter = %s)", lastStageID(), defLabel), "q cancel"))
 		if err != nil {
 			return cur, err
 		}
@@ -171,11 +171,11 @@ func (a *App) askResource(cur MyResource, editing bool) (MyResource, error) {
 			cur.Stage = NoStage
 			break
 		}
-		if n, err := strconv.Atoi(s); err == nil && n >= 0 && n <= 16 {
+		if n, err := strconv.Atoi(s); err == nil && n >= 0 && n <= lastStageID() {
 			cur.Stage = n
 			break
 		}
-		a.con.warn("Enter a stage from 0 to 16, or g for general.")
+		a.con.warn("Enter a stage from 0 to %d, or g for general.", lastStageID())
 	}
 	note, err := a.con.promptText(keep("Why is it good? A note for future you (Enter to skip)", cur.Note), maxNotesLen, false)
 	if err != nil {

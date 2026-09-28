@@ -135,6 +135,8 @@ func (r *Registry) saveWatch(w WatchItem, now time.Time) (int, error) {
 		return 0, fmt.Errorf("keep it under %d characters", maxNotesLen)
 	case !contains(watchTopics, w.Topic):
 		return 0, fmt.Errorf("topic must be one of %s", strings.Join(watchTopics, ", "))
+	case w.URL != "" && !webLink(w.URL):
+		return 0, errors.New("the link must start with https:// (or http://)")
 	}
 	for _, have := range r.Watch {
 		if w.URL != "" && have.URL == w.URL {
@@ -256,15 +258,32 @@ func plainSummary(s string, n int) string {
 	return truncate(stripControl(s), n)
 }
 
-// stripControl removes control characters, including escape sequences a
+// unsafeRune reports characters that must never reach the terminal from
+// outside data: C0 and C1 control codes (escape sequences, carriage
+// returns that overwrite a line) and the Unicode bidirectional overrides
+// that can make text display in a different order than it is stored.
+func unsafeRune(r rune) bool {
+	return r < 0x20 || r == 0x7f || (r >= 0x80 && r < 0xa0) ||
+		(r >= 0x202a && r <= 0x202e) || (r >= 0x2066 && r <= 0x2069)
+}
+
+// stripControl removes unsafe characters, including escape sequences a
 // hostile feed could use to repaint the terminal.
 func stripControl(s string) string {
 	return strings.Map(func(r rune) rune {
-		if r < 0x20 || r == 0x7f || (r >= 0x80 && r < 0xa0) {
+		if unsafeRune(r) {
 			return -1
 		}
 		return r
 	}, s)
+}
+
+// webLink reports whether s is a plain http(s) link that is safe to show
+// and to hand to the system's browser opener.
+func webLink(s string) bool {
+	u, err := url.Parse(s)
+	return err == nil && (u.Scheme == "https" || u.Scheme == "http") && u.Host != "" &&
+		strings.IndexFunc(s, unsafeRune) < 0
 }
 
 // latin1Reader converts ISO-8859-1 (and, closely enough, Windows-1252)
@@ -376,7 +395,7 @@ func parseFeed(data []byte, feed Feed) ([]FeedItem, error) {
 		if it.Title == "" || !utf8.ValidString(it.Title) {
 			continue
 		}
-		if u, err := url.Parse(it.Link); it.Link != "" && (err != nil || (u.Scheme != "https" && u.Scheme != "http")) {
+		if it.Link != "" && !webLink(it.Link) {
 			it.Link = "" // never pass odd schemes (javascript:, file:) to a browser
 		}
 		out = append(out, it)

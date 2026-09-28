@@ -167,6 +167,72 @@ argon2.verify(hash, attempt)     # True or False`,
 		`Asset: user passwords. Attacker: remote. Entry: login form. Defence: rate limit + Argon2.`,
 		"Security without a threat model is guesswork: you over-protect some things and forget others.",
 		[]string{"Vulnerability", "Principle of least privilege"}},
+	{"Broken access control", []string{"IDOR", "insecure direct object reference", "access control", "privilege escalation"}, "Security", 10,
+		"A logged-in user can reach data or actions that are not theirs, because the server never checks ownership or role. IDOR is the classic form: changing an ID in a request shows someone else's record.",
+		"A hotel where every key card opens every room, because the lock only checks that the card is a real hotel card.",
+		`GET /invoices/1041   → yours
+GET /invoices/1042   → someone else's (should be 403 Forbidden)`,
+		"Check permissions on the server for every request, deny by default, and never trust an ID just because it came from your own page.",
+		[]string{"Authentication", "Principle of least privilege", "Vulnerability"}},
+	{"Man-in-the-middle", []string{"MITM", "on-path attack", "eavesdropping"}, "Security", 10,
+		"An attacker who sits between two parties on the network, reading or changing their messages while each side thinks it talks directly to the other.",
+		"A postman who steams open your letters, reads them, and reseals them before delivery.",
+		`Open café Wi-Fi + plain HTTP: anyone nearby can read and alter the page.
+HTTPS: the attacker sees only encrypted bytes and cannot fake the certificate.`,
+		"TLS defeats it only if certificate errors are never clicked through. That warning is the attack being caught.",
+		[]string{"TLS", "Encryption", "Firewall"}},
+	{"Firewall", []string{"firewalls", "packet filter", "security group"}, "Security", 10,
+		"A filter that allows or blocks network traffic by rules (addresses, ports, protocols), so only the services you mean to expose can be reached.",
+		"A building's reception desk that lets visitors reach the showroom but not the server room.",
+		`sudo ufw default deny incoming
+sudo ufw allow 22/tcp        # SSH only`,
+		"A firewall limits exposure; it does not fix vulnerable software behind an open port.",
+		[]string{"Port", "Principle of least privilege", "Denial of service"}},
+	{"Denial of service", []string{"DoS", "DDoS", "distributed denial of service", "botnet"}, "Security", 10,
+		"An attack on availability: flooding or crashing a service so real users cannot use it. A DDoS uses many machines at once, often a botnet of hijacked devices.",
+		"Hundreds of prank callers keeping a pizza shop's phone line busy all evening.",
+		`2016: the Mirai botnet of hacked cameras and routers flooded the DNS
+provider Dyn, and sites such as Twitter and Netflix became unreachable
+for many users for hours.`,
+		"Rate limits, timeouts and caches help; big floods need upstream protection from a provider or CDN.",
+		[]string{"Firewall", "DNS", "Threat model"}},
+	{"Phishing", []string{"spear phishing", "social engineering"}, "Security", 10,
+		"Tricking people into revealing passwords or running malware with a fake email, message or website that looks trustworthy. Spear phishing targets one person using details about them.",
+		"A letter on convincing fake bank paper asking you to \"confirm\" your PIN.",
+		`From: IT Support <it-support@yourcompany-helpdesk.co>
+"Your mailbox is full. Log in here within 24 hours."`,
+		"Check the real link and sender domain, and prefer passkeys or hardware keys: they cannot be typed into a fake site.",
+		[]string{"Two-factor authentication", "Authentication", "Threat model"}},
+	{"Two-factor authentication", []string{"2FA", "MFA", "multi-factor authentication", "TOTP", "passkey", "passkeys"}, "Security", 10,
+		"Logging in with two different kinds of proof, such as a password plus a code from your phone, so a stolen password alone is not enough. Passkeys replace the password with a key pair on your device.",
+		"A bank vault that needs both a key and a combination.",
+		`password ✓  +  6-digit code from an authenticator app (TOTP) ✓  →  logged in`,
+		"SMS codes are better than nothing but can be stolen by SIM swapping. Authenticator apps, hardware keys and passkeys are stronger.",
+		[]string{"Authentication", "Phishing", "Password hashing"}},
+	{"Secrets management", []string{"API key", "API keys", "leaked credentials", "hard-coded secret", "secret scanning"}, "Security", 10,
+		"Keeping passwords, API keys and private keys out of source code and logs: in environment variables or a secrets vault, readable by as few people and programs as possible, and replaced (rotated) when they leak.",
+		"Not taping the house key to the front door, however convenient it is.",
+		`# bad: committed to Git forever, even if deleted later
+API_KEY = "sk_live_51H…"
+# better
+api_key = os.environ["API_KEY"]`,
+		"Deleting a leaked key in a new commit is not enough: it stays in Git history. Revoke it and issue a new one.",
+		[]string{"Principle of least privilege", "Supply-chain attack", "Git"}},
+	{"Fuzzing", []string{"fuzzer", "fuzz testing", "libFuzzer", "AFL"}, "Security", 10,
+		"Testing by feeding a program huge numbers of random or mutated inputs and watching for crashes. Combined with sanitizers, it finds memory bugs before attackers do.",
+		"A toddler pressing every button on the TV remote in every order, until the TV does something its designers never expected.",
+		`clang -g -fsanitize=fuzzer,address parse.c -o fuzz_parse
+./fuzz_parse corpus/`,
+		"A fuzzer finds crashes, not their causes; you still shrink the input and fix the root cause.",
+		[]string{"Buffer overflow", "Memory safety", "Undefined behavior"}},
+	{"Incident response", []string{"security incident", "forensics", "post-mortem", "postmortem"}, "Security", 10,
+		"What a team does when an attack is suspected: detect it, contain it (stop the damage), remove the attacker, recover, and learn from it, with notes kept at every step.",
+		"A fire drill: everyone knows who calls whom, where the exits are, and what to grab, before there is any smoke.",
+		`1. Detect: 3,000 failed logins for "admin" in 10 minutes
+2. Contain: block the source, force a password reset
+3. Recover, then write a blameless post-mortem`,
+		"Do not wipe a compromised machine first: you destroy the evidence of how they got in. Isolate it, then investigate.",
+		[]string{"Log", "Threat model", "Vulnerability"}},
 }
 
 var vocabAI = []Word{

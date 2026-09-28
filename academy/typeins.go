@@ -574,4 +574,175 @@ for name, params, bytes_per_param in models:
 7B, 4-bit   ( 3.5 GB)  laptop, 100 GB/s:  28.6 tok/s, GPU, 1000 GB/s: 285.7 tok/s
 70B, 4-bit  (35.0 GB)  laptop, 100 GB/s:   2.9 tok/s, GPU, 1000 GB/s:  28.6 tok/s`,
 	},
+	17: {
+		File:    "safejoin.py",
+		Lang:    "Python",
+		Run:     "python3 safejoin.py",
+		Predict: "Which of the six names will safe_join refuse? And where does the naive join send \"/etc/passwd\"?",
+		Lesson:  "Normalising first turns every trick into a plain path, so one simple check (is it still inside the folder?) catches ../ escapes, hidden ../ in the middle, and absolute paths, which make os.path.join throw the base folder away entirely. normpath does not follow symbolic links; a real server also resolves them (realpath) before checking.",
+		Code: `# SAFE JOIN -- keep user-supplied file names inside one folder.
+# A download server, an upload handler, a zip extractor: all of them
+# join a folder with a name that came from outside.
+import posixpath as path
+
+BASE = "/srv/files"
+
+def naive_join(name):
+    return path.join(BASE, name)
+
+def safe_join(name):
+    full = path.normpath(path.join(BASE, name))       # 1. canonicalise
+    if path.commonpath([full, BASE]) != BASE:          # 2. then check
+        raise ValueError("outside " + BASE)
+    return full
+
+for name in ["report.pdf", "2026/notes.txt", "a/./b//c.txt",
+             "../etc/passwd", "a/../../etc/passwd", "/etc/passwd"]:
+    try:
+        verdict = safe_join(name)
+    except ValueError as e:
+        verdict = "REFUSED (" + str(e) + ")"
+    print(name)
+    print("   naive:", naive_join(name))
+    print("   safe: ", verdict)`,
+		Expected: `report.pdf
+   naive: /srv/files/report.pdf
+   safe:  /srv/files/report.pdf
+2026/notes.txt
+   naive: /srv/files/2026/notes.txt
+   safe:  /srv/files/2026/notes.txt
+a/./b//c.txt
+   naive: /srv/files/a/./b//c.txt
+   safe:  /srv/files/a/b/c.txt
+../etc/passwd
+   naive: /srv/files/../etc/passwd
+   safe:  REFUSED (outside /srv/files)
+a/../../etc/passwd
+   naive: /srv/files/a/../../etc/passwd
+   safe:  REFUSED (outside /srv/files)
+/etc/passwd
+   naive: /etc/passwd
+   safe:  REFUSED (outside /srv/files)`,
+	},
+	18: {
+		File:    "rbac.py",
+		Lang:    "Python",
+		Run:     "python3 rbac.py",
+		Predict: "Predict each of the seven decisions before running: can the viewer edit, can bob edit document 1, can an unknown user read anything?",
+		Lesson:  "Only explicitly granted actions pass (deny by default), so the unknown user eve gets nothing. Roles alone are not enough: bob is an editor, but the ownership rule stops him editing ada's document. That second check is exactly what broken access control forgets.",
+		Code: `# WHO MAY DO WHAT -- role-based access control with deny by default.
+# Roles grant permissions; the owner check stops editors from
+# changing other people's documents.
+ROLES = {
+    "viewer": {"read"},
+    "editor": {"read", "edit"},
+    "admin":  {"read", "edit", "delete"},
+}
+USERS = {"ada": "admin", "bob": "editor", "cy": "viewer"}
+DOCS = {1: "ada", 2: "bob"}          # document id -> owner
+
+def can(user, action, doc):
+    perms = ROLES.get(USERS.get(user), set())  # unknown user: no rights
+    if action not in perms:
+        return False                            # deny by default
+    if action == "edit" and USERS[user] != "admin":
+        return DOCS.get(doc) == user            # editors edit only their own
+    return True
+
+print("user  action  doc  allowed")
+for user, action, doc in [("cy", "read", 1), ("cy", "edit", 1),
+                          ("bob", "edit", 2), ("bob", "edit", 1),
+                          ("bob", "delete", 2), ("ada", "delete", 2),
+                          ("eve", "read", 1)]:
+    print(f"{user:5} {action:7} {doc:3}  {can(user, action, doc)}")`,
+		Expected: `user  action  doc  allowed
+cy    read      1  True
+cy    edit      1  False
+bob   edit      2  True
+bob   edit      1  False
+bob   delete    2  False
+ada   delete    2  True
+eve   read      1  False`,
+	},
+	19: {
+		File:    "bruteforce.py",
+		Lang:    "Python",
+		Run:     "python3 bruteforce.py",
+		Predict: "Which addresses will trigger an alert? Check the times carefully for 198.51.100.7.",
+		Lesson:  "Only 203.0.113.9 fails 5 times inside 60 seconds. 198.51.100.7 fails 3 times spread over almost two minutes and is never flagged: slow attacks stay under a fixed window, which is why real detectors also look at longer periods and at many users tried from one address.",
+		Code: `# BRUTE-FORCE DETECTOR -- the heart of tools like fail2ban.
+# Alert when one address fails to log in LIMIT times within WINDOW
+# seconds. (Times are seconds; the addresses are documentation ones.)
+from collections import defaultdict, deque
+
+LIMIT, WINDOW = 5, 60
+LOG = """\
+0 203.0.113.9 FAIL root
+2 203.0.113.9 FAIL admin
+3 198.51.100.4 OK ada
+5 203.0.113.9 FAIL root
+9 203.0.113.9 FAIL test
+14 198.51.100.4 FAIL ada
+20 203.0.113.9 FAIL root
+90 198.51.100.7 FAIL bob
+95 198.51.100.7 FAIL bob
+200 198.51.100.7 FAIL bob"""
+
+recent = defaultdict(deque)   # address -> times of its recent failures
+for line in LOG.splitlines():
+    t, ip, result, user = line.split()
+    t = int(t)
+    if result != "FAIL":
+        continue
+    q = recent[ip]
+    q.append(t)
+    while q and q[0] <= t - WINDOW:   # forget failures outside the window
+        q.popleft()
+    if len(q) == LIMIT:
+        print(f"t={t:>3}s ALERT {ip}: {LIMIT} failures in {t - q[0]}s (last user: {user})")
+
+print("addresses seen failing:", ", ".join(sorted(recent)))`,
+		Expected: `t= 20s ALERT 203.0.113.9: 5 failures in 20s (last user: root)
+addresses seen failing: 198.51.100.4, 198.51.100.7, 203.0.113.9`,
+	},
+	20: {
+		File:    "integrity.py",
+		Lang:    "Python",
+		Run:     "python3 integrity.py",
+		Predict: "Which three changes will the checker report, and how will each be labelled?",
+		Lesson:  "A fingerprint changes completely when even one byte changes, so a weakened setting shows up as MODIFIED, a dropped script as NEW and a removed program as DELETED. Tripwire and AIDE work this way on real systems, and forensic investigators hash every disk image for the same reason: to prove later that nothing changed.",
+		Code: `# INTEGRITY CHECK -- the idea behind Tripwire and forensic hashing.
+# Take a fingerprint (SHA-256) of every file while the system is known
+# to be good; later, any change, addition or deletion stands out.
+import hashlib
+
+def fingerprint(files):
+    return {name: hashlib.sha256(data).hexdigest()[:12] for name, data in files.items()}
+
+before = {
+    "/etc/passwd":   b"root:x:0:0:root:/root:/bin/bash\n",
+    "/etc/ssh/sshd_config": b"PasswordAuthentication no\n",
+    "/usr/bin/ls":   b"\x7fELF...the real ls...",
+}
+baseline = fingerprint(before)
+
+after = dict(before)
+after["/etc/ssh/sshd_config"] = b"PasswordAuthentication yes\n"    # weakened
+after["/usr/bin/.cache"] = b"#!/bin/sh\ncurl ... | sh\n"         # dropped
+del after["/usr/bin/ls"]                                           # removed
+now = fingerprint(after)
+
+for name in sorted(baseline.keys() | now.keys()):
+    if name not in now:
+        print(f"DELETED   {name}")
+    elif name not in baseline:
+        print(f"NEW       {name}  {now[name]}")
+    elif now[name] != baseline[name]:
+        print(f"MODIFIED  {name}  {baseline[name]} -> {now[name]}")
+print("baseline of /etc/passwd:", baseline["/etc/passwd"], "(unchanged)")`,
+		Expected: `MODIFIED  /etc/ssh/sshd_config  474ef6932d6b -> 6bf43c7543d3
+NEW       /usr/bin/.cache  1ea62370ad2b
+DELETED   /usr/bin/ls
+baseline of /etc/passwd: e787b373a745 (unchanged)`,
+	},
 }

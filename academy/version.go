@@ -58,7 +58,7 @@ func versionLine() string {
 func usage(out io.Writer, fs *flag.FlagSet) func() {
 	return func() {
 		fmt.Fprintf(out, `Systems & AI Academy %s
-A terminal study companion for self-learners: 17 stages from how computers
+A terminal study companion for self-learners: %d stages from how computers
 work and C to operating systems, security and AI, with spaced repetition,
 exercises, a dictionary, a PDF library and tech watch. Your progress lives
 in one JSON file.
@@ -67,7 +67,7 @@ Usage:
   academy [flags]
 
 Flags:
-`, appVersion())
+`, appVersion(), len(curriculum))
 		fs.SetOutput(out)
 		fs.PrintDefaults()
 		fmt.Fprint(out, `

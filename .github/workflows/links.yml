@@ -1,0 +1,32 @@
+name: Links
+
+# Checks that every resource and classic-corner link in the curriculum
+# still resolves. It runs when the curriculum changes, weekly (links rot),
+# and on demand. It is informational: it is not a required check, because
+# a website being down for an hour must not block unrelated work.
+on:
+  push:
+    paths: ["academy/**.go", ".github/workflows/links.yml"]
+  pull_request:
+    paths: ["academy/**.go"]
+  schedule:
+    - cron: "17 6 * * 1" # Mondays 06:17 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  links:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: academy
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version: stable
+          cache-dependency-path: academy/go.mod
+      - name: Check every link
+        run: go run . -no-color -check-links

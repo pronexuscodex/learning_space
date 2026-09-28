@@ -39,7 +39,7 @@ func TestLibraryCatalogue(t *testing.T) {
 	}
 	names := map[string]bool{}
 	for i, d := range docs {
-		if !strings.HasPrefix(d.PDF, "https://") || d.Title == "" || d.Stage < 0 || d.Stage > 16 {
+		if !strings.HasPrefix(d.PDF, "https://") || d.Title == "" || d.Stage < 0 || d.Stage > lastStageID() {
 			t.Errorf("bad document %+v", d)
 		}
 		if names[d.fileName()] {

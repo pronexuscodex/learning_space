@@ -97,7 +97,17 @@ type StageGuide struct {
 
 // curriculum is every stage's guide, keyed by stage ID. Each track's
 // content lives in its own file.
-var curriculum = mergeGuides(machineGuides, foundationsGuides, systemsAndAIGuides, softwareGuides, dataGuides)
+var curriculum = mergeGuides(machineGuides, foundationsGuides, systemsAndAIGuides, softwareGuides, dataGuides, securityGuides)
+
+// lastStageID is the highest stage number in the curriculum. Nothing else
+// should assume how many stages there are.
+func lastStageID() int {
+	last := 0
+	for id := range curriculum {
+		last = max(last, id)
+	}
+	return last
+}
 
 // mergeGuides combines per-file guide maps; a duplicate stage ID is a
 // programming error.
@@ -1019,7 +1029,7 @@ everywhere.`,
 		},
 		Resources: []Resource{
 			{"Book", "Programming Massively Parallel Processors", "", "The CUDA textbook (Hwu, Kirk & El Hajj)."},
-			{"Site", "CUDA C++ Programming Guide", "https://docs.nvidia.com/cuda/cuda-c-programming-guide/", "The official execution and memory model."},
+			{"Site", "CUDA Programming Guide", "https://docs.nvidia.com/cuda/cuda-programming-guide/", "The official execution and memory model."},
 			{"Article", "How to Optimize a CUDA Matmul Kernel", "https://siboehm.com/articles/22/CUDA-MMM", "Simon Boehm's step-by-step SGEMM ladder towards cuBLAS speed."},
 			{"Article", "Making Deep Learning Go Brrrr", "https://horace.io/brrr_intro.html", "Horace He on compute, memory and overhead as bottlenecks."},
 			{"Video", "GPU MODE lectures", "https://github.com/gpu-mode/lectures", "A community lecture series on CUDA, Triton and kernels."},

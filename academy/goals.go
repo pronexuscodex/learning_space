@@ -238,6 +238,7 @@ func (r *Registry) awardAchievements(now time.Time) []Achievement {
 const (
 	backupDirName = "academy_backups"
 	backupKeep    = 10
+	backupStamp   = "20060102-150405.000" // in backup file names
 )
 
 // backupDir is where backups of the registry at path are kept.
@@ -268,7 +269,7 @@ func backupRegistry(path string, now time.Time) error {
 		}
 	}
 	base := strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
-	name := filepath.Join(dir, fmt.Sprintf("%s-%s.json", base, now.Format("20060102-150405.000")))
+	name := filepath.Join(dir, fmt.Sprintf("%s-%s.json", base, now.Format(backupStamp)))
 	if err := atomicWriteFile(name, data); err != nil {
 		return err
 	}
@@ -283,11 +284,29 @@ func backupRegistry(path string, now time.Time) error {
 }
 
 // listBackups returns the backups of the registry at path, newest first.
+// Only names of the exact form <base>-<timestamp>.json count, so another
+// registry in the same folder (academy.json next to academy-old.json)
+// never has its backups listed, or pruned, as this one's.
 func listBackups(path string) ([]string, error) {
 	base := strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
-	matches, err := filepath.Glob(filepath.Join(backupDir(path), base+"-*.json"))
+	entries, err := os.ReadDir(backupDir(path))
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil, nil
+	}
 	if err != nil {
 		return nil, err
+	}
+	var matches []string
+	for _, e := range entries {
+		stamp, ok := strings.CutPrefix(e.Name(), base+"-")
+		stamp, isJSON := strings.CutSuffix(stamp, ".json")
+		if !ok || !isJSON || !e.Type().IsRegular() {
+			continue
+		}
+		if _, err := time.Parse(backupStamp, stamp); err != nil {
+			continue
+		}
+		matches = append(matches, filepath.Join(backupDir(path), e.Name()))
 	}
 	// The timestamp format sorts lexically.
 	sort.Sort(sort.Reverse(sort.StringSlice(matches)))

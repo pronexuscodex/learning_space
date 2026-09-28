@@ -83,6 +83,42 @@ func TestAchievementsAwardOnce(t *testing.T) {
 	}
 }
 
+func TestBackupsOfAnotherRegistryAreLeftAlone(t *testing.T) {
+	dir := t.TempDir()
+	mine := filepath.Join(dir, "academy.json")
+	other := filepath.Join(dir, "academy-old.json")
+	for _, p := range []string{mine, other} {
+		if err := atomicWriteJSON(p, seedRegistry()); err != nil {
+			t.Fatal(err)
+		}
+	}
+	base := time.Date(2026, 9, 24, 10, 0, 0, 0, time.Local)
+	if err := backupRegistry(other, base); err != nil {
+		t.Fatal(err)
+	}
+	// Stray files that merely look similar must not count either.
+	os.WriteFile(filepath.Join(backupDir(mine), "academy-notes.json"), []byte("{}"), 0o600)
+	reg := seedRegistry()
+	for i := 1; i <= backupKeep+2; i++ {
+		reg.Goals.Minutes = i
+		if err := atomicWriteJSON(mine, reg); err != nil {
+			t.Fatal(err)
+		}
+		if err := backupRegistry(mine, base.Add(time.Duration(i)*time.Second)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if b, _ := listBackups(mine); len(b) != backupKeep {
+		t.Fatalf("academy.json: expected %d backups, got %d", backupKeep, len(b))
+	}
+	if b, _ := listBackups(other); len(b) != 1 {
+		t.Fatalf("academy-old.json's backup was listed or pruned as academy.json's: %v", b)
+	}
+	if _, err := os.Stat(filepath.Join(backupDir(mine), "academy-notes.json")); err != nil {
+		t.Fatal("an unrelated file in the backup folder was deleted")
+	}
+}
+
 func TestBackupsRotateAndRestore(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, registryFileName)

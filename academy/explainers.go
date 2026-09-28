@@ -573,12 +573,13 @@ jargon appears, and every idea comes with exercises drawn from real
 situations.
 
 WHAT IT COVERS
-Sixteen stages in four tracks, covering the core of a computer science
-degree plus modern AI:
+Twenty-one stages in five tracks, covering the core of a computer
+science degree, modern AI and defensive security:
 - Track F, Foundations: programming, data structures and algorithms, discrete maths, digital logic and computer architecture.
 - Track A, Systems: compilers and the machine, operating systems, databases and storage, networks and the web.
 - Track S, Software, Security & Theory: software engineering, security and cryptography, theory of computation, programming languages.
 - Track B, AI: linear algebra and calculus, statistics and classical ML, neural networks, AI infrastructure and GPUs.
+- Track D, Defensive Security: secure coding, identity and cloud security, network defence and monitoring, incident response and privacy.
 
 HOW EACH CONCEPT IS TAUGHT
 - In plain words: an everyday analogy with no jargon at all.
@@ -650,12 +651,14 @@ The stages are numbered in the order that makes sense for a complete beginner:
 - Track A (Stages 5 to 8): compilers, operating systems, databases and networks, the systems everything runs on.
 - Track S (Stages 9 to 12): professional tools, security, the theory of computation and programming languages.
 - Track B (Stages 13 to 16): the mathematics of machine learning, then neural networks and AI infrastructure.
+- Track D (Stages 17 to 20): defending real systems: secure code, identity and cloud, network monitoring, incident response.
 The Roadmap [m] shows where you are and what each stage builds on. What's next [n] always picks a sensible next step.
 
 WHERE TO START
 - Complete beginner? Start at Stage 0, How Computers Work, then Stage 1, and follow Track F in order.
 - After Track F, take Tracks A and S in either order.
 - For AI, Stages 0 to 3 are enough preparation for Stage 13.
+- For security, take Stage 10 (and the networking of Stage 8) first, then Track D in order.
 - Each stage shows what it builds on. If those stages feel shaky, a quick visit back first pays off.
 - Stuck on a word? Open the Glossary in the stage's Study Hall.
 
@@ -686,7 +689,7 @@ understands this material on the first pass. You have unlimited time and
 no exams.
 
 BEYOND THE CORE
-Once the seventeen stages feel comfortable, these electives build on them:
+Once the twenty-one stages feel comfortable, these electives build on them:
 - Computer graphics: Scratchapixel (scratchapixel.com)
 - Quantum computing: IBM Quantum Learning (learning.quantum.ibm.com)
 - Embedded systems and electronics: Arduino docs (docs.arduino.cc)

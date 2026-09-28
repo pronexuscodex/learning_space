@@ -18,6 +18,7 @@ var stagePrereqs = map[int][]int{
 	5: {1, 2, 4}, 6: {5}, 7: {2, 6}, 8: {6},
 	9: {1}, 10: {3, 8}, 11: {2, 3}, 12: {1, 5},
 	13: {3}, 14: {3, 13}, 15: {13, 14}, 16: {5, 6, 15},
+	17: {1, 10}, 18: {8, 10}, 19: {8, 10}, 20: {10, 19},
 }
 
 // conceptLinks is keyed by Concept.Name.
@@ -169,6 +170,16 @@ var conceptLinks = map[string]links{
 		"Crypto 101: the chapters on block ciphers, public-key encryption and signatures. Cryptopals set 1."},
 	"TLS & Authentication on the Web": {[]string{"HTTP, DNS & How the Web Works", "Encryption: Symmetric & Public-Key"},
 		"Crypto 101: the chapter on SSL and TLS. High Performance Browser Networking: the chapter on TLS."},
+	"Memory-Safety Bugs: Overflows & Use-After-Free": {[]string{"Memory, Addresses & Pointers", "Safe Input & Undefined Behavior", "Registers, the Stack & Calling Conventions", "Memory Management"},
+		"Computer Systems: A Programmer's Perspective (Stage 5), section 3.10.3 on out-of-bounds memory references and buffer overflow. pwn.college: the Memory Errors module."},
+	"Access Control: Who May Do What": {[]string{"TLS & Authentication on the Web", "HTTP, DNS & How the Web Works", "System Calls & Privilege"},
+		"PortSwigger Web Security Academy: the access control topic. OWASP Cheat Sheet Series: the Authorization cheat sheet."},
+	"Network Attacks & Defences": {[]string{"TCP: Handshake, Flow & Congestion Control", "The Layered Stack & Encapsulation", "Sockets & I/O Multiplexing", "Networks: How Computers Talk"},
+		"Nmap Network Scanning: the chapters on port scanning basics and techniques. OverTheWire Bandit, levels 0 to 20."},
+	"Secrets & the Software Supply Chain": {[]string{"Version Control with Git", "From Code to Production", "Hashing & Password Storage"},
+		"OWASP Cheat Sheet Series: the Secrets Management and Software Supply Chain Security cheat sheets. CISA's Known Exploited Vulnerabilities Catalog."},
+	"Detection & Incident Response": {[]string{"From Code to Production", "The Command Line & Your Environment", "Thinking Like an Attacker: Threat Modelling"},
+		"Google's Site Reliability Engineering book: the chapters on managing incidents and postmortem culture. OWASP Cheat Sheet Series: the Logging cheat sheet."},
 
 	// ---- Stage 11
 	"Finite Automata & Regular Expressions": {[]string{"Parsing: Recursive Descent & Pratt", "Logic & Boolean Algebra"},
@@ -241,6 +252,54 @@ var conceptLinks = map[string]links{
 		"The FlashAttention paper. Horace He's post on operator fusion."},
 	"KV Cache, Batching & PagedAttention": {[]string{"Virtual Memory & Paging", "Attention & the Transformer"},
 		"The PagedAttention (vLLM) paper. llama.cpp's source for a real KV cache."},
+
+	// ---- Stage 17
+	"Secure Design Principles": {[]string{"Thinking Like an Attacker: Threat Modelling", "Software Design & Abstraction", "Access Control: Who May Do What"},
+		"Saltzer & Schroeder (this stage's classic), the section on design principles. Building Secure and Reliable Systems: the chapter on design for least privilege."},
+	"Handling Untrusted Input": {[]string{"Web Vulnerabilities: Injection & XSS", "Safe Input & Undefined Behavior", "Parsing: Recursive Descent & Pratt"},
+		"OWASP ASVS: the chapter on validation, sanitization and encoding. OWASP Cheat Sheet Series (Stage 10): the Input Validation cheat sheet."},
+	"Writing Memory-Safe Code": {[]string{"Memory-Safety Bugs: Overflows & Use-After-Free", "Memory Management", "Memory, Addresses & Pointers"},
+		"SEI CERT C Coding Standard: the rules for strings (STR) and memory management (MEM). Building Secure and Reliable Systems: the chapter on writing code."},
+	"Security Code Review": {[]string{"Testing & Reliability", "Version Control with Git", "Thinking Like an Attacker: Threat Modelling"},
+		"Building Secure and Reliable Systems: the chapters on writing code and testing code. OWASP ASVS, used as a review checklist."},
+	"Automated Security Testing": {[]string{"Testing & Reliability", "Secrets & the Software Supply Chain", "From Code to Production"},
+		"OSS-Fuzz documentation: the getting-started guide. The Go fuzzing tutorial."},
+
+	// ---- Stage 18
+	"Strong Authentication: MFA & Passkeys": {[]string{"TLS & Authentication on the Web", "Encryption: Symmetric & Public-Key", "Hashing & Password Storage"},
+		"NIST SP 800-63B: the sections on memorized secrets and authenticators. FIDO Alliance: the passkeys overview."},
+	"Sessions, Tokens & Single Sign-On": {[]string{"TLS & Authentication on the Web", "HTTP, DNS & How the Web Works", "Encryption: Symmetric & Public-Key"},
+		"OAuth 2.0 Simplified: the chapters on the authorization code flow and PKCE. OWASP Authentication Cheat Sheet."},
+	"Authorization Design: Roles, Attributes & Least Privilege": {[]string{"Access Control: Who May Do What", "Secure Design Principles", "Sets, Functions & Relations"},
+		"Open Policy Agent documentation: the policy language introduction. AWS IAM security best practices."},
+	"Cloud Security & Shared Responsibility": {[]string{"From Code to Production", "Secrets & the Software Supply Chain", "Network Attacks & Defences"},
+		"AWS IAM security best practices. Building Secure and Reliable Systems (Stage 17): the chapter on design for least privilege."},
+	"Zero Trust: Never Trust the Network Alone": {[]string{"Network Attacks & Defences", "TLS & Authentication on the Web", "Secure Design Principles"},
+		"NIST SP 800-207: the sections on tenets and logical components. The BeyondCorp paper (this stage's classic)."},
+
+	// ---- Stage 19
+	"Firewalls & Network Segmentation": {[]string{"Network Attacks & Defences", "The Layered Stack & Encapsulation", "Zero Trust: Never Trust the Network Alone"},
+		"nftables wiki: the quick reference and simple rule set examples. Firewalls and Internet Security (Cheswick, Bellovin & Rubin): the chapters on firewall design."},
+	"Logging & Telemetry": {[]string{"Detection & Incident Response", "Durability: Page Cache, fsync & Atomic Rename", "The Command Line & Your Environment"},
+		"OWASP Cheat Sheet Series (Stage 10): the Logging cheat sheet. Zeek documentation: the log files overview."},
+	"Intrusion Detection: Signatures & Anomalies": {[]string{"Probability for Programmers", "Statistical Inference & Experiments", "Finite Automata & Regular Expressions"},
+		"Axelsson's base-rate fallacy paper (on this stage's reading list). Suricata documentation: the rules introduction."},
+	"Detection Engineering with MITRE ATT&CK": {[]string{"Thinking Like an Attacker: Threat Modelling", "Testing & Reliability", "Logging & Telemetry"},
+		"MITRE ATT&CK: the Getting Started page and any technique's Detection section. The Sigma project's rule specification."},
+	"Security Monitoring & Alert Triage": {[]string{"Detection & Incident Response", "Evaluating Models Honestly", "Intrusion Detection: Signatures & Anomalies"},
+		"Security Onion documentation: the analyst workflow. Google's SRE book (Stage 9): the chapter on being on-call."},
+
+	// ---- Stage 20
+	"Incident Response Planning": {[]string{"Detection & Incident Response", "Security Monitoring & Alert Triage", "Thinking Like an Attacker: Threat Modelling"},
+		"NIST SP 800-61 Rev. 3. Incident Response & Computer Forensics (on this stage's reading list): the chapters on preparing for incidents."},
+	"Containment, Eradication & Recovery": {[]string{"Durability: Page Cache, fsync & Atomic Rename", "Write-Ahead Logging & Recovery", "Secrets & the Software Supply Chain"},
+		"NIST SP 800-61 Rev. 3: the recommendations on response and recovery. The British Library's published incident review."},
+	"Digital Forensics Basics": {[]string{"Hashing & Password Storage", "Logging & Telemetry", "Processes & the Address Space"},
+		"RFC 3227 (this stage's classic). The Sleuth Kit and Autopsy documentation: the getting-started guide."},
+	"Blameless Post-Mortems": {[]string{"Testing & Reliability", "From Code to Production", "Incident Response Planning"},
+		"Google's SRE book: the chapter on postmortem culture. GitLab's 2017 database outage post-mortem."},
+	"Privacy & Data Protection": {[]string{"Hashing & Password Storage", "Encryption: Symmetric & Public-Key", "Probability for Programmers"},
+		"The GDPR's articles on principles (Article 5) and breach notification (Articles 33 and 34)."},
 }
 
 // stageOfConcept finds which stage a concept belongs to (0 if unknown).
