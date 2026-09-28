@@ -1029,7 +1029,7 @@ everywhere.`,
 		},
 		Resources: []Resource{
 			{"Book", "Programming Massively Parallel Processors", "", "The CUDA textbook (Hwu, Kirk & El Hajj)."},
-			{"Site", "CUDA C++ Programming Guide", "https://docs.nvidia.com/cuda/cuda-c-programming-guide/", "The official execution and memory model."},
+			{"Site", "CUDA Programming Guide", "https://docs.nvidia.com/cuda/cuda-programming-guide/", "The official execution and memory model."},
 			{"Article", "How to Optimize a CUDA Matmul Kernel", "https://siboehm.com/articles/22/CUDA-MMM", "Simon Boehm's step-by-step SGEMM ladder towards cuBLAS speed."},
 			{"Article", "Making Deep Learning Go Brrrr", "https://horace.io/brrr_intro.html", "Horace He on compute, memory and overhead as bottlenecks."},
 			{"Video", "GPU MODE lectures", "https://github.com/gpu-mode/lectures", "A community lecture series on CUDA, Triton and kernels."},

@@ -18,7 +18,7 @@ var stagePrereqs = map[int][]int{
 	5: {1, 2, 4}, 6: {5}, 7: {2, 6}, 8: {6},
 	9: {1}, 10: {3, 8}, 11: {2, 3}, 12: {1, 5},
 	13: {3}, 14: {3, 13}, 15: {13, 14}, 16: {5, 6, 15},
-	17: {1, 10},
+	17: {1, 10}, 18: {8, 10},
 }
 
 // conceptLinks is keyed by Concept.Name.
@@ -264,6 +264,18 @@ var conceptLinks = map[string]links{
 		"Building Secure and Reliable Systems: the chapters on writing code and testing code. OWASP ASVS, used as a review checklist."},
 	"Automated Security Testing": {[]string{"Testing & Reliability", "Secrets & the Software Supply Chain", "From Code to Production"},
 		"OSS-Fuzz documentation: the getting-started guide. The Go fuzzing tutorial."},
+
+	// ---- Stage 18
+	"Strong Authentication: MFA & Passkeys": {[]string{"TLS & Authentication on the Web", "Encryption: Symmetric & Public-Key", "Hashing & Password Storage"},
+		"NIST SP 800-63B: the sections on memorized secrets and authenticators. FIDO Alliance: the passkeys overview."},
+	"Sessions, Tokens & Single Sign-On": {[]string{"TLS & Authentication on the Web", "HTTP, DNS & How the Web Works", "Encryption: Symmetric & Public-Key"},
+		"OAuth 2.0 Simplified: the chapters on the authorization code flow and PKCE. OWASP Authentication Cheat Sheet."},
+	"Authorization Design: Roles, Attributes & Least Privilege": {[]string{"Access Control: Who May Do What", "Secure Design Principles", "Sets, Functions & Relations"},
+		"Open Policy Agent documentation: the policy language introduction. AWS IAM security best practices."},
+	"Cloud Security & Shared Responsibility": {[]string{"From Code to Production", "Secrets & the Software Supply Chain", "Network Attacks & Defences"},
+		"AWS IAM security best practices. Building Secure and Reliable Systems (Stage 17): the chapter on design for least privilege."},
+	"Zero Trust: Never Trust the Network Alone": {[]string{"Network Attacks & Defences", "TLS & Authentication on the Web", "Secure Design Principles"},
+		"NIST SP 800-207: the sections on tenets and logical components. The BeyondCorp paper (this stage's classic)."},
 }
 
 // stageOfConcept finds which stage a concept belongs to (0 if unknown).

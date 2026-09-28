@@ -256,4 +256,270 @@ govulncheck on every change.`,
 			{"Why keep pull requests small?", "Reviewers can only read a few hundred lines carefully; large changes hide bugs."},
 		},
 	},
+
+	// -----------------------------------------------------------------
+	18: {
+		Overview: `Most breaches today do not break code; they log in. Stolen passwords,
+tricked employees, over-powerful accounts and misconfigured cloud
+storage cause a large share of real incidents. This stage covers how
+people and programs prove who they are, how permissions are designed so
+one stolen account cannot do much damage, how to secure the cloud
+accounts that now run most software, and the zero-trust idea that no
+network location is trusted by itself.`,
+		Outcomes: []string{
+			"Choose phishing-resistant authentication: MFA, hardware keys and passkeys",
+			"Explain sessions, OAuth 2.0 and OpenID Connect, and validate tokens correctly",
+			"Design roles and permissions around least privilege, and review them regularly",
+			"Secure a cloud account using the shared responsibility model",
+			"Explain zero trust and how it differs from trusting the office network",
+		},
+		Glossary: []Term{
+			{"MFA", "Multi-factor authentication: proving who you are with two or more different kinds of evidence."},
+			{"Passkey", "A login credential based on a key pair stored on your device; nothing reusable is typed or sent."},
+			{"OAuth 2.0", "A standard for letting one app act on your behalf at another, with limited, revocable permission."},
+			{"OpenID Connect", "A layer on top of OAuth 2.0 that tells an app who you are (single sign-on)."},
+			{"JWT", "JSON Web Token: a signed token carrying claims such as who you are and when the token expires."},
+			{"RBAC", "Role-based access control: permissions are given to roles, and people are given roles."},
+			{"Shared responsibility", "The cloud provider secures its infrastructure; you secure your accounts, data and settings."},
+			{"Zero trust", "Checking every request's identity and device, instead of trusting anything inside the network."},
+		},
+		Concepts: []Concept{
+			{
+				Name:    "Strong Authentication: MFA & Passkeys",
+				Summary: "Stop stolen and phished passwords from being enough.",
+				Body: `A password alone fails in predictable ways: it is reused, guessed,
+leaked in someone else's breach, or typed into a fake site. Multi-factor
+authentication adds a second kind of evidence: something you have (a
+phone, a security key) or something you are (a fingerprint that unlocks
+a key on your device).
+
+Not all factors are equal. SMS codes can be stolen by SIM swapping, and
+any code, including an authenticator app's, can be typed into a
+convincing fake site. Push prompts can be approved by a tired user who
+is flooded with them. Phishing-resistant methods (FIDO2 security keys
+and passkeys) sign a challenge for the real website's address, so they
+simply do not work on a look-alike domain.
+
+Current guidance (NIST SP 800-63B) also says: allow long passphrases,
+check new passwords against lists of breached ones, and stop forcing
+routine password changes, which push people towards weak patterns.`,
+				Diagram: `password only        ─▶ reused, leaked, phished
+password + SMS code  ─▶ SIM swap, phishing
+password + app code  ─▶ phishing: the code is typed into the fake site
+security key/passkey ─▶ bound to the real site's name: phishing fails`,
+				MentalModel: "The strongest factor is one that cannot be typed into the wrong website.",
+				TryIt:       "Turn on a passkey or a security key for your email account, then list which of your other accounts still rely on a password alone.",
+				Analogy: `A password is a spoken code word: anyone who overhears it can repeat it.
+A passkey is a key cut for one specific lock; hold it up to a fake door
+and it simply does not fit.`,
+				Example: `In 2022 an attacker who had an Uber contractor's password sent repeated
+MFA push requests, then messaged the contractor pretending to be IT
+support until one was approved. The same year, Cloudflare employees
+received convincing SMS phishing messages and some typed in their
+passwords, but the attack failed because Cloudflare required hardware
+security keys, which will not sign in to a fake site.`,
+				Exercises: trio(
+					"Rank from weakest to strongest against phishing: password only, SMS code, authenticator app code, push approval with number matching, hardware security key.",
+					"Ask for each: can an attacker's fake site pass it on in real time?",
+					"Add TOTP two-factor authentication to a small web app you built: enrolment with a QR code, verification with a time window, and one-time recovery codes stored hashed.",
+					"Use a well-tested library for TOTP (RFC 6238); never invent the maths yourself.",
+					"Do an account-security audit of your own digital life: every account that can reset others (email, phone carrier, password manager), its second factor, and its recovery options. Upgrade the weakest three.",
+					"Your email account can reset almost everything else, so protect it first and best.",
+				),
+			},
+			{
+				Name:    "Sessions, Tokens & Single Sign-On",
+				Summary: "How a login is remembered, and how one login works across many apps.",
+				Body: `After you log in, the server has to remember it. Classic web apps use a
+session: a random ID in a cookie (HttpOnly, Secure, SameSite), pointing
+to state on the server that can be revoked at once. Many modern systems
+use signed tokens instead, often JWTs, which carry claims (who, for which
+app, until when) that any service can verify without asking a central
+database. That convenience has a cost: a token is valid until it
+expires, so keep lifetimes short and use refresh tokens to renew them.
+
+OAuth 2.0 lets one app act for you at another with limited permission
+(scopes), such as "read my calendar" without your password. OpenID
+Connect adds identity on top, which gives single sign-on: log in once
+with your company or Google account. When you accept a token, always
+check its signature with the expected key and algorithm, its issuer,
+its audience (it was meant for you) and its expiry.`,
+				Diagram: `you ─▶ app: "log in"
+app ─▶ identity provider: send the user here (OpenID Connect)
+you ─▶ identity provider: log in with MFA
+identity provider ─▶ app: signed ID token
+                          (who, for which app, until when)
+app: verify signature, issuer, audience, expiry ─▶ start your session`,
+				MentalModel: "A token is a signed promise: check who signed it, who it is for, and when it expires.",
+				TryIt:       "Paste a JWT from a tutorial into a decoder such as jwt.io and read its three parts. Note that anyone can read the claims; the signature only proves they were not changed.",
+				Analogy: `A concert wristband. The ticket office (identity provider) checks your
+ID once and gives you a band stamped for tonight's show (audience) and
+tonight's date (expiry). Security staff inside only check the band, not
+your ID again, so a band for the wrong venue or the wrong night must be
+refused.`,
+				Example: `In 2023 a China-based group known as Storm-0558 used a stolen Microsoft
+consumer signing key to forge tokens that Microsoft's systems also
+accepted for enterprise email accounts, reading the email of US
+government agencies. A US review board found in 2024 that the key
+should never have been accepted for those accounts: the services did not
+correctly check which signing keys were allowed for which kind of token.`,
+				Exercises: trio(
+					"Why should an API that receives a JWT check the audience claim, even when the signature is valid?",
+					"A valid token issued for a different app would otherwise be accepted by yours.",
+					"Implement session login for a small web app twice: once with server-side sessions in a secure cookie, once with short-lived signed tokens plus a refresh token. Add logout to both and explain which one can revoke access instantly.",
+					"Server-side sessions are deleted in one step; a token stays valid until it expires unless you keep a deny list.",
+					"Add 'Log in with GitHub' (OAuth 2.0) to a small app using an established library, requesting the smallest scope you need, and write down each redirect and what it carries.",
+					"Use the authorization code flow with PKCE; never put client secrets in browser code.",
+				),
+			},
+			{
+				Name:    "Authorization Design: Roles, Attributes & Least Privilege",
+				Summary: "Grant the minimum, check on the server, and review access regularly.",
+				Body: `Checking permissions on every request is the rule (Stage 10). This
+concept is about designing the permissions themselves so mistakes stay
+small. Role-based access control (RBAC) groups permissions into roles
+such as viewer, editor and admin. Attribute-based control (ABAC) adds
+conditions: the owner of the document, the user's department, the time
+of day. Many teams write policies as code (Open Policy Agent, cloud IAM
+policies) so they can be reviewed and tested like any other change.
+
+Least privilege in practice: start new accounts and services with
+nothing and add what they need; avoid permanent admin rights by granting
+them just in time, for a limited period and with a reason; separate
+duties so no single person can both make and approve a payment; and
+review who has access at regular intervals, removing what is unused.
+Service accounts and API keys need the same care as people.`,
+				Diagram: `user ─▶ roles ─▶ permissions            (RBAC: coarse, simple)
+      + attributes: owner? department? time? device?
+                                          (ABAC: fine-grained)
+policy as code ─▶ reviewed ─▶ tested ─▶ deployed`,
+				MentalModel: "Ask of every permission: who needs it, for how long, and who checks it is still needed?",
+				TryIt:       "Type in and run this stage's rbac.py, then add an 'auditor' role that can read everything but change nothing, and test it.",
+				Analogy: `A hospital: nurses can read the charts of patients on their ward, not
+the whole hospital (attributes), a surgeon's theatre access is for the
+day of the operation (just in time), and controlled drugs need two staff
+to sign them out (separation of duties).`,
+				Example: `In 2019 an attacker stole data on about 100 million Capital One
+customers. A misconfigured web firewall could be tricked into fetching
+cloud credentials for its own role, and that role had far more
+permission than a firewall needed, including listing and reading the
+storage buckets with customer data.`,
+				Exercises: trio(
+					"A reporting service needs to read orders once a night. What permissions should its account have, and what should it certainly not have?",
+					"Read only, only the orders table, ideally only during the job's time window.",
+					"Extend the rbac.py type-in: add an auditor role, an ABAC rule that editors may only edit documents in their own team, and a test for every allowed and every denied case.",
+					"Write the denied cases first: they are the ones that protect you.",
+					"Do an access review of a real system you use (a GitHub organisation, a shared drive, a cloud account): list every person and key with write or admin access, when each last used it, and remove or reduce at least one.",
+					"GitHub shows organisation members' roles; cloud providers show when each access key was last used.",
+				),
+			},
+			{
+				Name:    "Cloud Security & Shared Responsibility",
+				Summary: "The provider secures the cloud; you secure what you put in it.",
+				Body: `A cloud provider secures its data centres, hardware and core services.
+Everything you configure is your responsibility: accounts and
+permissions, network rules, what is public, encryption settings,
+logging, and patching the software you run. Most cloud incidents are
+configuration mistakes, not broken providers.
+
+A secure baseline: protect the root or owner account with a hardware
+key and never use it day to day; give people and services roles with
+least privilege, not long-lived keys; block public access to storage
+unless something is meant to be public; turn on audit logs (such as AWS
+CloudTrail) and keep them where an attacker cannot delete them; encrypt
+data at rest with managed keys; and define everything as code
+(Terraform, CloudFormation) so changes are reviewed, repeatable and
+easy to audit. Posture tools and CIS Benchmarks check the configuration
+continuously.`,
+				Diagram: `             provider secures          you secure
+IaaS (VMs)   hardware, network,        OS patches, apps, data,
+             hypervisor                accounts, firewall rules
+SaaS (email) almost everything         accounts, MFA, sharing
+                                       settings, your data`,
+				MentalModel: "If you can configure it, you are responsible for how it is configured.",
+				TryIt:       "In any cloud account you own (a free tier is enough), find the setting that blocks public access to storage and the audit log, and check that both are on.",
+				Analogy: `Renting a flat in a well-guarded building. The landlord maintains the
+front door, the lifts and the fire alarms. Leaving your own flat door
+open, or giving copies of your key to strangers, is still your problem.`,
+				Example: `In 2023 Toyota disclosed that a misconfigured cloud environment had
+left the vehicle location data of about 2.15 million customers in Japan
+publicly accessible for roughly a decade. Gartner predicted in 2019
+that through 2025, 99% of cloud security failures would be the
+customer's fault, mostly misconfiguration.`,
+				Exercises: trio(
+					"For each, say whether the provider or the customer is responsible: a disk failure in the data centre; a storage bucket set to public; an unpatched web server on a rented VM; a weak password on the admin account.",
+					"If it is a setting you choose or software you install, it is yours.",
+					"Write infrastructure as code (Terraform or your provider's tool) for a small, private storage bucket with public access blocked, encryption on, access logging on, and a role that can only read it. Review your own plan output before applying.",
+					"terraform plan shows exactly what would change; read it like a code review.",
+					"Harden a free-tier cloud account: hardware-key MFA on the owner account, a day-to-day user with limited rights, a budget alert, audit logging to a protected bucket, and a check with the provider's security advisor or a CIS Benchmark. Record what you changed.",
+					"A budget alert is also a security alarm: stolen accounts are often used to mine cryptocurrency.",
+				),
+			},
+			{
+				Name:    "Zero Trust: Never Trust the Network Alone",
+				Summary: "Verify every request by who is asking and from what device.",
+				Body: `The old model was a castle with a moat: a firewall around the office
+network, and anything inside trusted. It fails once one laptop inside is
+compromised, and it never fitted remote work and cloud services anyway.
+
+Zero trust removes trust based on network location. Every request to
+every application is checked: who is the user (strong authentication),
+is the device known and healthy (up to date, disk encrypted), and is
+this particular access allowed by policy? Access is granted per
+application, not to a whole network, and is re-checked continuously.
+Traffic between services is authenticated and encrypted too (often
+with mutual TLS). NIST described the architecture in SP 800-207 (2020).
+
+Zero trust is a direction, not a product: teams move there step by step,
+starting with strong identity and device checks for their most
+important applications.`,
+				Diagram: `castle and moat:  outside ─▶ [firewall] ─▶ inside: everything trusted
+zero trust:       any network ─▶ access proxy ─▶ one application
+                                  │ checks: user identity + MFA,
+                                  │ device health, policy
+                                  └ every request, every time`,
+				MentalModel: "Being on the office network proves nothing; identity and device health prove something.",
+				TryIt:       "Draw how you reach your email today. Where is identity checked, where is the device checked, and where does being on a certain network make a difference?",
+				Analogy: `A hotel where your key card is checked at every door you open, not just
+at the front entrance. Walking in behind a guest gets a stranger into
+the lobby, and nowhere else.`,
+				Example: `After the 2009 "Operation Aurora" attacks, Google started BeyondCorp,
+moving its employees off a privileged corporate network so that every
+application checks the user and device instead. It described the
+approach publicly in 2014, and it became a model for zero-trust
+products across the industry.`,
+				Exercises: trio(
+					"An attacker takes over one laptop on the office Wi-Fi. What can they reach in a castle-and-moat network, and what in a zero-trust one?",
+					"In zero trust the laptop's network position grants nothing; only its user's permissions and its health count.",
+					"Put a small internal web app behind an identity-aware proxy (for example oauth2-proxy in front of it), so that only logged-in users from your organisation can reach it, and confirm that the app itself is not reachable directly.",
+					"Bind the app to localhost so the proxy is the only way in.",
+					"Write a one-page zero-trust plan for a small organisation (a club, a family, a small business): its important applications, how each will check identity and device, and the order you would do it in.",
+					"Start with email and the password manager: they unlock everything else.",
+				),
+			},
+		},
+		Resources: []Resource{
+			{"Site", "NIST SP 800-63B: Digital Identity Guidelines", "https://pages.nist.gov/800-63-3/sp800-63b.html", "The US standard for passwords, MFA and authenticators, readable online."},
+			{"Site", "FIDO Alliance: passkeys", "https://fidoalliance.org/passkeys/", "What passkeys are and how they resist phishing."},
+			{"Site", "OAuth 2.0 Simplified (Aaron Parecki)", "https://www.oauth.com/", "A clear, free guide to OAuth flows and tokens."},
+			{"Site", "OWASP Authentication Cheat Sheet", "https://cheatsheetseries.owasp.org/cheatsheets/Authentication_Cheat_Sheet.html", "Practical rules for login, passwords and MFA."},
+			{"Site", "AWS IAM security best practices", "https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html", "Least privilege and account hygiene in one cloud provider's words."},
+			{"Paper", "NIST SP 800-207: Zero Trust Architecture", "https://csrc.nist.gov/pubs/sp/800/207/final", "The reference description of zero trust."},
+			{"Tool", "Open Policy Agent", "https://www.openpolicyagent.org/docs/latest/", "Write, test and review authorization policies as code."},
+		},
+		Blueprints: []Blueprint{
+			{"Login Service Done Right", "A login service with passkeys or TOTP, secure sessions, token refresh, rate limiting and an audit log of every login.",
+				[]string{"Password + TOTP or passkey", "Secure session cookies", "Short-lived tokens with refresh", "Rate limiting", "Login audit log"}},
+			{"Policy as Code", "Authorization rules for a small app written in Open Policy Agent, with a test for every allowed and denied case, running in CI.",
+				[]string{"Roles and attributes", "Policy file", "Allow and deny tests", "CI check"}},
+			{"Hardened Cloud Baseline", "A free-tier cloud account defined as code: protected owner account, least-privilege roles, private storage, audit logs and alerts.",
+				[]string{"Owner account locked down", "Roles instead of keys", "Private encrypted storage", "Audit logging", "Budget and security alerts"}},
+		},
+		Quiz: []Question{
+			{"Why are passkeys resistant to phishing?", "They sign a challenge bound to the real website's name, so they will not work on a look-alike domain."},
+			{"Name four things to check on a JWT before trusting it.", "The signature (with the expected key and algorithm), the issuer, the audience and the expiry."},
+			{"In the shared responsibility model, who is responsible for a storage bucket left public?", "The customer: it is a configuration they chose."},
+			{"What does zero trust stop trusting?", "Network location: being inside the office network grants nothing by itself."},
+		},
+	},
 }

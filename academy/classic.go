@@ -309,4 +309,15 @@ var classicGuides = map[int]ClassicGuide{
 			"About 50 lines: a string copy that always takes the buffer size, always terminates, and tells you if it had to cut the string short.",
 			"Read it next to strcpy and strncpy's manual pages, and write down each mistake it makes impossible."},
 	},
+	18: {
+		Anchor: ClassicRead{"Zero Trust Networks", "Evan Gilman & Doug Barth", 2017, "",
+			"How to build networks where every request is authenticated and authorised, with no trusted inside.",
+			"Read the opening chapters on the zero-trust model, then map each idea onto a network you know."},
+		Classic: ClassicRead{"BeyondCorp: A New Approach to Enterprise Security", "Rory Ward & Betsy Beyer", 2014, "https://research.google/pubs/beyondcorp-a-new-approach-to-enterprise-security/",
+			"Google's short paper on removing the privileged corporate network, which started the zero-trust movement.",
+			"Read it in one sitting, then list which checks replace the office network, and where each one happens."},
+		Source: ClassicRead{"doas.c (OpenBSD)", "Ted Unangst and contributors", 0, "https://github.com/openbsd/src/blob/master/usr.bin/doas/doas.c",
+			"A small, readable replacement for sudo: a real program whose whole job is deciding who may run what, as whom.",
+			"Find where it reads the rules, where it matches a request against them, and what it does when no rule matches."},
+	},
 }
