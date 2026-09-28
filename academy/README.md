@@ -36,6 +36,36 @@ New here? Build it (below), run it, and press **`0`** for the *Start Here* guide
 
 ## Install
 
+### Recommended: the installer (one command)
+
+It installs the academy like any other app, without administrator rights: the program goes where your system keeps per-user apps, `academy` works in every new terminal, and the app appears in your app menu with its icon. The installer downloads the latest release from this repository and checks its SHA256 checksum before installing anything.
+
+**Windows** (PowerShell):
+
+```powershell
+irm https://raw.githubusercontent.com/pronexuscodex/learning_space/main/install.ps1 | iex
+```
+
+This adds **Systems & AI Academy** to the Start Menu and to **Settings → Apps → Installed apps**, where you can uninstall it like any other app.
+
+**macOS and Linux** (Terminal):
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/pronexuscodex/learning_space/main/install.sh | sh
+```
+
+On macOS, **Academy** appears in Launchpad and Spotlight and can be kept in the Dock. On Linux, **Systems & AI Academy** is added to your applications menu. Both open in a terminal window.
+
+| | Windows | macOS and Linux |
+|---|---|---|
+| Program | `%LocalAppData%\Programs\Academy\academy.exe` | `~/.local/bin/academy` |
+| Your progress and backups | `%LocalAppData%\academy` | `~/Library/Application Support/academy` (macOS), `~/.local/share/academy` (Linux) |
+| Your PDFs | `Documents\Academy Library` | `Documents/Academy Library` |
+
+To **upgrade**, run the same command again: your progress and PDFs are never touched. `academy -where` shows exactly where everything is. To **uninstall**, use Settings → Apps on Windows, or run `curl -fsSL https://raw.githubusercontent.com/pronexuscodex/learning_space/main/install.sh | sh -s -- --uninstall` on macOS and Linux. Uninstalling keeps your progress and PDFs, and lists where they are in case you want to delete them too.
+
+Installed this way, the program never shows the "unknown developer" or SmartScreen warnings that downloaded files get. To install a specific version, set `ACADEMY_VERSION=v1.2.0` first.
+
 ### With a package manager (from version 1.1.0)
 
 **macOS and Linux, with [Homebrew](https://brew.sh):**
@@ -121,10 +151,11 @@ Your progress is one file, `academy_campus_registry.json`. Backups and exports g
 | Installed with Homebrew on macOS | `~/Library/Application Support/academy` |
 | Installed with Homebrew on Linux | `~/.local/share/academy` (or `$XDG_DATA_HOME/academy`) |
 | Installed with Scoop or winget | `%LocalAppData%\academy` |
-| A downloaded or self-built binary | next to the binary |
+| Installed with the installer, or in a system folder such as `/usr/local/bin` or `Program Files` | the same per-user folder as above for your system |
+| A downloaded or self-built binary anywhere else | next to the binary (a portable copy, for example on a USB stick) |
 | `go run .` | the current directory, because the temporary build folder would be deleted |
 
-Package managers replace their install folder on every upgrade, which is why those installs keep your data elsewhere. To move from a downloaded copy to a package-manager install, move your registry and its folders into the new location, or set `ACADEMY_HOME` to the old folder.
+Installers and package managers replace their install folder on every upgrade, which is why those installs keep your data elsewhere. If an older version left a registry beside an installed binary, it keeps being used. Run `academy -where` to see which folders are in use. To move from a downloaded copy to a package-manager install, move your registry and its folders into the new location, or set `ACADEMY_HOME` to the old folder.
 
 Other flags: `-no-color`, `-check-links` (verify every resource URL), `-backups` (list automatic backups), `-restore N` (restore one) and `-fetch-library` (download every PDF in the Library for offline study).
 

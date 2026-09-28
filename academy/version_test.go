@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"flag"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -25,6 +26,21 @@ func TestVersionAndUsage(t *testing.T) {
 	for _, want := range []string{"Usage:", "-version", "Examples:", "academy -restore 1"} {
 		if !strings.Contains(b.String(), want) {
 			t.Errorf("usage lacks %q", want)
+		}
+	}
+}
+
+func TestWhereText(t *testing.T) {
+	reg := filepath.FromSlash("/data/academy/" + registryFileName)
+	got := whereText(filepath.FromSlash("/bin/academy"), reg)
+	for _, want := range []string{
+		"Program:  " + filepath.FromSlash("/bin/academy") + "\n",
+		"Progress: " + reg + "\n",
+		"Backups:  " + backupDir(reg) + "\n",
+		"PDFs:     " + libraryDir(reg) + "\n",
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("whereText missing %q in:\n%s", want, got)
 		}
 	}
 }

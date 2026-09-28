@@ -653,10 +653,14 @@ func seedRegistry() *Registry {
 // not given:
 //
 //  1. in $ACADEMY_HOME, when that is set;
-//  2. in a per-user data folder, when a package manager (Homebrew, Scoop,
-//     winget, Nix) installed the binary, because it replaces that folder on
-//     every upgrade;
-//  3. next to the executable, so a downloaded copy is self-contained;
+//  2. in a per-user data folder, when the binary is installed: by a
+//     package manager (Homebrew, Scoop, winget, Nix), by the install
+//     script, or in a system program folder. Installers replace those
+//     folders on upgrade, and users should not have to look inside them.
+//     A registry already beside an installed binary (from an older version)
+//     keeps being used, so no progress goes missing;
+//  3. next to the executable, so a downloaded copy is self-contained
+//     (a "portable" copy, for example on a USB stick);
 //  4. in the current directory, when the binary lives in a temporary build
 //     directory (as with `go run`), so data is not lost on exit.
 func defaultRegistryPath() string {
@@ -667,19 +671,24 @@ func defaultRegistryPath() string {
 		}
 	}
 	wd, _ := os.Getwd()
-	path := registryPathFor(exe, wd, os.Getenv, userDataDir)
+	path := registryPathFor(exe, wd, os.Getenv, userDataDir, fileExists)
 	// A data folder may not exist yet; the registry's own folder is created
 	// on demand so the first commit can write there.
 	os.MkdirAll(filepath.Dir(path), 0o755)
 	return path
 }
 
-// packageManaged lists path fragments of folders a package manager owns.
-var packageManaged = []string{"/Cellar/", "/homebrew/", "/linuxbrew/", "/nix/store/", "/scoop/apps/", "/winget/packages/"}
+// installedDirs lists path fragments of folders that installers own:
+// package managers, the install scripts (~/.local/bin on macOS and Linux,
+// %LocalAppData%\Programs on Windows) and system program folders.
+var installedDirs = []string{
+	"/Cellar/", "/homebrew/", "/linuxbrew/", "/nix/store/", "/scoop/apps/", "/winget/packages/",
+	"/.local/bin/", "/AppData/Local/Programs/", "/Program Files", "/usr/bin/", "/usr/local/bin/", "/opt/",
+}
 
-func isPackageManaged(dir string) bool {
+func isInstalled(dir string) bool {
 	d := strings.ToLower(filepath.ToSlash(dir)) + "/"
-	for _, frag := range packageManaged {
+	for _, frag := range installedDirs {
 		if strings.Contains(d, strings.ToLower(frag)) {
 			return true
 		}
@@ -688,13 +697,13 @@ func isPackageManaged(dir string) bool {
 }
 
 // registryPathFor is defaultRegistryPath with its inputs passed in, for tests.
-func registryPathFor(exe, wd string, getenv func(string) string, dataDir func() (string, error)) string {
+func registryPathFor(exe, wd string, getenv func(string) string, dataDir func() (string, error), exists func(string) bool) string {
 	if home := getenv("ACADEMY_HOME"); home != "" {
 		return filepath.Join(home, registryFileName)
 	}
 	if exe != "" {
 		dir := filepath.Dir(exe)
-		if isPackageManaged(dir) {
+		if isInstalled(dir) && !exists(filepath.Join(dir, registryFileName)) {
 			if data, err := dataDir(); err == nil {
 				return filepath.Join(data, "academy", registryFileName)
 			}
@@ -708,6 +717,11 @@ func registryPathFor(exe, wd string, getenv func(string) string, dataDir func() 
 		return filepath.Join(wd, registryFileName)
 	}
 	return registryFileName
+}
+
+func fileExists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
 }
 
 // userDataDir is the per-user folder for application data:
@@ -958,13 +972,14 @@ func roundHours(h float64) float64 { return math.Round(h*100) / 100 }
 // ---------------------------------------------------------------------------
 
 func main() {
-	pathFlag := flag.String("registry", "", "path to the JSON registry (default: in $ACADEMY_HOME if set; otherwise beside the binary, or in a per-user data folder when a package manager installed it)")
+	pathFlag := flag.String("registry", "", "path to the JSON registry (default: in $ACADEMY_HOME if set; in your user data folder when the app is installed; otherwise beside the binary)")
 	noColor := flag.Bool("no-color", false, "disable ANSI colours (also honours NO_COLOR)")
 	checkLinks := flag.Bool("check-links", false, "verify every resource URL over the network, then exit")
 	listBackupsFlag := flag.Bool("backups", false, "list the automatic backups of the registry, then exit")
 	fetchLibraryFlag := flag.Bool("fetch-library", false, "download every free PDF in the library for offline study, then exit")
 	restoreFlag := flag.String("restore", "", "restore the registry from a backup (a number from -backups, or a file path), then exit")
 	showVersion := flag.Bool("version", false, "print the version, then exit")
+	showWhere := flag.Bool("where", false, "print where the program, your progress, backups and PDFs are, then exit")
 	flag.Usage = usage(os.Stderr, flag.CommandLine)
 	flag.Parse()
 	if flag.NArg() > 0 {
@@ -995,6 +1010,11 @@ func main() {
 		os.Exit(1)
 	}
 
+	if *showWhere {
+		exe, _ := os.Executable()
+		fmt.Print(whereText(exe, path))
+		return
+	}
 	if *fetchLibraryFlag {
 		os.Exit(fetchLibrary(path, os.Stdout))
 	}
