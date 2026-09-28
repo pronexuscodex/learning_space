@@ -168,8 +168,9 @@ func (a *App) renderStageSyllabus(stageID int, g StageGuide) {
 	for _, l := range flow(legend, "  ", w, "  ") {
 		a.println(l)
 	}
+	numWidth := len(fmt.Sprint(len(g.Concepts))) + 1 // "9." or "10.", so the names line up
 	for i, c := range g.Concepts {
-		head := fmt.Sprintf("    %s %s %s %s", masteryBadge(level[c.Name]), color(fmt.Sprintf("%d.", i+1)), dots[c.Name], sty.Bold(truncate(c.Name, w-15)))
+		head := fmt.Sprintf("    %s %s %s %s", masteryBadge(level[c.Name]), color(fmt.Sprintf("%*s", numWidth, fmt.Sprintf("%d.", i+1))), dots[c.Name], sty.Bold(truncate(c.Name, w-15)))
 		if room := w - visibleLen(head) - 3; room >= 16 {
 			head += " " + sty.Gray("— "+truncate(c.Summary, room))
 		}

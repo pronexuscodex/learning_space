@@ -12,10 +12,15 @@ versions follow [Semantic Versioning](https://semver.org/).
 - Nine dictionary words: broken access control, man-in-the-middle, firewall, denial of service, phishing, two-factor authentication, secrets management, fuzzing and incident response.
 
 ### Fixed
+- Security audit: links typed into the tech-watch log must be http(s) links, because "Open in your browser" passes them to the system, which on Windows can start programs. Links saved earlier are checked again before opening.
+- Security audit: imported resource files may no longer contain hidden control codes or right-to-left override characters, which could overwrite or reorder text on screen. The same rule now filters feeds.
+- Backups of one registry are no longer listed, or pruned, as another's when two registries share a folder (such as `academy.json` and `academy-old.json`).
+- Stage pages with ten or more concepts keep the concept names aligned.
 - Ctrl+C during a Library download now cancels just that download, instead of quitting the app.
 - A download stops with a clear message when the server sends nothing for 30 seconds, instead of waiting up to 15 minutes.
 
 ### Changed
+- CI checks for known vulnerabilities with govulncheck, and Dependabot keeps the workflow actions up to date.
 - CI: the random-input "monkey" test runs offline, so a slow website can no longer make it fail.
 - Release archives are reproducible: every file carries the commit's timestamp, a fixed owner and a fixed order, so rebuilding a commit gives the same checksums.
 - Publishing a release from the website no longer builds it twice; the second workflow run stops when the files are already attached.

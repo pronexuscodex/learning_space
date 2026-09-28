@@ -451,11 +451,45 @@ only make exploitation harder. The real fixes are bounded functions
 (snprintf, fgets, never gets), checking every length, testing with
 sanitizers and fuzzers, and choosing memory-safe languages (Rust, Go,
 Java, Python) where the bug cannot happen.`,
-				Diagram: `char name[8]; strcpy(name, input);        stack, growing ▼
+				Diagram: `char name[8]; strcpy(name, input);    higher addresses ▶
 
- before:  [ name: b o b \0 . . . . ][ canary ][ saved rbp ][ return address ]
- attack:  [ A  A  A  A  A  A  A  A ][ A A A A ][ A A A A A ][ A A A A A A A A ]
-                                     ▲ changed, so the program aborts before ret`,
+ before: [ b o b \0 . . . . ][ canary ][ saved rbp ][ return addr ]
+ attack: [ A A A A A A A A ][ A A A A  ][ A A A A A ][ A A A A A A  ]
+                              ▲ changed: the program aborts at ret`,
+				UnderTheHood: `Take main with char name[8] and strcpy(name, argv[1]), built with
+gcc 13 on x86-64 Linux (gcc -O0, Intel syntax). The compiler lays out
+the stack frame like this:
+
+  mov  rax, QWORD PTR fs:40      ; load the secret canary
+  mov  QWORD PTR -8[rbp], rax    ; store it just above name
+  lea  rdx, -16[rbp]             ; name lives at rbp-16 .. rbp-9
+  call strcpy@PLT
+  mov  rdx, QWORD PTR -8[rbp]    ; before returning: reload it
+  sub  rdx, QWORD PTR fs:40      ; still the same?
+  call __stack_chk_fail@PLT      ; (only reached if it changed)
+
+Run it with growing arguments:
+
+  ./a.out alice              hello, alice
+  ./a.out AAAA…A (16 A's)    *** stack smashing detected ***
+                             terminated  (exit 134)
+  -fno-stack-protector, 40   Segmentation fault  (exit 139)
+
+Without the canary, gdb shows the crash on main's final ret: the saved
+return address has become 0x4141414141414141 ("AAAAAAAA"), which is not
+a valid address, so the CPU refuses to jump. An attacker writes a real
+address there instead, and ret obeys.
+
+Now the surprise: 8 letters (9 bytes with the final zero) is not
+detected. The canary is random on every run, but glibc always makes
+its lowest byte 00, so the stray terminating zero overwrites 00 with 00.
+AddressSanitizer is not fooled:
+
+  gcc -fsanitize=address ...; ./a.out AAAAAAAA
+  ERROR: AddressSanitizer: stack-buffer-overflow ... WRITE of size 9
+
+The canary catches big overflows when the function returns;
+the sanitizer catches every out-of-bounds byte at the moment it happens.`,
 				MentalModel: "Every buffer has a size; every write must prove it fits.",
 				TryIt:       "Compile a program that copies argv[1] into char name[8] with strcpy, once normally and once with -fsanitize=address, and run both with a 20-character argument.",
 				Analogy: `A form with eight boxes for your surname, printed right above the
@@ -494,14 +528,14 @@ every object, not just the role; give each account and service the least
 privilege it needs; and log every refused request, because a run of 403
 errors is often an attack in progress. Role-based access control (RBAC)
 groups permissions into roles such as viewer, editor and admin.`,
-				Diagram: `request ──▶ authenticate: who are you?   ── no ──▶ 401 Unauthorized
-                 │ yes
-                 ▼
-            authorise: may YOU do THIS    ── no ──▶ 403 Forbidden  (and log it)
-            to THIS object?
-                 │ yes
-                 ▼
-               do it`,
+				Diagram: `request ─▶ who are you?          ── no ─▶ 401 Unauthorized
+               │ yes
+               ▼
+           may YOU do THIS       ── no ─▶ 403 Forbidden (log it)
+           to THIS object?
+               │ yes
+               ▼
+             do it`,
 				MentalModel: "For every request ask three things: who is this, what are they doing, and do they own it?",
 				TryIt:       "In any web app you built, log in as one user, copy a URL containing an ID, then open it logged in as another user. Does the server refuse?",
 				Analogy: `A hotel key card. The front desk checks your passport once
@@ -539,9 +573,15 @@ front that denies by default. Separate networks into zones
 (segmentation) so one compromised laptop cannot reach the database.
 Encrypt everything in transit, patch internet-facing software first, and
 watch the traffic for anything unusual.`,
-				Diagram: `internet ──▶ [ firewall: allow 443 only ] ──▶ web server ──▶ [ firewall ] ──▶ database
-                 ▲ port scan finds only 443           (zone 1)          (zone 2: never
-                                                                           reachable from outside)`,
+				Diagram: `internet ─▶ [ firewall: 443 only ] ─▶ web server   (zone 1)
+                                          │
+                                   [ firewall ]
+                                          │
+                                          ▼
+                                       database     (zone 2)
+
+a port scan from outside finds only 443; the database is never
+reachable from the internet`,
 				MentalModel: "Every open port is a door; close the ones you do not use and lock the rest.",
 				TryIt:       "Run nmap -sV scanme.nmap.org (the Nmap project allows scanning that host) and nmap localhost, and explain every open port you find.",
 				Analogy: `A castle: a moat and one gate (the firewall), guards who check everyone
@@ -587,8 +627,8 @@ exactly this reason.`,
 				Diagram: `your code ──┐
 packages ───┼──▶ build server ──▶ release file ──▶ user's machine
 compiler ───┘        ▲                 ▲
-      each arrow is a place to attack; checksums and signatures let the
-      user check that nothing was swapped on the way`,
+  each arrow is a place to attack; checksums and signatures
+  let the user check that nothing was swapped on the way`,
 				MentalModel: "Trust is transitive: everything you depend on can act as you.",
 				TryIt:       "Run your language's audit tool (npm audit, pip-audit or govulncheck) on a project, and read one advisory in full.",
 				Analogy: `Poisoning the flour at the mill instead of breaking into every bakery.
@@ -626,9 +666,10 @@ detect and analyse, contain (isolate machines, disable accounts),
 eradicate and recover, then learn in a blameless post-mortem. Keep
 notes with timestamps from the first minute, and preserve evidence:
 wiping a machine first destroys the record of how the attacker got in.`,
-				Diagram: `  prepare ──▶ detect & analyse ──▶ contain ──▶ eradicate & recover ──▶ lessons learned
-     ▲                                                                    │
-     └──────────────────────── improve defences ──────────────────────────┘`,
+				Diagram: `prepare ─▶ detect & analyse ─▶ contain ─▶ eradicate & recover
+   ▲                                                   │
+   │                                                   ▼
+   └────────── improve defences ◀──────────── lessons learned`,
 				MentalModel: "You cannot respond to what you never logged.",
 				TryIt:       "On Linux, run journalctl -u ssh (or read /var/log/auth.log) on a machine with SSH open to the internet, and count the failed login attempts from strangers.",
 				Analogy: `A smoke detector and a fire drill. The detector (logging and alerts)
