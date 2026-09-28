@@ -14,12 +14,14 @@ versions follow [Semantic Versioning](https://semver.org/).
   - Stage 20, Incident Response, Forensics & Privacy
 
   Each stage has a glossary, free resources, lab blueprints, a quiz, a classic corner and a type-in whose output comes from running it. Existing registries gain the new stages automatically.
-- A **Links** workflow checks every resource and classic-corner link on curriculum changes and weekly. Sites that refuse automated checks (HTTP 401, 403, 429) are reported as warnings, not failures.
+- A **Links** workflow checks every resource and classic-corner link on curriculum changes and weekly, and downloads the start of every Library PDF to confirm it really is a PDF. Sites that refuse automated checks (HTTP 401, 403, 429) are reported as warnings, not failures.
 - Stage 10, Security & Cryptography, doubles from 5 to 10 concepts: memory-safety bugs (overflows and use-after-free, with real compiler output), access control, network attacks and defences, secrets and the software supply chain, and detection and incident response. Each has an analogy, real incidents, a diagram and three exercises built on legal practice sites (pwn.college, PortSwigger, OverTheWire, picoCTF).
 - Stage 10 also gains glossary terms, five free resources, two lab blueprints (a home security lab, fuzzing a C parser) and four quiz questions.
 - Nine dictionary words: broken access control, man-in-the-middle, firewall, denial of service, phishing, two-factor authentication, secrets management, fuzzing and incident response.
 
 ### Fixed
+- Every stage's PDF library now has something to download: Stages 4, 10, 11, 12, 17, 18 and 20 were empty, and now have free official PDFs (NIST guides, RFC 3227, Turing 1936, the BeyondCorp paper and more). The Stage 14 PDF had moved away, so Think Stats replaces it.
+- Narrow terminals (40 to 60 columns): the exercise card title, the Classic Mode struggle-clock message, blueprint milestones, the Exercise gym heading and the resource library header no longer run past the edge of the screen.
 - Security audit: links typed into the tech-watch log must be http(s) links, because "Open in your browser" passes them to the system, which on Windows can start programs. Links saved earlier are checked again before opening.
 - Security audit: imported resource files may no longer contain hidden control codes or right-to-left override characters, which could overwrite or reorder text on screen. The same rule now filters feeds.
 - Backups of one registry are no longer listed, or pruned, as another's when two registries share a folder (such as `academy.json` and `academy-old.json`).
