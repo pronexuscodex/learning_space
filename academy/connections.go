@@ -18,7 +18,7 @@ var stagePrereqs = map[int][]int{
 	5: {1, 2, 4}, 6: {5}, 7: {2, 6}, 8: {6},
 	9: {1}, 10: {3, 8}, 11: {2, 3}, 12: {1, 5},
 	13: {3}, 14: {3, 13}, 15: {13, 14}, 16: {5, 6, 15},
-	17: {1, 10}, 18: {8, 10}, 19: {8, 10},
+	17: {1, 10}, 18: {8, 10}, 19: {8, 10}, 20: {10, 19},
 }
 
 // conceptLinks is keyed by Concept.Name.
@@ -288,6 +288,18 @@ var conceptLinks = map[string]links{
 		"MITRE ATT&CK: the Getting Started page and any technique's Detection section. The Sigma project's rule specification."},
 	"Security Monitoring & Alert Triage": {[]string{"Detection & Incident Response", "Evaluating Models Honestly", "Intrusion Detection: Signatures & Anomalies"},
 		"Security Onion documentation: the analyst workflow. Google's SRE book (Stage 9): the chapter on being on-call."},
+
+	// ---- Stage 20
+	"Incident Response Planning": {[]string{"Detection & Incident Response", "Security Monitoring & Alert Triage", "Thinking Like an Attacker: Threat Modelling"},
+		"NIST SP 800-61 Rev. 3. Incident Response & Computer Forensics (on this stage's reading list): the chapters on preparing for incidents."},
+	"Containment, Eradication & Recovery": {[]string{"Durability: Page Cache, fsync & Atomic Rename", "Write-Ahead Logging & Recovery", "Secrets & the Software Supply Chain"},
+		"NIST SP 800-61 Rev. 3: the recommendations on response and recovery. The British Library's published incident review."},
+	"Digital Forensics Basics": {[]string{"Hashing & Password Storage", "Logging & Telemetry", "Processes & the Address Space"},
+		"RFC 3227 (this stage's classic). The Sleuth Kit and Autopsy documentation: the getting-started guide."},
+	"Blameless Post-Mortems": {[]string{"Testing & Reliability", "From Code to Production", "Incident Response Planning"},
+		"Google's SRE book: the chapter on postmortem culture. GitLab's 2017 database outage post-mortem."},
+	"Privacy & Data Protection": {[]string{"Hashing & Password Storage", "Encryption: Symmetric & Public-Key", "Probability for Programmers"},
+		"The GDPR's articles on principles (Article 5) and breach notification (Articles 33 and 34)."},
 }
 
 // stageOfConcept finds which stage a concept belongs to (0 if unknown).

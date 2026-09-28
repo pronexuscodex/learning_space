@@ -705,4 +705,44 @@ print("addresses seen failing:", ", ".join(sorted(recent)))`,
 		Expected: `t= 20s ALERT 203.0.113.9: 5 failures in 20s (last user: root)
 addresses seen failing: 198.51.100.4, 198.51.100.7, 203.0.113.9`,
 	},
+	20: {
+		File:    "integrity.py",
+		Lang:    "Python",
+		Run:     "python3 integrity.py",
+		Predict: "Which three changes will the checker report, and how will each be labelled?",
+		Lesson:  "A fingerprint changes completely when even one byte changes, so a weakened setting shows up as MODIFIED, a dropped script as NEW and a removed program as DELETED. Tripwire and AIDE work this way on real systems, and forensic investigators hash every disk image for the same reason: to prove later that nothing changed.",
+		Code: `# INTEGRITY CHECK -- the idea behind Tripwire and forensic hashing.
+# Take a fingerprint (SHA-256) of every file while the system is known
+# to be good; later, any change, addition or deletion stands out.
+import hashlib
+
+def fingerprint(files):
+    return {name: hashlib.sha256(data).hexdigest()[:12] for name, data in files.items()}
+
+before = {
+    "/etc/passwd":   b"root:x:0:0:root:/root:/bin/bash\n",
+    "/etc/ssh/sshd_config": b"PasswordAuthentication no\n",
+    "/usr/bin/ls":   b"\x7fELF...the real ls...",
+}
+baseline = fingerprint(before)
+
+after = dict(before)
+after["/etc/ssh/sshd_config"] = b"PasswordAuthentication yes\n"    # weakened
+after["/usr/bin/.cache"] = b"#!/bin/sh\ncurl ... | sh\n"         # dropped
+del after["/usr/bin/ls"]                                           # removed
+now = fingerprint(after)
+
+for name in sorted(baseline.keys() | now.keys()):
+    if name not in now:
+        print(f"DELETED   {name}")
+    elif name not in baseline:
+        print(f"NEW       {name}  {now[name]}")
+    elif now[name] != baseline[name]:
+        print(f"MODIFIED  {name}  {baseline[name]} -> {now[name]}")
+print("baseline of /etc/passwd:", baseline["/etc/passwd"], "(unchanged)")`,
+		Expected: `MODIFIED  /etc/ssh/sshd_config  474ef6932d6b -> 6bf43c7543d3
+NEW       /usr/bin/.cache  1ea62370ad2b
+DELETED   /usr/bin/ls
+baseline of /etc/passwd: e787b373a745 (unchanged)`,
+	},
 }

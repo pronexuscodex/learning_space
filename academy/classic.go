@@ -331,4 +331,15 @@ var classicGuides = map[int]ClassicGuide{
 			"The widely used tool that watches logs and blocks addresses with too many failures: this stage's type-in, grown up.",
 			"Read one filter (config/filter.d/sshd.conf) and the jail settings, and compare them with your bruteforce.py."},
 	},
+	20: {
+		Anchor: ClassicRead{"Incident Response & Computer Forensics", "Jason Luttgens, Matthew Pepe & Kevin Mandia", 2014, "",
+			"A practitioner's guide to the whole process, from preparation to remediation, by experienced incident responders.",
+			"Read the preparation chapters first, then follow one investigation chapter alongside your own lab."},
+		Classic: ClassicRead{"Guidelines for Evidence Collection and Archiving (RFC 3227)", "Dominique Brezinski & Tom Killalea", 2002, "https://www.rfc-editor.org/rfc/rfc3227",
+			"Ten pages that still define the order of volatility and the basics of handling evidence.",
+			"Read it in one sitting, then write your own collection checklist for a Linux server in the order it recommends."},
+		Source: ClassicRead{"The Sleuth Kit", "Brian Carrier and contributors", 0, "https://github.com/sleuthkit/sleuthkit",
+			"The open-source library behind Autopsy: real code that reads file systems directly, including deleted files.",
+			"Read the tools' manual pages first (fls, icat, mactime), then find how fls walks a directory in the source."},
+	},
 }

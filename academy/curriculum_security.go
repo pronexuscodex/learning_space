@@ -778,4 +778,266 @@ detection worked; the process after the alert did not.`,
 			{"Why send logs to a central store as they happen?", "Attackers often delete local logs; a protected central copy survives."},
 		},
 	},
+
+	// -----------------------------------------------------------------
+	20: {
+		Overview: `Sooner or later every organisation has an incident. What separates a
+bad day from a disaster is preparation: a plan people have practised,
+backups that actually restore, evidence handled carefully enough to
+learn what happened, and a culture that fixes causes instead of blaming
+people. This stage also covers privacy and data protection: collecting
+less personal data, protecting what you keep, and the legal duties that
+apply when it leaks.`,
+		Outcomes: []string{
+			"Write an incident response plan with clear roles, severities and contacts",
+			"Contain an incident, rebuild from known-good sources and restore from tested backups",
+			"Collect and preserve digital evidence without destroying it",
+			"Run a blameless post-mortem that leads to real fixes",
+			"Apply data-protection principles and know when a breach must be reported",
+		},
+		Glossary: []Term{
+			{"Incident commander", "The one person who coordinates an incident response and makes the calls."},
+			{"Playbook", "Written, step-by-step instructions for handling a particular kind of incident."},
+			{"Containment", "Stopping an incident from spreading or doing more damage, before fixing it."},
+			{"Chain of custody", "A record of who handled evidence, when and how, so it can be trusted later."},
+			{"Order of volatility", "Collect the evidence that disappears fastest (memory, network state) first."},
+			{"Post-mortem", "A written review after an incident: what happened, why, and what will change."},
+			{"Personal data", "Any information about an identifiable person: a name, an email, a location, an IP address."},
+			{"Data minimisation", "Collecting and keeping only the personal data you actually need."},
+		},
+		Concepts: []Concept{
+			{
+				Name:    "Incident Response Planning",
+				Summary: "Decide who does what before the emergency, and practise it.",
+				Body: `In an incident, people are stressed, information is incomplete, and
+decisions cannot wait. A plan written in calm times answers the
+questions in advance. Who is the incident commander, who handles
+communication, who keeps the timeline, who does the technical work? How
+are incidents classified by severity, and who must be woken up for each
+level? Who are the outside contacts: lawyers, insurers, the data
+protection authority, law enforcement, key customers? How do we talk if
+email and chat are compromised?
+
+Playbooks cover the likely cases (ransomware, a stolen laptop, leaked
+credentials, a compromised account), and tabletop exercises test them:
+the team walks through a realistic scenario around a table and finds
+the gaps before a real attack does. NIST's guide, SP 800-61, long
+described the lifecycle as: prepare, detect and analyse, contain,
+eradicate and recover, and learn. Its 2025 revision places incident
+response inside NIST's wider Cybersecurity Framework.`,
+				Diagram: `incident commander ── decides, coordinates
+ ├─ technical lead ── investigates, contains, fixes
+ ├─ communications ── staff, customers, regulators
+ └─ scribe ────────── timeline: every action, with the time
+severity 1: all hands now │ severity 2: working hours │ 3: ticket`,
+				MentalModel: "The worst moment to write a plan is during the incident.",
+				TryIt:       "For your own devices, write the first five things you would do if your email account were taken over, and the phone numbers or recovery codes you would need, printed on paper.",
+				Analogy: `A fire drill. Nobody learns where the exits are while the building is
+full of smoke; they learned it in the drill, and the fire marshal
+already has a list of who must be accounted for.`,
+				Example: `In 2017 the NotPetya malware destroyed the IT systems of the shipping
+company Maersk within hours. Its teams rebuilt about 4,000 servers and
+45,000 PCs in around ten days, helped by the one domain controller that
+survived, in Ghana, because a power cut had taken it offline during the
+attack. Luck saved them; a plan and offline backups would not have
+needed it.`,
+				Exercises: trio(
+					"Name the four roles in an incident team and say why the incident commander should usually not do technical work.",
+					"Someone must keep the overview and make decisions while others are deep in the details.",
+					"Write an incident response plan for a small organisation (or your own home lab): roles, severity levels with examples, a contact list, how to communicate if email is down, and one full playbook for ransomware.",
+					"Keep a printed copy: in a real incident, the plan's file server may be encrypted.",
+					"Run a 30-minute tabletop exercise with a friend or classmate using your plan and a scenario such as 'a laptop with customer data was stolen from a car'. Record every question the plan could not answer, and update it.",
+					"The facilitator reveals new facts every few minutes: 'the laptop was not encrypted'.",
+				),
+			},
+			{
+				Name:    "Containment, Eradication & Recovery",
+				Summary: "Stop the spread, remove the attacker, and restore from known-good sources.",
+				Body: `Containment comes first: isolate affected machines from the network
+(keep them powered on for evidence), disable compromised accounts, and
+block the attacker's addresses and domains. Then eradicate: find how
+they got in and close it, remove their persistence (new accounts,
+scheduled tasks, backdoors), and rotate every credential they may have
+seen, including service accounts and API keys.
+
+Recovery means rebuilding from known-good sources, not cleaning a
+compromised machine and hoping: reinstall from trusted images and
+restore data from backups taken before the compromise. Backups only
+count if they restore: follow the 3-2-1 rule (three copies, on two kinds
+of storage, one off-site), keep at least one copy offline or immutable
+so ransomware cannot encrypt it, and test restores regularly. Watch
+closely afterwards; attackers often try to return.`,
+				Diagram: `contain:   isolate hosts, disable accounts, block addresses
+eradicate: close the way in, remove backdoors, rotate secrets
+recover:   rebuild from clean images, restore pre-attack backups
+watch:     extra monitoring for the attacker returning`,
+				MentalModel: "You cannot trust a machine an attacker controlled; rebuild it.",
+				TryIt:       "Pick one important folder of yours, restore it from your backup to a different place, and check that the files open. If you cannot, you do not have a backup yet.",
+				Analogy: `A kitchen with food poisoning: close it (contain), find and throw out
+the contaminated stock and fix the broken fridge (eradicate), restock
+from a trusted supplier (recover), and have inspectors visit more often
+for a while (watch).`,
+				Example: `In 2021 ransomware in Colonial Pipeline's business systems led it to
+shut down the largest fuel pipeline on the US East Coast for several
+days. The attackers had got in with the password of an old VPN account
+that had no multi-factor authentication. In 2023 a ransomware attack
+took the British Library's systems offline for months, and it later
+published a detailed report on what went wrong so others could learn.`,
+				Exercises: trio(
+					"Why keep an infected machine powered on but disconnected, rather than switching it off?",
+					"Memory holds evidence (running processes, network connections, keys) that is lost at power-off.",
+					"Set up 3-2-1 backups for a machine or project you care about, with one copy that is offline or immutable, then do a full test restore to a different machine and time it.",
+					"The restore time is your real recovery time; write it down.",
+					"Write a ransomware playbook for a small business: the first hour minute by minute, how to decide what to rebuild, the order of recovery by business importance, and how to check backups are clean before restoring.",
+					"Restore identity systems (accounts, passwords) first: everything else depends on them.",
+				),
+			},
+			{
+				Name:    "Digital Forensics Basics",
+				Summary: "Collect evidence carefully enough to trust what it tells you.",
+				Body: `Forensics answers what happened, when, and how. The first rule is to
+avoid destroying what you are trying to study. Collect in order of
+volatility: memory and network connections first (they vanish at
+power-off), then running processes, then disk, then logs and backups
+stored elsewhere (RFC 3227 describes this). Work on copies: take a
+full image of a disk with a write blocker, record its hash, and analyse
+the copy, so you can prove later that nothing changed.
+
+Keep a chain of custody: who collected each item, when, how it was
+stored and who handled it since. Build a timeline by merging file
+times, log entries and network records, all converted to one time
+zone. Free tools such as The Sleuth Kit and Autopsy (disks) and
+Volatility (memory) do the heavy lifting. If the incident may end up in
+court, involve professionals early.`,
+				Diagram: `most volatile  ▲ memory, network connections
+               │ running processes, logged-in users
+               │ disk contents (image it, hash it)
+least volatile │ remote logs, backups, archives`,
+				MentalModel: "Every action you take changes the evidence; copy first, analyse the copy.",
+				TryIt:       "Type in and run this stage's integrity.py, then change one byte of a file's content and predict its new fingerprint's first characters before running again.",
+				Analogy: `Detectives at a crime scene photograph everything before touching
+anything, wear gloves, and log every item into an evidence bag with a
+label, so that months later the court can trust it has not been swapped
+or contaminated.`,
+				Example: `In 2005 the BTK serial killer in Kansas was identified partly because a
+floppy disk he sent to the police held a deleted Word document whose
+hidden metadata named a local church and the user "Dennis". RFC 3227,
+published in 2002, is still the standard short guide to collecting
+evidence in the right order.`,
+				Exercises: trio(
+					"Put these in the order you would collect them: a copy of the web server's disk, the current network connections, the cloud provider's access logs, the contents of memory.",
+					"Memory and connections first: they disappear when the machine is switched off.",
+					"Extend the integrity.py type-in to scan a real folder you own: store the baseline in a JSON file, then report new, modified and deleted files on each run. Test it by changing files yourself.",
+					"Hash files in chunks so large files do not fill memory.",
+					"Investigate your own machine: build a timeline of one afternoon from its logs (logins, installed software, browser history, file changes), all in one time zone, and write a one-page report of what happened when.",
+					"On Linux, journalctl --since and find -newermt are a good start; on Windows, Event Viewer.",
+				),
+			},
+			{
+				Name:    "Blameless Post-Mortems",
+				Summary: "Learn from every incident by fixing systems, not blaming people.",
+				Body: `After an incident, write down what happened while memories are fresh:
+the timeline, the impact, how it was detected and resolved, what went
+well and what did not. Look for contributing factors, not one culprit:
+the missing check, the confusing tool, the alert nobody owned, the
+backup nobody had tested.
+
+Blameless means assuming people acted reasonably given what they knew
+and the tools they had. If one person's mistake could cause an outage,
+the system allowed it, and that is what to fix. Blame makes people hide
+mistakes, which destroys exactly the information you need. Every
+post-mortem ends with action items, each with an owner and a date, and
+someone checks later that they were done. Many companies publish their
+post-mortems, and reading them is one of the fastest ways to learn.`,
+				Diagram: `timeline ─▶ impact ─▶ contributing factors (not "who")
+         ─▶ what went well ─▶ what went badly
+         ─▶ action items: owner + date ─▶ follow-up review`,
+				MentalModel: "Ask 'what made this mistake easy to make?', never 'who made it?'.",
+				TryIt:       "Read one public post-mortem (Cloudflare's blog publishes many) and list its contributing factors and action items.",
+				Analogy: `Air accident investigation. Investigators look for every factor behind
+a crash (design, training, weather, procedures) rather than only blaming
+the pilot, and aviation became extraordinarily safe because every
+lesson is shared across the whole industry.`,
+				Example: `In 2017 a GitLab engineer accidentally deleted a production database
+while working late during an incident. Five different backup methods
+turned out not to work, and about six hours of data were lost. GitLab
+streamed the recovery live and published a blameless post-mortem that
+focused on the broken backups, not on the engineer.`,
+				Exercises: trio(
+					`Rewrite this finding blamelessly: "Sam deployed the wrong config and caused the outage."`,
+					"Say what allowed it: no review step, no config validation, no staged rollout.",
+					"Write a post-mortem for a real failure you experienced (a lost file, a broken project, a missed deadline): timeline, impact, contributing factors, and three action items with dates.",
+					"Look for at least three contributing factors; there is almost never only one.",
+					"Read three published post-mortems from different companies and write a one-page comparison: common contributing factors, which action items look most effective, and one practice you will adopt.",
+					"GitLab, Cloudflare and Google have all published detailed ones.",
+				),
+			},
+			{
+				Name:    "Privacy & Data Protection",
+				Summary: "Collect less, protect what you keep, and know your legal duties.",
+				Body: `Personal data is any information about an identifiable person, and
+the safest personal data is the data you never collected. The EU's
+General Data Protection Regulation (GDPR), a model for laws in many
+countries, sets principles: a lawful reason for each use, collecting
+only what is needed for a stated purpose (data minimisation), keeping
+it accurate and no longer than needed, and securing it. People have
+rights to see, correct and delete their data.
+
+In engineering terms: design for privacy from the start, record what
+personal data you hold and why, set retention periods and actually
+delete, restrict access, and encrypt. Pseudonymisation (replacing names
+with IDs) reduces risk but is still personal data; true anonymisation
+is much harder than it looks, because combining a few attributes often
+identifies a person. Under GDPR, a personal-data breach must usually be
+reported to the regulator within 72 hours of becoming aware of it.`,
+				Diagram: `collect only what you need ─▶ record why ─▶ protect it
+   ─▶ keep only as long as needed ─▶ delete (backups too)
+breach? ─▶ assess risk ─▶ tell the regulator within 72 h
+       ─▶ tell the people affected if the risk to them is high`,
+				MentalModel: "Data you do not have cannot leak.",
+				TryIt:       "Ask one service you use for a copy of all the data it holds about you (most have a download-your-data page) and look through it. What surprises you?",
+				Analogy: `A doctor's surgery keeps only the records it needs to treat you, locks
+the filing cabinet, shreds old files on schedule, and must tell you and
+the authorities if a folder goes missing.`,
+				Example: `In 2023 Ireland's data protection regulator fined Meta €1.2 billion
+for transferring Europeans' Facebook data to the US without adequate
+protection. In 2008 researchers showed that the "anonymous" movie
+ratings Netflix had released for a competition could be linked back to
+real people using public reviews: removing names is not anonymisation.
+This academy keeps your progress only on your own computer and sends
+nothing anywhere.`,
+				Exercises: trio(
+					"Which of these are personal data: an email address, a customer ID number, the average age of all customers, an IP address, a photo of a crowd?",
+					"If it can be linked to one person, even indirectly, it is personal data.",
+					"Take a small app you built and write its data inventory: every personal field, why it is collected, where it is stored, who can access it, and when it is deleted. Remove one field you do not need and add a delete-my-account feature.",
+					"Remember logs, backups and analytics: personal data hides in all of them.",
+					"Write a breach-response checklist for a small online shop under GDPR (or your country's law): how to assess the risk, what to tell the regulator within 72 hours, when and how to tell customers, and a template notification email.",
+					"Your national data protection authority publishes breach-reporting guidance and forms.",
+				),
+			},
+		},
+		Resources: []Resource{
+			{"Paper", "NIST SP 800-61 Rev. 3: Incident Response Recommendations", "https://csrc.nist.gov/pubs/sp/800/61/r3/final", "The current US guide to incident response."},
+			{"Paper", "RFC 3227: Guidelines for Evidence Collection and Archiving", "https://www.rfc-editor.org/rfc/rfc3227", "A short, classic guide to collecting evidence in the right order."},
+			{"Tool", "Autopsy and The Sleuth Kit", "https://www.sleuthkit.org/autopsy/", "Free, open-source disk forensics."},
+			{"Tool", "Volatility", "https://volatilityfoundation.org/", "The open-source framework for memory forensics."},
+			{"Book", "Google SRE book: Postmortem Culture", "https://sre.google/sre-book/postmortem-culture/", "How Google runs blameless post-mortems."},
+			{"Article", "GitLab's 2017 database outage post-mortem", "https://about.gitlab.com/blog/2017/02/10/postmortem-of-database-outage-of-january-31/", "A candid, blameless account of a real data-loss incident."},
+			{"Site", "GDPR: the official text", "https://eur-lex.europa.eu/eli/reg/2016/679/oj", "The EU General Data Protection Regulation."},
+		},
+		Blueprints: []Blueprint{
+			{"Incident Response Kit", "An incident response plan, three playbooks, a contact sheet and a post-mortem template, tested in a tabletop exercise.",
+				[]string{"Roles and severities", "Playbooks: ransomware, stolen laptop, leaked key", "Printed contact sheet", "Tabletop exercise", "Updated plan"}},
+			{"Tested Backups", "3-2-1 backups for a real project, with an immutable or offline copy and a monthly restore test with timings.",
+				[]string{"Three copies, two media, one off-site", "Offline or immutable copy", "Automated schedule", "Restore test log"}},
+			{"Forensics Lab", "A small virtual machine you misconfigure and 'attack' yourself, then investigate: memory capture, disk image, hashes, timeline and report.",
+				[]string{"Capture memory", "Image and hash the disk", "Build a timeline", "Write the report", "Chain-of-custody log"}},
+		},
+		Quiz: []Question{
+			{"Why should the incident commander usually not do hands-on technical work?", "They must keep the overview, coordinate people and make decisions."},
+			{"What is the 3-2-1 backup rule?", "Three copies of the data, on two kinds of storage, with one copy off-site (and ideally one offline or immutable)."},
+			{"Why collect memory before imaging the disk?", "Memory is the most volatile evidence: it is lost when the machine is switched off."},
+			{"Within how long must a personal-data breach usually be reported to the regulator under GDPR?", "Within 72 hours of becoming aware of it."},
+		},
+	},
 }
