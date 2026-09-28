@@ -29,13 +29,28 @@ type linkResult struct {
 // ok reports whether the link resolved to a successful page.
 func (l linkResult) ok() bool { return l.Err == nil && l.Status >= 200 && l.Status < 400 }
 
-// allResourceLinks lists every resource that has a URL.
+// guarded reports a server that answered but refuses automated clients
+// (401, 403, 429): the page is there, a person with a browser can open it,
+// so it is a warning, not a dead link.
+func (l linkResult) guarded() bool {
+	return l.Err == nil && (l.Status == 401 || l.Status == 403 || l.Status == 429)
+}
+
+// allResourceLinks lists every resource and classic-corner reading that
+// has a URL.
 func allResourceLinks() []linkResult {
 	var out []linkResult
 	for id, g := range curriculum {
 		for _, r := range g.Resources {
 			if r.URL != "" {
 				out = append(out, linkResult{Stage: id, Title: r.Title, URL: r.URL})
+			}
+		}
+		if cg, ok := classicGuides[id]; ok {
+			for _, r := range []ClassicRead{cg.Anchor, cg.Classic, cg.Source} {
+				if r.URL != "" {
+					out = append(out, linkResult{Stage: id, Title: r.Title, URL: r.URL})
+				}
 			}
 		}
 	}
@@ -93,11 +108,15 @@ func runLinkCheck(out io.Writer) int {
 	}
 	wg.Wait()
 
-	failed := 0
+	failed, guarded := 0, 0
 	for _, l := range links {
 		mark := sty.Green("✓")
 		detail := sty.Gray(fmt.Sprintf("%d", l.Status))
-		if !l.ok() {
+		if l.guarded() {
+			guarded++
+			mark = sty.Yellow("⚠")
+			detail = sty.Yellow(fmt.Sprintf("HTTP %d: reachable, but refuses automated checks", l.Status))
+		} else if !l.ok() {
 			failed++
 			mark = sty.Red("✗")
 			if l.Err != nil {
@@ -111,7 +130,10 @@ func runLinkCheck(out io.Writer) int {
 			fmt.Fprintf(out, "      %s\n", sty.Gray(l.URL))
 		}
 	}
-	fmt.Fprintf(out, "\n  %d of %d links OK", len(links)-failed, len(links))
+	fmt.Fprintf(out, "\n  %d of %d links OK", len(links)-failed-guarded, len(links))
+	if guarded > 0 {
+		fmt.Fprintf(out, "; %d refuse automated checks (open them in a browser)", guarded)
+	}
 	if failed > 0 {
 		fmt.Fprintf(out, "; %d failed (a firewall or proxy can also cause failures)", failed)
 	}
