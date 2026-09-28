@@ -181,8 +181,8 @@ func TestLibraryFolderLocation(t *testing.T) {
 		want string
 	}{
 		{"Documents by default", libraryDirFor(reg, env(), docs), "/home/ada/Documents/Academy Library"},
-		{"ACADEMY_LIBRARY wins", libraryDirFor(reg, env("ACADEMY_LIBRARY", "/pdfs", "ACADEMY_HOME", "/study"), docs), "/pdfs"},
-		{"inside ACADEMY_HOME", libraryDirFor(reg, env("ACADEMY_HOME", "/study"), docs), "/study/Academy Library"},
+		{"ACADEMY_LIBRARY wins", libraryDirFor(reg, env("ACADEMY_LIBRARY", filepath.FromSlash("/pdfs"), "ACADEMY_HOME", filepath.FromSlash("/study")), docs), "/pdfs"},
+		{"inside ACADEMY_HOME", libraryDirFor(reg, env("ACADEMY_HOME", filepath.FromSlash("/study")), docs), "/study/Academy Library"},
 		{"no home folder: beside the registry", libraryDirFor(reg, env(), noDocs), "/data/academy/Academy Library"},
 	} {
 		if c.got != filepath.FromSlash(c.want) {

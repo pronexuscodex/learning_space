@@ -90,7 +90,7 @@ func xdgDocuments(home string) string {
 		v = strings.Trim(v, `"`)
 		v = strings.Replace(v, "$HOME", home, 1)
 		if filepath.IsAbs(v) && filepath.Clean(v) != filepath.Clean(home) {
-			return v
+			return filepath.Clean(v)
 		}
 	}
 	return ""
