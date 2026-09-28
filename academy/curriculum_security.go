@@ -522,4 +522,260 @@ products across the industry.`,
 			{"What does zero trust stop trusting?", "Network location: being inside the office network grants nothing by itself."},
 		},
 	},
+
+	// -----------------------------------------------------------------
+	19: {
+		Overview: `Defenders cannot stop every attack, but they can make networks hard to
+move through and make attackers visible. This stage covers dividing a
+network so one compromised machine cannot reach everything, collecting
+the logs and network records that reveal what happened, detecting
+attacks with signatures and anomaly detection, mapping detections to the
+MITRE ATT&CK catalogue of attacker behaviour, and running the day-to-day
+work of monitoring without drowning in alerts.`,
+		Outcomes: []string{
+			"Design firewall rules and network zones that deny by default",
+			"Decide what to log, collect it centrally, and protect it",
+			"Explain signature and anomaly detection, and why false alarms are inevitable",
+			"Map an attack to MITRE ATT&CK techniques and write a detection for one",
+			"Triage alerts with a runbook and tune noisy rules",
+		},
+		Glossary: []Term{
+			{"Segmentation", "Dividing a network into zones so traffic between them can be controlled."},
+			{"DMZ", "A zone for internet-facing servers, separated from the internal network."},
+			{"Egress filtering", "Controlling which connections may leave a network, not just which may enter."},
+			{"Telemetry", "The logs, metrics and network records a system produces about what it is doing."},
+			{"IDS", "Intrusion detection system: watches traffic or hosts and raises alerts on suspicious activity."},
+			{"SIEM", "Security information and event management: collects logs in one place, correlates them and raises alerts."},
+			{"False positive", "An alert for something harmless. A false negative is an attack that raises no alert."},
+			{"MITRE ATT&CK", "A public catalogue of attacker tactics and techniques, used to plan and measure detection."},
+		},
+		Concepts: []Concept{
+			{
+				Name:    "Firewalls & Network Segmentation",
+				Summary: "Deny by default, and never let one compromised machine reach everything.",
+				Body: `A firewall filters traffic by rules. Stateful firewalls remember
+connections, so replies to traffic you started are allowed while
+unsolicited traffic is not. Good rule sets deny by default and allow
+only what is needed, in both directions: egress filtering stops a
+compromised server from phoning home or sending data out.
+
+Segmentation splits a network into zones with firewalls between them:
+internet-facing servers in a DMZ, office laptops in another zone,
+databases and management systems in the most protected one, reachable
+only from the machines that need them. Administrators reach sensitive
+zones through a single hardened entry point (a bastion host or VPN) with
+strong authentication. A flat network, where everything can talk to
+everything, lets one infected machine reach every other.`,
+				Diagram: `internet ─▶ [fw] ─▶ DMZ: web servers
+                     │ only the app port
+                     ▼
+office ───▶ [fw] ─▶ internal: app servers ─▶ [fw] ─▶ databases
+admins ───▶ VPN / bastion with MFA ──────────────────▲`,
+				MentalModel: "Draw who needs to talk to whom; everything else is blocked.",
+				TryIt:       "List the listening ports on your computer (ss -tulpn on Linux, netstat -an on Windows or macOS) and decide which of them need to be reachable from other machines.",
+				Analogy: `A ship divided into watertight compartments. One hole floods one
+compartment, and the ship stays afloat. A ship with one big open hull
+sinks from a single hole.`,
+				Example: `The 2013 Target breach started with a heating contractor's login to a
+vendor portal, and the attackers then reached the checkout systems that
+held card data. A US Senate report in 2014 pointed to weak separation
+between those networks. In 2017 the WannaCry worm spread through
+Windows file sharing (port 445) across flat networks, disrupting
+hospitals in the UK's National Health Service.`,
+				Exercises: trio(
+					"A web server in the DMZ needs to reach its database. Write the minimum firewall rules: which direction, which port, from where to where?",
+					"Allow only the web server's address to the database port; deny everything else in both directions.",
+					"Write an nftables or ufw rule set for a small server that allows SSH from one address range and HTTPS from anywhere, denies everything else inbound, and limits outbound traffic to DNS, NTP, HTTPS and package updates. Test it from another machine.",
+					"Test the denials as carefully as the allows: from a second machine, try a port that should be closed.",
+					"Draw the network of your home or a small office: every device, what it needs to reach, and a proposed set of zones (for example: work devices, guests, smart-home devices) with the rules between them. Implement the guest zone if your router supports it.",
+					"Smart TVs and cameras rarely need to reach your laptop; put them in their own zone.",
+				),
+			},
+			{
+				Name:    "Logging & Telemetry",
+				Summary: "Record the events that answer 'what happened?', and keep them safe.",
+				Body: `When something goes wrong, logs are the only witness. Log the events
+that matter for security: logins and failed logins, permission denials,
+changes to accounts and permissions, administrator actions, and
+configuration changes. At the network level, collect connection records
+(flow logs), DNS queries and web proxy logs; they show which machine
+talked to what, even when the content was encrypted.
+
+Make logs useful: structured (JSON with named fields), with accurate
+synchronised clocks (NTP) and time zones, and with enough context (user,
+source address, request ID). Send them to a central store as they happen,
+because attackers delete local logs, and restrict who can change or
+delete them. Keep them long enough to investigate attacks discovered
+months later. Never log secrets: passwords, tokens and full card
+numbers turn your logs into a target.`,
+				Diagram: `servers ──┐
+laptops ──┼─▶ collector ─▶ central store
+firewall ─┤                (append-only, access-controlled)
+DNS ──────┘                     │
+                                ├─▶ search during investigations
+                                └─▶ detection rules ─▶ alerts`,
+				MentalModel: "Log so that a stranger could reconstruct the story months later.",
+				TryIt:       "On Linux, run journalctl -u ssh --since today (or read /var/log/auth.log); on Windows, open Event Viewer and find event ID 4625 (failed logon). What would an investigator want that is missing?",
+				Analogy: `A ship's logbook, written as things happen, in ink, with the time of
+every entry, and a copy sent ashore each day, so that a wreck, or a
+dishonest captain, cannot erase the record.`,
+				Example: `The security company FireEye discovered in 2020 that it had been
+breached when an alert flagged a new phone registered for an employee's
+two-factor login. Following that single logged event uncovered the
+SolarWinds supply-chain attack, whose backdoored update had reached
+thousands of organisations months earlier.`,
+				Exercises: trio(
+					"Which of these should be logged, and which must never be: failed logins, the password typed on a failed login, a role change, a session token, the source IP of an admin action?",
+					"Log that a secret was used, never the secret itself.",
+					"Add structured security logging to a small app you built: log in, log out, failed login, permission denied and role change as JSON lines with time, user, source address and outcome. Check that no password or token ever appears.",
+					"Write a test that logs in with a known password and asserts that string is absent from the log output.",
+					"Set up central logging for two machines or containers you own (for example with rsyslog or a small Loki or OpenSearch stack), then delete a local log file on one machine and show that the central copy still has it.",
+					"Forward over an encrypted connection, and restrict who can delete from the central store.",
+				),
+			},
+			{
+				Name:    "Intrusion Detection: Signatures & Anomalies",
+				Summary: "Spot known attacks by their fingerprints, and new ones by what is unusual.",
+				Body: `An intrusion detection system (IDS) watches network traffic (Suricata,
+Snort, Zeek) or activity on a host, and raises alerts. Signature
+detection matches known patterns, such as a known piece of malware or an
+exploit's request. It is precise, but it misses anything new. Anomaly
+detection learns what is normal (which users log in when, how much data
+a server usually sends) and flags departures. It can catch new attacks,
+but it also flags every unusual but harmless event.
+
+Base rates make this hard: real attacks are rare compared with normal
+events. If one event in a million is an attack, even a detector that is
+99% accurate raises about 10,000 false alarms for every real one. So
+good detection combines signals, focuses on the behaviours attackers
+cannot avoid, and is tuned continuously. An intrusion prevention system
+(IPS) goes further and blocks what it detects, so its rules must be
+especially precise.`,
+				Diagram: `1,000,000 events, 1 of them an attack; detector 99% accurate:
+  attack caught:        1
+  false alarms:    ~10,000   (1% of 999,999 harmless events)
+  → an alert is almost always harmless unless the rule is very precise`,
+				MentalModel: "Rare events and imperfect detectors mean most alerts are false; design for that.",
+				TryIt:       "Type in and run this stage's bruteforce.py. Then change the log so an attacker stays just under the limit, and notice that the detector never fires.",
+				Analogy: `Airport security uses both: a list of banned items on the X-ray screen
+(signatures), and trained officers who notice a passenger behaving
+oddly (anomalies). The list misses new tricks; the officers stop many
+innocent travellers.`,
+				Example: `Martin Roesch released Snort in 1998 as a small open-source network
+intrusion detection tool, and it became one of the most widely used. In
+2000 Stefan Axelsson's paper "The base-rate fallacy and the difficulty
+of intrusion detection" showed mathematically why false alarms dominate
+unless detectors are extremely precise.`,
+				Exercises: trio(
+					"Work it out: 10,000 logins a day, 1 of which is an attack; your detector catches every attack but also flags 0.5% of normal logins. How many alerts a day, and how many are real?",
+					"About 50 false alarms plus 1 real one: roughly one real alert in fifty.",
+					"Extend the bruteforce.py type-in to read a real SSH or web server log, count distinct user names tried per address, and add a second rule for many different users from one address (password spraying).",
+					"Spraying tries one common password on many accounts, so per-account counts stay low.",
+					"Run Zeek or Suricata on a packet capture of your own traffic (captured with tcpdump or Wireshark), read the logs or alerts it produces, and explain three of them.",
+					"Zeek's conn.log and dns.log are the most readable place to start.",
+				),
+			},
+			{
+				Name:    "Detection Engineering with MITRE ATT&CK",
+				Summary: "Plan detections around what attackers do, not which tools they use.",
+				Body: `Attackers change tools easily but their behaviour less so: after getting
+in, they still need to run code, stay in, raise privileges, steal
+credentials, move to other machines and take data out. MITRE ATT&CK
+catalogues these tactics and hundreds of techniques observed in real
+attacks, each with notes on how to detect and mitigate it.
+
+Detection engineering treats detections like software. Pick a technique
+that matters for your environment, find the log source that shows it,
+write a rule (for example in Sigma, a vendor-neutral rule format),
+document why it exists and what to do when it fires, then test it:
+trigger the behaviour safely in a lab and confirm the alert appears.
+Mapping your detections onto ATT&CK shows where your coverage has gaps.`,
+				Diagram: `technique (e.g. new admin account created)
+   ─▶ log source (account-change events)
+   ─▶ rule (Sigma) + why it matters + what to do
+   ─▶ test: create a test account in a lab ─▶ did the alert fire?
+   ─▶ coverage map: which techniques are covered, which are not`,
+				MentalModel: "A detection is untested code until you have seen it fire in a lab.",
+				TryIt:       "Open attack.mitre.org, pick the technique 'Valid Accounts', and read its detection section. Which of your own systems would log it?",
+				Analogy: `Burglars change their crowbars, but they all still have to get through
+a door or window. Alarm sensors on the doors (behaviours) work against
+every crowbar; a list of known crowbar brands (tools) does not.`,
+				Example: `MITRE began building ATT&CK in 2013 from observations in its own test
+network and released it publicly in 2015. Security teams and vendors
+now use it as a common language for detections and threat reports, and
+the Sigma project publishes thousands of shared detection rules mapped
+to it.`,
+				Exercises: trio(
+					"Why is 'alert when an account is added to the administrators group' a more durable detection than 'alert when the file bad-tool.exe runs'?",
+					"Renaming a file defeats the second; the attacker still needs admin rights.",
+					"Write a detection for one technique in your own lab: for example, a new user account or a new scheduled task or cron job. Write it as a Sigma rule or a script over your logs, trigger it with a harmless test, and document what to do when it fires.",
+					"Include in the rule's notes how you tested it and what a false positive looks like.",
+					"Build a small coverage map: list ten ATT&CK techniques relevant to a small organisation, and for each, the log source you have, whether a detection exists, and whether it has been tested. Pick the biggest gap and close it.",
+					"Start with techniques around valid accounts, remote services and exfiltration.",
+				),
+			},
+			{
+				Name:    "Security Monitoring & Alert Triage",
+				Summary: "Turn alerts into decisions, without burning out the people.",
+				Body: `A security operations team watches alerts, usually collected in a SIEM,
+and decides for each: harmless, suspicious, or an incident. Good triage
+is a routine: gather context (which user, which machine, what else
+happened around that time), compare with what is normal for them, and
+decide within a set time, following a written runbook for each alert
+type.
+
+Alert fatigue is the main enemy: when most alerts are noise, people
+start clicking them away, and the real one gets missed. So every alert
+must be actionable, have an owner and a runbook, and be reviewed: rules
+that fire often without finding anything are tuned or removed.
+Automation (SOAR) can gather context and handle routine responses, such
+as resetting a password or isolating a laptop, so people spend their
+time on judgement.`,
+				Diagram: `alert ─▶ enrich (user, machine, recent events) ─▶ compare with normal
+      ─▶ decide: benign │ suspicious: investigate │ incident: respond
+      ─▶ afterwards: tune the rule if it was noise`,
+				MentalModel: "An alert without a runbook and an owner is noise that will be ignored.",
+				TryIt:       "Write a five-step runbook for the alert 'login from a new country followed by a password change'. What would you check first, and what would make you escalate?",
+				Analogy: `A hospital's emergency department triages patients: a quick, standard
+assessment sorts them so the most serious are seen first. If the alarm
+on every bed beeped constantly for nothing, nurses would stop
+listening, which is exactly what happens with noisy alerts.`,
+				Example: `During the 2013 Target breach, the company's malware-detection system
+raised alerts that were passed to its security team, but they were not
+acted on in time, and around 40 million card numbers were stolen. The
+detection worked; the process after the alert did not.`,
+				Exercises: trio(
+					"An alert fires 300 times a week and has never found a real incident. Give three options, and say which you would try first.",
+					"Tune it (narrow the condition), add context to raise its precision, or remove it; do not just ignore it.",
+					"Write runbooks for three alerts: many failed logins for one account, a new admin account, and unusual outbound data volume from a server. Each with: what it means, what to check, how to decide, and who to escalate to.",
+					"A good runbook lets someone who did not write the rule handle the alert at 3 a.m.",
+					"Run a week of monitoring on your own home lab or a server you own: collect alerts from your detections, triage each one with your runbooks, keep a log of decisions and time taken, and tune at least one noisy rule.",
+					"Measure precision: the share of alerts that turned out to matter.",
+				),
+			},
+		},
+		Resources: []Resource{
+			{"Site", "MITRE ATT&CK", "https://attack.mitre.org/", "The catalogue of attacker tactics and techniques, with detection notes."},
+			{"Tool", "Zeek documentation", "https://docs.zeek.org/en/master/", "A network monitor that turns traffic into readable logs."},
+			{"Tool", "Suricata", "https://suricata.io/", "An open-source intrusion detection and prevention engine."},
+			{"Tool", "Wireshark User's Guide", "https://www.wireshark.org/docs/wsug_html_chunked/", "Capture and read network traffic."},
+			{"Site", "nftables wiki", "https://wiki.nftables.org/", "The Linux firewall framework, with examples."},
+			{"Tool", "Sigma detection rules", "https://github.com/SigmaHQ/sigma", "A vendor-neutral rule format and thousands of shared detections."},
+			{"Site", "Security Onion documentation", "https://docs.securityonion.net/", "A free platform for network security monitoring and log management."},
+		},
+		Blueprints: []Blueprint{
+			{"Segmented Home Lab", "A small virtual network with a DMZ, an internal zone and an admin zone, firewall rules between them, and tests that prove the denials.",
+				[]string{"Draw the zones", "Firewall rules", "Bastion or VPN with MFA", "Test allowed and denied paths"}},
+			{"Central Logging Stack", "Logs from several machines and the firewall collected centrally, protected from deletion, and searchable.",
+				[]string{"Log shipping", "Central store", "Retention and access control", "Saved searches for investigations"}},
+			{"Detection Pipeline", "Five tested detections mapped to ATT&CK, each with a runbook, running over your lab's logs.",
+				[]string{"Choose techniques", "Write rules", "Trigger each in the lab", "Runbooks", "Tune after a week"}},
+		},
+		Quiz: []Question{
+			{"Why filter outgoing traffic as well as incoming?", "So a compromised machine cannot easily connect out to attackers or send data away."},
+			{"What is the difference between signature and anomaly detection?", "Signatures match known attack patterns; anomaly detection flags departures from normal behaviour."},
+			{"Why do most alerts turn out to be false alarms?", "Real attacks are rare compared with normal events (the base rate), so even accurate detectors flag many harmless events."},
+			{"Why send logs to a central store as they happen?", "Attackers often delete local logs; a protected central copy survives."},
+		},
+	},
 }

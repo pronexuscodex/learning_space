@@ -18,7 +18,7 @@ var stagePrereqs = map[int][]int{
 	5: {1, 2, 4}, 6: {5}, 7: {2, 6}, 8: {6},
 	9: {1}, 10: {3, 8}, 11: {2, 3}, 12: {1, 5},
 	13: {3}, 14: {3, 13}, 15: {13, 14}, 16: {5, 6, 15},
-	17: {1, 10}, 18: {8, 10},
+	17: {1, 10}, 18: {8, 10}, 19: {8, 10},
 }
 
 // conceptLinks is keyed by Concept.Name.
@@ -276,6 +276,18 @@ var conceptLinks = map[string]links{
 		"AWS IAM security best practices. Building Secure and Reliable Systems (Stage 17): the chapter on design for least privilege."},
 	"Zero Trust: Never Trust the Network Alone": {[]string{"Network Attacks & Defences", "TLS & Authentication on the Web", "Secure Design Principles"},
 		"NIST SP 800-207: the sections on tenets and logical components. The BeyondCorp paper (this stage's classic)."},
+
+	// ---- Stage 19
+	"Firewalls & Network Segmentation": {[]string{"Network Attacks & Defences", "The Layered Stack & Encapsulation", "Zero Trust: Never Trust the Network Alone"},
+		"nftables wiki: the quick reference and simple rule set examples. Firewalls and Internet Security (Cheswick, Bellovin & Rubin): the chapters on firewall design."},
+	"Logging & Telemetry": {[]string{"Detection & Incident Response", "Durability: Page Cache, fsync & Atomic Rename", "The Command Line & Your Environment"},
+		"OWASP Cheat Sheet Series (Stage 10): the Logging cheat sheet. Zeek documentation: the log files overview."},
+	"Intrusion Detection: Signatures & Anomalies": {[]string{"Probability for Programmers", "Statistical Inference & Experiments", "Finite Automata & Regular Expressions"},
+		"Axelsson's base-rate fallacy paper (on this stage's reading list). Suricata documentation: the rules introduction."},
+	"Detection Engineering with MITRE ATT&CK": {[]string{"Thinking Like an Attacker: Threat Modelling", "Testing & Reliability", "Logging & Telemetry"},
+		"MITRE ATT&CK: the Getting Started page and any technique's Detection section. The Sigma project's rule specification."},
+	"Security Monitoring & Alert Triage": {[]string{"Detection & Incident Response", "Evaluating Models Honestly", "Intrusion Detection: Signatures & Anomalies"},
+		"Security Onion documentation: the analyst workflow. Google's SRE book (Stage 9): the chapter on being on-call."},
 }
 
 // stageOfConcept finds which stage a concept belongs to (0 if unknown).

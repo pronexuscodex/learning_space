@@ -320,4 +320,15 @@ var classicGuides = map[int]ClassicGuide{
 			"A small, readable replacement for sudo: a real program whose whole job is deciding who may run what, as whom.",
 			"Find where it reads the rules, where it matches a request against them, and what it does when no rule matches."},
 	},
+	19: {
+		Anchor: ClassicRead{"The Practice of Network Security Monitoring", "Richard Bejtlich", 2013, "",
+			"A practical guide to collecting network data, detecting intrusions and responding, with free tools.",
+			"Build its sensor setup in a lab as you read, and keep a notebook of what each data type shows you."},
+		Classic: ClassicRead{"An Evening with Berferd, in Which a Cracker Is Lured, Endured, and Studied", "Bill Cheswick", 1992, "https://www.cheswick.com/ches/papers/berferd.pdf",
+			"A Bell Labs researcher's account of watching an intruder for months in a jail he built for him: one of the first honeypots.",
+			"Note every point where logging let Cheswick see what the intruder did, and what he wished he had recorded."},
+		Source: ClassicRead{"fail2ban", "Cyril Jaquier and contributors", 0, "https://github.com/fail2ban/fail2ban",
+			"The widely used tool that watches logs and blocks addresses with too many failures: this stage's type-in, grown up.",
+			"Read one filter (config/filter.d/sshd.conf) and the jail settings, and compare them with your bruteforce.py."},
+	},
 }
