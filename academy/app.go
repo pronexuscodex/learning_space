@@ -216,7 +216,7 @@ func (a *App) printMenu() {
 			{item("6", sty.Bold("Study Hall")), hint("learn & practise"), "Study Hall"},
 			{item("9", review), "", "Review"},
 			{item("n", sty.Bold(sty.Green("What's next"))), hint("best next step"), "What's next"},
-			{item("m", "Roadmap"), hint("all 17 stages"), "Roadmap"},
+			{item("m", "Roadmap"), hint(fmt.Sprintf("all %d stages", len(curriculum))), "Roadmap"},
 			{item("d", sty.Bold("Dictionary")), hint("every word explained"), "Dictionary"},
 			{item("/", "Search"), hint("find any topic"), "Search"},
 		}},

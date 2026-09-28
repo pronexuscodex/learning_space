@@ -37,8 +37,8 @@ func validateResource(m MyResource) error {
 		return fmt.Errorf("the title is longer than %d characters", maxNameLen)
 	case len([]rune(m.Note)) > maxNotesLen:
 		return fmt.Errorf("the note is longer than %d characters", maxNotesLen)
-	case m.Stage < NoStage || m.Stage > 16:
-		return fmt.Errorf("stage %d does not exist (use 0–16, or -1 for general)", m.Stage)
+	case m.Stage < NoStage || m.Stage > lastStageID():
+		return fmt.Errorf("stage %d does not exist (use 0–%d, or -1 for general)", m.Stage, lastStageID())
 	case !contains(resourceKinds, m.Kind):
 		return fmt.Errorf("kind %q is not one of %s", m.Kind, strings.Join(resourceKinds, ", "))
 	}

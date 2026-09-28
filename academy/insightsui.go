@@ -233,7 +233,7 @@ func (a *App) focusTimer() error {
 			stage = n
 			break
 		}
-		a.con.warn("Enter a stage number from 0 to 16, or g for general study.")
+		a.con.warn("Enter a stage number from 0 to %d, or g for general study.", lastStageID())
 	}
 
 	minutes := 25

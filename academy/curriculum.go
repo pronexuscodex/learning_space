@@ -99,6 +99,16 @@ type StageGuide struct {
 // content lives in its own file.
 var curriculum = mergeGuides(machineGuides, foundationsGuides, systemsAndAIGuides, softwareGuides, dataGuides)
 
+// lastStageID is the highest stage number in the curriculum. Nothing else
+// should assume how many stages there are.
+func lastStageID() int {
+	last := 0
+	for id := range curriculum {
+		last = max(last, id)
+	}
+	return last
+}
+
 // mergeGuides combines per-file guide maps; a duplicate stage ID is a
 // programming error.
 func mergeGuides(parts ...map[int]StageGuide) map[int]StageGuide {

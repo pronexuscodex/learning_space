@@ -21,7 +21,7 @@ func TestAddResourceValidatesAndDedupes(t *testing.T) {
 	bad := []MyResource{
 		{Kind: "Book"},
 		{Kind: "Book", Title: strings.Repeat("x", maxNameLen+1)},
-		{Kind: "Book", Title: "x", Stage: 17},
+		{Kind: "Book", Title: "x", Stage: lastStageID() + 1},
 		{Kind: "Book", Title: "x", Stage: -5},
 		{Kind: "Spaceship", Title: "x"},
 		{Kind: "Book", Title: "x", URL: "ftp://example.org/x"},
