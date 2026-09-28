@@ -60,7 +60,6 @@ var freeBooks = []LibraryDoc{
 	{18, "Paper", "NIST SP 800-63B: Digital Identity Guidelines", "https://pages.nist.gov/800-63-3/sp800-63b.html", "https://nvlpubs.nist.gov/nistpubs/SpecialPublications/NIST.SP.800-63b.pdf"},
 	{18, "Classic", "BeyondCorp: A New Approach to Enterprise Security", "https://research.google/pubs/beyondcorp-a-new-approach-to-enterprise-security/", "https://research.google.com/pubs/archive/43231.pdf"},
 	{20, "Paper", "NIST SP 800-61 Rev. 3: Incident Response Recommendations", "https://csrc.nist.gov/pubs/sp/800/61/r3/final", "https://nvlpubs.nist.gov/nistpubs/SpecialPublications/NIST.SP.800-61r3.pdf"},
-	{20, "Classic", "Guidelines for Evidence Collection and Archiving (RFC 3227)", "https://www.rfc-editor.org/rfc/rfc3227", "https://www.rfc-editor.org/pdfrfc/rfc3227.txt.pdf"},
 }
 
 // pdfURL returns the direct PDF address for a link, if it has one: links
