@@ -226,13 +226,19 @@ worldwide, which is why staged rollouts matter.`,
 	10: {
 		Overview: `Security is about keeping systems doing what they should, even when
 someone clever is trying to make them do something else. This stage
-teaches how attackers think, the most common vulnerabilities, and the
-cryptography that protects every password, message and payment. Only
-ever practise attacks on systems you own or that explicitly invite it.`,
+teaches how attackers think, the most common vulnerabilities, the
+cryptography that protects every password, message and payment, and how
+defenders keep networks, code and builds safe, and respond when
+something goes wrong. Only ever practise attacks on systems you own or
+that explicitly invite it: CTFs, deliberately vulnerable labs, and your
+own virtual machines.`,
 		Outcomes: []string{
 			"Threat-model an app and prioritise its biggest risks",
 			"Find and fix common web vulnerabilities (injection, XSS, broken access control)",
 			"Use hashing, encryption and signatures correctly, without inventing your own crypto",
+			"Explain how memory-safety bugs in C become exploits, and prevent them",
+			"Harden a server and its network, and keep secrets and dependencies under control",
+			"Detect an attack in logs and run a calm, documented incident response",
 		},
 		Glossary: []Term{
 			{"Vulnerability", "A weakness that an attacker can exploit."},
@@ -244,6 +250,12 @@ ever practise attacks on systems you own or that explicitly invite it.`,
 			{"Encryption", "Scrambling data so only someone with the key can read it."},
 			{"Certificate", "A signed document binding a public key to a name, such as a website domain."},
 			{"Phishing", "Tricking people into revealing secrets through fake messages or websites."},
+			{"Buffer overflow", "Writing past the end of a buffer, overwriting whatever memory comes next."},
+			{"ASLR", "Address space layout randomisation: code and data load at random addresses, so attackers cannot predict them."},
+			{"IDOR", "Insecure direct object reference: changing an ID in a request reaches someone else's data."},
+			{"Port scan", "Probing a machine to find which network services answer."},
+			{"Supply-chain attack", "Compromising software you depend on so the attack arrives through a trusted channel."},
+			{"Incident response", "The planned steps for detecting, containing and recovering from an attack."},
 		},
 		Concepts: []Concept{
 			{
@@ -421,6 +433,223 @@ accounts.`,
 					"TOTP is a public standard (RFC 6238); use a well-tested library for it.",
 				),
 			},
+			{
+				Name:    "Memory-Safety Bugs: Overflows & Use-After-Free",
+				Summary: "When C trusts a length it should have checked.",
+				Body: `C lets you write past the end of an array, read memory you already
+freed, or use a pointer to something that no longer exists. The language
+does not stop you; the behaviour is undefined. To an attacker, that is
+an opportunity: a stack buffer overflow can overwrite the saved return
+address, so when the function returns, the CPU jumps wherever the
+attacker chose. Use-after-free and out-of-bounds reads leak secrets or
+hijack control in the same way.
+
+Defences come in layers. Compilers add stack canaries (a secret value
+checked before returning), the operating system randomises where code
+and data live (ASLR) and marks the stack non-executable (NX). But these
+only make exploitation harder. The real fixes are bounded functions
+(snprintf, fgets, never gets), checking every length, testing with
+sanitizers and fuzzers, and choosing memory-safe languages (Rust, Go,
+Java, Python) where the bug cannot happen.`,
+				Diagram: `char name[8]; strcpy(name, input);        stack, growing ▼
+
+ before:  [ name: b o b \0 . . . . ][ canary ][ saved rbp ][ return address ]
+ attack:  [ A  A  A  A  A  A  A  A ][ A A A A ][ A A A A A ][ A A A A A A A A ]
+                                     ▲ changed, so the program aborts before ret`,
+				MentalModel: "Every buffer has a size; every write must prove it fits.",
+				TryIt:       "Compile a program that copies argv[1] into char name[8] with strcpy, once normally and once with -fsanitize=address, and run both with a 20-character argument.",
+				Analogy: `A form with eight boxes for your surname, printed right above the
+"Pay to" line. Write a long enough name and your extra letters spill into
+the payment line. A careful clerk (bounds checking) refuses the form; a
+careless one pays whoever the spill-over names.`,
+				Example: `The 1988 Morris worm spread partly through a buffer overflow in the
+fingerd service, which read a request with gets(). Heartbleed (2014) was
+a missing length check in OpenSSL that let anyone read up to 64 KB of a
+server's memory per request, including private keys and passwords.
+Microsoft and Google's Chromium team have each reported that about 70%
+of their serious security bugs are memory-safety bugs.`,
+				Exercises: trio(
+					`Why is gets(buf) impossible to use safely, while fgets(buf, sizeof buf, stdin) is fine?`,
+					"gets cannot know how big buf is; fgets is told the size and stops there.",
+					"Write a function that copies a string into a fixed-size buffer and can never overflow, returning an error when the input is too long. Test it with strings of length 0, 7, 8 and 100, compiled with -fsanitize=address,undefined.",
+					"snprintf(dst, size, \"%s\", src) returns the length it wanted to write; compare it with size.",
+					"Solve the first levels of the pwn.college \"Memory Errors\" module or picoCTF's buffer-overflow challenges, then write up for each: the bug, why it was exploitable, and the one-line fix.",
+					"These platforms exist so you can practise legally. Never try this on systems you do not own.",
+				),
+			},
+			{
+				Name:    "Access Control: Who May Do What",
+				Summary: "Logged in is not the same as allowed.",
+				Body: `Authentication proves who someone is; access control (authorization)
+decides what they may do. Broken access control tops the OWASP Top 10
+because it is easy to forget: a page hides the Delete button from normal
+users, but the server still accepts the delete request from anyone who
+sends it. An insecure direct object reference (IDOR) is the classic
+case: /invoices/1042 returns someone else's invoice because the server
+checks only that you are logged in.
+
+Rules that work: enforce every check on the server, never only in the
+interface; deny by default and allow explicitly; check ownership on
+every object, not just the role; give each account and service the least
+privilege it needs; and log every refused request, because a run of 403
+errors is often an attack in progress. Role-based access control (RBAC)
+groups permissions into roles such as viewer, editor and admin.`,
+				Diagram: `request ──▶ authenticate: who are you?   ── no ──▶ 401 Unauthorized
+                 │ yes
+                 ▼
+            authorise: may YOU do THIS    ── no ──▶ 403 Forbidden  (and log it)
+            to THIS object?
+                 │ yes
+                 ▼
+               do it`,
+				MentalModel: "For every request ask three things: who is this, what are they doing, and do they own it?",
+				TryIt:       "In any web app you built, log in as one user, copy a URL containing an ID, then open it logged in as another user. Does the server refuse?",
+				Analogy: `A hotel key card. The front desk checks your passport once
+(authentication). After that, the lock on each door checks whether your
+card belongs to that room (authorization). A hotel whose locks only
+check "is this a real hotel card?" lets every guest into every room.`,
+				Example: `In 2019 the US title-insurance company First American Financial exposed
+about 885 million documents, including bank account numbers and Social
+Security numbers, because anyone with a link to one document could
+change the number in the URL and read others. No login was needed.`,
+				Exercises: trio(
+					`A page shows "Edit" only to admins, but the server's /edit endpoint does not check the role. Is the app secure? Explain.`,
+					"Anyone can send the request directly, with curl or the browser's developer tools.",
+					"Add role-based access control to a small web app: viewer, editor and admin roles, a single function that decides every permission, a default of deny, and tests that prove an editor cannot delete and a viewer cannot edit someone else's post.",
+					"Keep one can(user, action, object) function and call it on every request; test the denials, not just the successes.",
+					"Complete the access-control labs in PortSwigger's Web Security Academy, including at least one IDOR and one privilege-escalation lab, and write a short checklist you would use to review someone else's API.",
+					"The labs run in your browser against PortSwigger's own servers, so they are legal to attack.",
+				),
+			},
+			{
+				Name:    "Network Attacks & Defences",
+				Summary: "Sniffing, spoofing, scanning and flooding, and the walls against them.",
+				Body: `On a shared network, anyone can try to read (sniff) or change traffic.
+On open Wi-Fi without encryption, a neighbour can see what you send. An
+attacker can pretend to be the router (ARP spoofing) or answer DNS
+questions with fake addresses, placing themselves in the middle. TLS
+defeats this, as long as nobody clicks through certificate warnings.
+
+Before attacking, attackers map: a port scan (nmap) finds which services
+answer, and each open port is a door to check. Availability attacks
+(denial of service) flood a service until real users cannot get in.
+
+Defences: expose as few services as possible, and put a firewall in
+front that denies by default. Separate networks into zones
+(segmentation) so one compromised laptop cannot reach the database.
+Encrypt everything in transit, patch internet-facing software first, and
+watch the traffic for anything unusual.`,
+				Diagram: `internet ──▶ [ firewall: allow 443 only ] ──▶ web server ──▶ [ firewall ] ──▶ database
+                 ▲ port scan finds only 443           (zone 1)          (zone 2: never
+                                                                           reachable from outside)`,
+				MentalModel: "Every open port is a door; close the ones you do not use and lock the rest.",
+				TryIt:       "Run nmap -sV scanme.nmap.org (the Nmap project allows scanning that host) and nmap localhost, and explain every open port you find.",
+				Analogy: `A castle: a moat and one gate (the firewall), guards who check everyone
+at the gate (authentication), an inner keep for the treasure
+(segmentation), and lookouts on the walls (monitoring). A secret tunnel
+nobody remembers is the forgotten open port.`,
+				Example: `In 2016 the Mirai botnet took over hundreds of thousands of cameras and
+routers that still used factory-default passwords, then flooded the DNS
+provider Dyn, making sites such as Twitter and Netflix unreachable for
+many users for hours. In 2010 the Firesheep browser extension showed
+that anyone on café Wi-Fi could hijack other people's Facebook and
+Twitter sessions, which pushed big sites to use HTTPS everywhere.`,
+				Exercises: trio(
+					"Your laptop is on café Wi-Fi. Which of these can the person at the next table read: the websites you visit over HTTPS, the pages' contents, your DNS lookups, an old plain-HTTP site you log into?",
+					"HTTPS hides contents but not which server you talk to; plain HTTP hides nothing.",
+					"Capture your own traffic with Wireshark while loading an HTTP page and an HTTPS page. Find the DNS query, the TCP handshake and the TLS handshake, and show that the HTTPS page's content is unreadable.",
+					"Use the display filters dns, tcp.flags.syn==1 and tls.handshake.",
+					"Harden a small Linux server or VM you own: firewall denying all inbound traffic except SSH (keys only, no passwords) and your web app, automatic security updates, and fail2ban. Scan it from outside with nmap before and after and compare.",
+					"ufw or nftables for the firewall; in /etc/ssh/sshd_config set PasswordAuthentication no.",
+				),
+			},
+			{
+				Name:    "Secrets & the Software Supply Chain",
+				Summary: "Your code is only as safe as its keys, dependencies and build.",
+				Body: `A modern program is mostly other people's code: hundreds of packages,
+a compiler, a build server and an update channel. A supply-chain attack
+compromises any of these, and the malicious code arrives through a
+channel you trust. Attackers publish look-alike packages
+(typosquatting), take over abandoned ones, or break into build systems.
+
+Secrets are the other half: API keys, database passwords and signing
+keys. Committed to a repository, a secret is public forever, even if a
+later commit deletes it, and bots scan public repositories for keys
+within minutes.
+
+Defences: keep secrets out of code (environment variables, a secrets
+manager), scan for them before pushing, revoke and rotate any that leak.
+Pin dependency versions with a lockfile, update them deliberately, and
+watch for security advisories. Sign and checksum what you release, and
+build it in a clean, automated pipeline. This academy's own releases
+publish SHA256 checksums and signed build-provenance attestations for
+exactly this reason.`,
+				Diagram: `your code ──┐
+packages ───┼──▶ build server ──▶ release file ──▶ user's machine
+compiler ───┘        ▲                 ▲
+      each arrow is a place to attack; checksums and signatures let the
+      user check that nothing was swapped on the way`,
+				MentalModel: "Trust is transitive: everything you depend on can act as you.",
+				TryIt:       "Run your language's audit tool (npm audit, pip-audit or govulncheck) on a project, and read one advisory in full.",
+				Analogy: `Poisoning the flour at the mill instead of breaking into every bakery.
+The bakers did nothing wrong except trust their supplier, which is why
+careful bakeries check each delivery's seal.`,
+				Example: `In 2020 attackers inserted a backdoor into the build of SolarWinds'
+Orion software, and about 18,000 customers installed the signed,
+official update. In 2024 a developer noticed that SSH logins had become
+half a second slower and uncovered a backdoor in xz-utils, planted over
+two years by a contributor who had gained the maintainer's trust. In
+2016 attackers found cloud credentials in a private GitHub repository
+used by Uber's engineers and stole data on 57 million people.`,
+				Exercises: trio(
+					"You committed an API key, then deleted it in the next commit. Is it safe now? What must you do?",
+					"It is still in Git history and possibly already scraped. Revoke it and issue a new key.",
+					"Add secret scanning and dependency auditing to one of your repositories: a pre-commit hook or CI step with gitleaks, plus your language's audit tool, and make CI fail on a finding.",
+					"Test it on a throwaway branch with a made-up key in a format the scanner's rules list, then delete the branch.",
+					"Verify a real release end to end: download an academy archive, check it against SHA256SUMS, then run gh attestation verify on it. Write down which attacks each check stops, and which it cannot.",
+					"A checksum from the same server as the file proves integrity, not origin; the signed attestation proves who built it.",
+				),
+			},
+			{
+				Name:    "Detection & Incident Response",
+				Summary: "Assume someone will get in; notice fast and respond calmly.",
+				Body: `Prevention eventually fails, so defenders also need to detect and
+respond. Detection starts with logs: logins (successes and failures),
+permission denials, administrator actions and unusual network traffic,
+sent to one place where they cannot be quietly deleted. Alerts watch for
+patterns such as many failed logins, a login from a new country followed
+by a password change, or a server suddenly sending gigabytes out.
+
+When something is found, incident response follows the classic NIST
+cycle: prepare (plans, contacts, backups you have actually tested),
+detect and analyse, contain (isolate machines, disable accounts),
+eradicate and recover, then learn in a blameless post-mortem. Keep
+notes with timestamps from the first minute, and preserve evidence:
+wiping a machine first destroys the record of how the attacker got in.`,
+				Diagram: `  prepare ──▶ detect & analyse ──▶ contain ──▶ eradicate & recover ──▶ lessons learned
+     ▲                                                                    │
+     └──────────────────────── improve defences ──────────────────────────┘`,
+				MentalModel: "You cannot respond to what you never logged.",
+				TryIt:       "On Linux, run journalctl -u ssh (or read /var/log/auth.log) on a machine with SSH open to the internet, and count the failed login attempts from strangers.",
+				Analogy: `A smoke detector and a fire drill. The detector (logging and alerts)
+turns a hidden fire into a loud one; the drill (the response plan) means
+that when it sounds, nobody wastes the first ten minutes arguing about
+who should call whom.`,
+				Example: `In 1986 Cliff Stoll, a Berkeley astronomer turned systems administrator,
+followed up a 75-cent accounting error and uncovered a spy selling
+military data, a story he told in The Cuckoo's Egg. In the 2017 Equifax
+breach, attackers went unnoticed for about 76 days, partly because an
+expired certificate had silently switched off a device that inspected
+outgoing traffic.`,
+				Exercises: trio(
+					"Put these steps in order and say what goes wrong if you skip each: contain, lessons learned, detect, recover, prepare.",
+					"Skipping preparation means improvising under stress; skipping lessons means it happens again.",
+					"Write a small log analyser for an SSH or web-server log: count failed logins per IP address, flag any address with more than 20 failures in 10 minutes, and print a short report. Test it on a real or sample log file.",
+					"Parse the timestamp, IP and outcome from each line into a record, then slide a 10-minute window per IP.",
+					"Write an incident-response plan for a small online shop: who is on call, how to reach them, the first 30 minutes step by step for \"customer passwords may have leaked\", what to tell customers and when, and a template for the post-mortem. Then run it as a 20-minute tabletop exercise with a friend.",
+					"Many countries require reporting some breaches within a deadline (72 hours under the EU's GDPR); put that in the plan.",
+				),
+			},
 		},
 		Resources: []Resource{
 			{"Site", "OWASP Top 10:2025", "https://owasp.org/Top10/2025/0x00_2025-Introduction/", "The current list of the most critical web-application security risks."},
@@ -429,6 +658,11 @@ accounts.`,
 			{"Site", "Cryptopals crypto challenges", "https://cryptopals.com/", "Learn cryptography by breaking it, step by step."},
 			{"Book", "Crypto 101 (free)", "https://www.crypto101.io/", "An introductory book on cryptography for programmers."},
 			{"Tool", "Have I Been Pwned", "https://haveibeenpwned.com/", "Check whether your accounts appear in known breaches."},
+			{"Site", "OverTheWire: Bandit", "https://overthewire.org/wargames/bandit/", "A beginner wargame played over SSH; teaches the Linux command line as a security tool."},
+			{"Course", "pwn.college (free)", "https://pwn.college/", "Arizona State University's hands-on course, from the command line to memory-corruption exploits."},
+			{"Site", "OWASP Cheat Sheet Series", "https://cheatsheetseries.owasp.org/", "Short, practical guides for defending against each class of vulnerability."},
+			{"Book", "Nmap Network Scanning (free online chapters)", "https://nmap.org/book/", "The official guide to port scanning, by Nmap's author."},
+			{"Site", "CISA Known Exploited Vulnerabilities Catalog", "https://www.cisa.gov/known-exploited-vulnerabilities-catalog", "Vulnerabilities attackers are exploiting right now: what to patch first."},
 		},
 		Blueprints: []Blueprint{
 			{"Password Manager", "A local, encrypted password vault with a master password, key derivation (Argon2) and authenticated encryption.",
@@ -437,12 +671,20 @@ accounts.`,
 				[]string{"Sign-up and login", "Session cookies", "Rate limiting", "TOTP 2FA", "Self-audit against OWASP Top 10"}},
 			{"CTF Journey", "Solve 30 beginner capture-the-flag challenges and write up how you solved each one.",
 				[]string{"Web challenges", "Crypto challenges", "Forensics challenges", "Write-ups"}},
+			{"Home Security Lab", "Two virtual machines on a private network: a hardened server and an attacker box, with centralised logs and an alert for brute-force logins.",
+				[]string{"Isolated VM network", "Hardened SSH and firewall", "Central log collection", "Brute-force alert", "Attack yourself and read the logs"}},
+			{"Fuzz a C Parser", "Fuzz a small C parser you wrote (for example a CSV or INI reader) with libFuzzer and AddressSanitizer, fix every crash, and keep the crashing inputs as regression tests.",
+				[]string{"Write the parser", "Fuzz target", "Triage and fix crashes", "Regression tests in CI"}},
 		},
 		Quiz: []Question{
 			{"What does the CIA triad stand for?", "Confidentiality, Integrity and Availability."},
 			{"What is the correct fix for SQL injection?", "Parameterised queries (prepared statements), so input is never interpreted as SQL."},
 			{"Why use bcrypt or Argon2 instead of SHA-256 for passwords?", "They are deliberately slow and salted, which makes mass guessing expensive."},
 			{"With public-key crypto, which key signs a message and which verifies it?", "The private key signs; anyone can verify with the matching public key."},
+			{"How can a stack buffer overflow give an attacker control of a program?", "By overwriting the saved return address, so the function returns to code the attacker chose."},
+			{"What is the difference between a 401 and a 403 response?", "401: we do not know who you are (authenticate). 403: we know who you are, and you may not do this."},
+			{"You leaked an API key in a public commit and deleted it. What now?", "Revoke it and issue a new one; it stays in Git history and has probably been scraped already."},
+			{"Why should you not wipe a hacked server immediately?", "It destroys the evidence of how the attacker got in; isolate it and investigate first."},
 		},
 	},
 

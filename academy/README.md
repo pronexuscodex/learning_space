@@ -144,7 +144,7 @@ Other flags: `-no-color`, `-check-links` (verify every resource URL), `-backups`
 | | 7 | Storage Engines, Databases & SQL |
 | | 8 | Networks, the Web & Distributed Systems |
 | **S · Software, Security & Theory** | 9 | Software Engineering & Professional Tools |
-| | 10 | Security & Cryptography |
+| | 10 | Security & Cryptography: attacks, defences and incident response |
 | | 11 | Theory of Computation & Complexity |
 | | 12 | Programming Languages & Paradigms |
 | **B · AI** | 13 | Mathematical Foundations: linear algebra & matrix calculus |
@@ -152,7 +152,7 @@ Other flags: `-no-color`, `-check-links` (verify every resource URL), `-backups`
 | | 15 | Neural Networks & Autograd from Scratch |
 | | 16 | AI Infrastructure, CUDA & Inference |
 
-That is **93 concepts** and **279 exercises**, plus a glossary, a resource library, lab blueprints, a quiz and a mastery check for every stage. Start Here also lists electives for afterwards: graphics, quantum computing, embedded systems and bioinformatics.
+That is **98 concepts** and **294 exercises**, plus a glossary, a resource library, lab blueprints, a quiz and a mastery check for every stage. Start Here also lists electives for afterwards: graphics, quantum computing, embedded systems and bioinformatics.
 
 ## How computers work (Stage 0)
 
@@ -326,7 +326,7 @@ For every stage:
 - **Mastery overview:** a glyph per concept on the mastery ladder, and your mastery-check result.
 - **Concepts:** the six-part cards described above. Mark each one as understood once you could explain it to a friend.
 - **Exercise gym:** warm-up → practice → real-world, with hints and check-off.
-- **Glossary:** 8–12 words explained simply.
+- **Glossary:** 8–15 words explained simply.
 - **Resource library:** free courses, books, papers, videos and tools with links, such as CS50, MIT OCW courses, OSTEP, CMU 15-445, PortSwigger Academy, ISL, and Karpathy's *Zero to Hero*.
 - **Lab blueprints:** larger projects with milestones (a text adventure, a route planner, a CPU emulator, a password manager, a regex engine, Raft, GPT from scratch…). You can enroll any of them as a lab in one step.
 - **Self-check quiz:** flashcards with self-scoring.

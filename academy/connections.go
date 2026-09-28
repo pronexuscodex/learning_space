@@ -169,6 +169,16 @@ var conceptLinks = map[string]links{
 		"Crypto 101: the chapters on block ciphers, public-key encryption and signatures. Cryptopals set 1."},
 	"TLS & Authentication on the Web": {[]string{"HTTP, DNS & How the Web Works", "Encryption: Symmetric & Public-Key"},
 		"Crypto 101: the chapter on SSL and TLS. High Performance Browser Networking: the chapter on TLS."},
+	"Memory-Safety Bugs: Overflows & Use-After-Free": {[]string{"Memory, Addresses & Pointers", "Safe Input & Undefined Behavior", "Registers, the Stack & Calling Conventions", "Memory Management"},
+		"Computer Systems: A Programmer's Perspective (Stage 5), section 3.10.3 on out-of-bounds memory references and buffer overflow. pwn.college: the Memory Errors module."},
+	"Access Control: Who May Do What": {[]string{"TLS & Authentication on the Web", "HTTP, DNS & How the Web Works", "System Calls & Privilege"},
+		"PortSwigger Web Security Academy: the access control topic. OWASP Cheat Sheet Series: the Authorization cheat sheet."},
+	"Network Attacks & Defences": {[]string{"TCP: Handshake, Flow & Congestion Control", "The Layered Stack & Encapsulation", "Sockets & I/O Multiplexing", "Networks: How Computers Talk"},
+		"Nmap Network Scanning: the chapters on port scanning basics and techniques. OverTheWire Bandit, levels 0 to 20."},
+	"Secrets & the Software Supply Chain": {[]string{"Version Control with Git", "From Code to Production", "Hashing & Password Storage"},
+		"OWASP Cheat Sheet Series: the Secrets Management and Software Supply Chain Security cheat sheets. CISA's Known Exploited Vulnerabilities Catalog."},
+	"Detection & Incident Response": {[]string{"From Code to Production", "The Command Line & Your Environment", "Thinking Like an Attacker: Threat Modelling"},
+		"Google's Site Reliability Engineering book: the chapters on managing incidents and postmortem culture. OWASP Cheat Sheet Series: the Logging cheat sheet."},
 
 	// ---- Stage 11
 	"Finite Automata & Regular Expressions": {[]string{"Parsing: Recursive Descent & Pratt", "Logic & Boolean Algebra"},

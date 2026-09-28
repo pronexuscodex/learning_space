@@ -6,6 +6,11 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- Stage 10, Security & Cryptography, doubles from 5 to 10 concepts: memory-safety bugs (overflows and use-after-free, with real compiler output), access control, network attacks and defences, secrets and the software supply chain, and detection and incident response. Each has an analogy, real incidents, a diagram and three exercises built on legal practice sites (pwn.college, PortSwigger, OverTheWire, picoCTF).
+- Stage 10 also gains glossary terms, five free resources, two lab blueprints (a home security lab, fuzzing a C parser) and four quiz questions.
+- Nine dictionary words: broken access control, man-in-the-middle, firewall, denial of service, phishing, two-factor authentication, secrets management, fuzzing and incident response.
+
 ### Fixed
 - Ctrl+C during a Library download now cancels just that download, instead of quitting the app.
 - A download stops with a clear message when the server sends nothing for 30 seconds, instead of waiting up to 15 minutes.
