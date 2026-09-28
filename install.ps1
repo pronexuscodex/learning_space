@@ -47,7 +47,16 @@ if ($userPath) {
     $kept = ($userPath -split ';' | Where-Object { $_ -and ($_.TrimEnd('\') -ne $InstallDir.TrimEnd('\')) }) -join ';'
     if ($kept -ne $userPath) { [Environment]::SetEnvironmentVariable('Path', $kept, 'User') }
 }
-Remove-Item -LiteralPath $InstallDir -Recurse -Force -ErrorAction SilentlyContinue
+# Only the installer's own files: an older academy kept progress, backups
+# and PDFs in this folder, and those must survive an uninstall.
+foreach ($f in 'academy.exe', 'academy.exe.old', 'README.md', 'CHANGELOG.md', 'LICENSE', 'uninstall.ps1') {
+    Remove-Item -LiteralPath (Join-Path $InstallDir $f) -Force -ErrorAction SilentlyContinue
+}
+if (-not (Get-ChildItem -LiteralPath $InstallDir -Force -ErrorAction SilentlyContinue)) {
+    Remove-Item -LiteralPath $InstallDir -Force -ErrorAction SilentlyContinue
+} else {
+    Write-Host "Kept your files in $InstallDir"
+}
 Write-Host 'Removed Systems & AI Academy.'
 Write-Host 'Your progress and PDFs were kept; delete these folders yourself if you no longer want them:'
 if ($where) { $where | ForEach-Object { Write-Host $_ } }

@@ -104,14 +104,17 @@ jobs:
           $dir = Join-Path $env:LOCALAPPDATA 'Programs\Academy'
           $n = @([Environment]::GetEnvironmentVariable('Path', 'User') -split ';' | Where-Object { $_ -eq $dir }).Count
           if ($n -ne 1) { throw "install folder is on PATH $n times" }
-      - name: Uninstall the way Settings > Apps does
+      - name: Uninstall the way Settings > Apps does, keeping the learner's files
         run: |
           $ErrorActionPreference = 'Stop'
+          $dir = Join-Path $env:LOCALAPPDATA 'Programs\Academy'
+          Set-Content -LiteralPath "$dir\academy_campus_registry.json" -Value '{}'
           $cmd = (Get-ItemProperty 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\SystemsAIAcademy').UninstallString
           Write-Host $cmd
           Start-Process -FilePath cmd.exe -ArgumentList "/c $cmd" -Wait -NoNewWindow
-          $dir = Join-Path $env:LOCALAPPDATA 'Programs\Academy'
-          if (Test-Path $dir) { throw 'install folder left behind' }
+          if (-not (Test-Path "$dir\academy_campus_registry.json")) { throw 'uninstall deleted the learner''s progress' }
+          if (Test-Path "$dir\academy.exe") { throw 'academy.exe left behind' }
+          Remove-Item -LiteralPath $dir -Recurse -Force
           if (Test-Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\SystemsAIAcademy') { throw 'Settings > Apps entry left behind' }
           $lnk = Join-Path ([Environment]::GetFolderPath('Programs')) 'Systems & AI Academy.lnk'
           if (Test-Path $lnk) { throw 'Start Menu shortcut left behind' }
