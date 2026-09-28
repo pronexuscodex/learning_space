@@ -7,6 +7,14 @@ versions follow [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- **Track D, Defensive Security**: four new stages, 20 concepts and 60 exercises about protecting real systems.
+  - Stage 17, Secure Coding & Code Review
+  - Stage 18, Identity, Access & Cloud Security
+  - Stage 19, Network Defence & Monitoring
+  - Stage 20, Incident Response, Forensics & Privacy
+
+  Each stage has a glossary, free resources, lab blueprints, a quiz, a classic corner and a type-in whose output comes from running it. Existing registries gain the new stages automatically.
+- A **Links** workflow checks every resource and classic-corner link on curriculum changes and weekly. Sites that refuse automated checks (HTTP 401, 403, 429) are reported as warnings, not failures.
 - Stage 10, Security & Cryptography, doubles from 5 to 10 concepts: memory-safety bugs (overflows and use-after-free, with real compiler output), access control, network attacks and defences, secrets and the software supply chain, and detection and incident response. Each has an analogy, real incidents, a diagram and three exercises built on legal practice sites (pwn.college, PortSwigger, OverTheWire, picoCTF).
 - Stage 10 also gains glossary terms, five free resources, two lab blueprints (a home security lab, fuzzing a C parser) and four quiz questions.
 - Nine dictionary words: broken access control, man-in-the-middle, firewall, denial of service, phishing, two-factor authentication, secrets management, fuzzing and incident response.

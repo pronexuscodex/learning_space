@@ -2,7 +2,7 @@
 
 # Systems & AI Academy: Campus Registry
 
-A terminal-based study companion for **self-learners**. It covers the core of a computer science degree plus modern AI in **17 stages**, starting with how computers work, and it assumes no prior knowledge. Every concept is explained from scratch and comes with **real-world exercises**.
+A terminal-based study companion for **self-learners**. It covers the core of a computer science degree plus modern AI in **21 stages**, starting with how computers work, and it assumes no prior knowledge. Every concept is explained from scratch and comes with **real-world exercises**.
 
 It is written in Go, uses only the standard library, and keeps all your progress in one readable JSON file.
 
@@ -151,8 +151,12 @@ Other flags: `-no-color`, `-check-links` (verify every resource URL), `-backups`
 | | 14 | Probability, Statistics & Classical ML |
 | | 15 | Neural Networks & Autograd from Scratch |
 | | 16 | AI Infrastructure, CUDA & Inference |
+| **D · Defensive Security** | 17 | Secure Coding & Code Review |
+| | 18 | Identity, Access & Cloud Security |
+| | 19 | Network Defence & Monitoring |
+| | 20 | Incident Response, Forensics & Privacy |
 
-That is **98 concepts** and **294 exercises**, plus a glossary, a resource library, lab blueprints, a quiz and a mastery check for every stage. Start Here also lists electives for afterwards: graphics, quantum computing, embedded systems and bioinformatics.
+That is **118 concepts** and **354 exercises**, plus a glossary, a resource library, lab blueprints, a quiz and a mastery check for every stage. Start Here also lists electives for afterwards: graphics, quantum computing, embedded systems and bioinformatics.
 
 ## How computers work (Stage 0)
 
@@ -266,7 +270,7 @@ The menu is grouped into four sections. Keys never change, whatever the layout: 
 | 6 | **Study Hall**: concepts, exercise gym, glossary, resources, lab blueprints, quiz and mastery check |
 | 9 | **Daily Review**: your due spaced-repetition cards, interleaved across stages (`r` works too) |
 | n | **What's next**: up to four recommended steps (due reviews, next concept, an open exercise, a ready mastery check or type-in, a focus session) and one key to start any of them |
-| m | **Roadmap**: all 17 stages by track, each marked locked · ready · in progress · understood · mastered, with concept progress, "you are here", and which stages a locked one still needs; open any stage's Study Hall from it |
+| m | **Roadmap**: all 21 stages by track, each marked locked · ready · in progress · understood · mastered, with concept progress, "you are here", and which stages a locked one still needs; open any stage's Study Hall from it |
 | d | **Programmer's dictionary**: 270+ jargon words explained plainly (see below) |
 | / | **Search** (also `s`): every concept, glossary term, resource, blueprint and classic; all words must match, titles rank first; open a hit directly |
 
