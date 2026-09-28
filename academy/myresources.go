@@ -49,7 +49,7 @@ func validateResource(m MyResource) error {
 		}
 	}
 	for _, s := range []string{m.Title, m.URL, m.Note} {
-		if strings.ContainsAny(s, "\x00\x1b") {
+		if strings.IndexFunc(s, unsafeRune) >= 0 {
 			return errors.New("control characters are not allowed")
 		}
 	}

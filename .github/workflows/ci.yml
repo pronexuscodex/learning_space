@@ -41,6 +41,12 @@ jobs:
       - name: Race detector
         if: runner.os == 'Linux'
         run: go test -race ./...
+      # Known vulnerabilities in the code paths the app actually calls (the
+      # app has no third-party modules, so this covers the Go standard
+      # library). Pinned, like any other dependency.
+      - name: Vulnerability check
+        if: runner.os == 'Linux' && matrix.go == 'stable'
+        run: go run golang.org/x/vuln/cmd/govulncheck@v1.8.0 ./...
       - name: Cross-compile every release target
         if: runner.os == 'Linux' && matrix.go == 'stable'
         run: |

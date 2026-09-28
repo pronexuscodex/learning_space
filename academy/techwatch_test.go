@@ -138,6 +138,13 @@ func TestWatchLogRadarAndFeeds(t *testing.T) {
 	if _, err := reg.saveWatch(WatchItem{Title: "x", Topic: "Gossip", Why: "x"}, now); err == nil {
 		t.Fatal("unknown topics must be refused")
 	}
+	// A hand-typed link is later handed to the system opener, which can run
+	// local programs on some systems: only web links are accepted.
+	for _, link := range []string{"file:///etc/passwd", `C:\Windows\System32\calc.exe`, "javascript:alert(1)", "https://"} {
+		if _, err := reg.saveWatch(WatchItem{Title: "x", URL: link, Topic: "AI", Why: "x"}, now); err == nil {
+			t.Errorf("link %q must be refused", link)
+		}
+	}
 	reg.watchByID(1).Ring = "trial"
 	if r := reg.radar(); len(r["trial"]) != 1 || len(r["adopt"]) != 0 {
 		t.Fatalf("radar = %+v", r)

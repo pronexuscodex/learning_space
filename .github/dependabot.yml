@@ -1,0 +1,12 @@
+# Keep the GitHub Actions used by CI and releases up to date. Each update
+# arrives as a pull request, so CI tests it before anything changes.
+# (The Go module has no dependencies to update.)
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]

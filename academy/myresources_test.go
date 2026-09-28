@@ -27,6 +27,10 @@ func TestAddResourceValidatesAndDedupes(t *testing.T) {
 		{Kind: "Book", Title: "x", URL: "ftp://example.org/x"},
 		{Kind: "Book", Title: "x", URL: "javascript:alert(1)"},
 		{Kind: "Book", Title: "evil\x1b[2J"},
+		{Kind: "Book", Title: "fake\rreal title"},                            // carriage return overwrites the line
+		{Kind: "Book", Title: "x", Note: "8-bit CSI \u009b2J"},               // C1 control code
+		{Kind: "Book", Title: "invoice\u202efdp.exe"},                        // right-to-left override
+		{Kind: "Book", Title: "x", URL: "https://example.org/\u2066x\u2069"}, // bidi isolate in a link
 	}
 	for _, b := range bad {
 		if _, err := reg.addResource(b, now); err == nil {

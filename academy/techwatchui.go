@@ -485,6 +485,8 @@ func (a *App) updateWatchItem(id int) error {
 	case 5:
 		if cur.URL == "" {
 			a.con.warn("No link saved for this item.")
+		} else if !webLink(cur.URL) {
+			a.con.warn("Only http:// and https:// links are opened.")
 		} else if err := openInViewer(cur.URL); err != nil {
 			a.con.warn("Could not open a browser here (%v).", err)
 		}
