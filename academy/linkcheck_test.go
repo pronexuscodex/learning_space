@@ -18,10 +18,14 @@ func TestLinkCheckClassifiesAnswers(t *testing.T) {
 			if r.Method == http.MethodHead {
 				w.WriteHeader(http.StatusMethodNotAllowed)
 			}
+		case "/head-404":
+			if r.Method == http.MethodHead {
+				http.NotFound(w, r)
+			}
 		}
 	}))
 	defer srv.Close()
-	for path, want := range map[string]string{"/ok": "ok", "/bots-not-welcome": "guarded", "/gone": "failed", "/head-refused": "ok"} {
+	for path, want := range map[string]string{"/ok": "ok", "/bots-not-welcome": "guarded", "/gone": "failed", "/head-refused": "ok", "/head-404": "ok"} {
 		l := linkResult{URL: srv.URL + path}
 		l.Status, l.Err = checkLink(srv.Client(), l.URL)
 		got := "failed"

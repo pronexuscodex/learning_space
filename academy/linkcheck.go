@@ -81,7 +81,7 @@ func checkLink(client *http.Client, url string) (int, error) {
 		}
 		io.Copy(io.Discard, io.LimitReader(resp.Body, 64<<10))
 		resp.Body.Close()
-		if method == http.MethodHead && (resp.StatusCode == http.StatusMethodNotAllowed || resp.StatusCode == http.StatusForbidden || resp.StatusCode >= 500) {
+		if method == http.MethodHead && resp.StatusCode >= 400 { // some servers answer HEAD wrongly; ask again with GET
 			continue
 		}
 		return resp.StatusCode, nil

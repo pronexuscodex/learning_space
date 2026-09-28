@@ -57,6 +57,8 @@ func trackColor(id string) func(string) string {
 		return sty.Yellow
 	case "B":
 		return sty.Magenta
+	case "D":
+		return sty.Blue
 	default:
 		return sty.Blue
 	}

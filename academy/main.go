@@ -615,6 +615,17 @@ func seedRegistry() *Registry {
 					),
 				},
 			},
+			{
+				ID:   "D",
+				Name: "Defensive Security",
+				Stages: []Stage{
+					stage(17, "Secure Coding & Code Review",
+						book("Building Secure and Reliable Systems", "Adkins, Beyer, Blankinship et al."),
+						paper("The Protection of Information in Computer Systems", "Saltzer & Schroeder"),
+						book("The Art of Software Security Assessment", "Dowd, McDonald & Schuh"),
+					),
+				},
+			},
 		},
 	}
 }

@@ -574,4 +574,54 @@ for name, params, bytes_per_param in models:
 7B, 4-bit   ( 3.5 GB)  laptop, 100 GB/s:  28.6 tok/s, GPU, 1000 GB/s: 285.7 tok/s
 70B, 4-bit  (35.0 GB)  laptop, 100 GB/s:   2.9 tok/s, GPU, 1000 GB/s:  28.6 tok/s`,
 	},
+	17: {
+		File:    "safejoin.py",
+		Lang:    "Python",
+		Run:     "python3 safejoin.py",
+		Predict: "Which of the six names will safe_join refuse? And where does the naive join send \"/etc/passwd\"?",
+		Lesson:  "Normalising first turns every trick into a plain path, so one simple check (is it still inside the folder?) catches ../ escapes, hidden ../ in the middle, and absolute paths, which make os.path.join throw the base folder away entirely. normpath does not follow symbolic links; a real server also resolves them (realpath) before checking.",
+		Code: `# SAFE JOIN -- keep user-supplied file names inside one folder.
+# A download server, an upload handler, a zip extractor: all of them
+# join a folder with a name that came from outside.
+import posixpath as path
+
+BASE = "/srv/files"
+
+def naive_join(name):
+    return path.join(BASE, name)
+
+def safe_join(name):
+    full = path.normpath(path.join(BASE, name))       # 1. canonicalise
+    if path.commonpath([full, BASE]) != BASE:          # 2. then check
+        raise ValueError("outside " + BASE)
+    return full
+
+for name in ["report.pdf", "2026/notes.txt", "a/./b//c.txt",
+             "../etc/passwd", "a/../../etc/passwd", "/etc/passwd"]:
+    try:
+        verdict = safe_join(name)
+    except ValueError as e:
+        verdict = "REFUSED (" + str(e) + ")"
+    print(name)
+    print("   naive:", naive_join(name))
+    print("   safe: ", verdict)`,
+		Expected: `report.pdf
+   naive: /srv/files/report.pdf
+   safe:  /srv/files/report.pdf
+2026/notes.txt
+   naive: /srv/files/2026/notes.txt
+   safe:  /srv/files/2026/notes.txt
+a/./b//c.txt
+   naive: /srv/files/a/./b//c.txt
+   safe:  /srv/files/a/b/c.txt
+../etc/passwd
+   naive: /srv/files/../etc/passwd
+   safe:  REFUSED (outside /srv/files)
+a/../../etc/passwd
+   naive: /srv/files/a/../../etc/passwd
+   safe:  REFUSED (outside /srv/files)
+/etc/passwd
+   naive: /etc/passwd
+   safe:  REFUSED (outside /srv/files)`,
+	},
 }

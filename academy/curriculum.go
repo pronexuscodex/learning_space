@@ -97,7 +97,7 @@ type StageGuide struct {
 
 // curriculum is every stage's guide, keyed by stage ID. Each track's
 // content lives in its own file.
-var curriculum = mergeGuides(machineGuides, foundationsGuides, systemsAndAIGuides, softwareGuides, dataGuides)
+var curriculum = mergeGuides(machineGuides, foundationsGuides, systemsAndAIGuides, softwareGuides, dataGuides, securityGuides)
 
 // lastStageID is the highest stage number in the curriculum. Nothing else
 // should assume how many stages there are.

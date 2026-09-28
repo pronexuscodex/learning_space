@@ -18,6 +18,7 @@ var stagePrereqs = map[int][]int{
 	5: {1, 2, 4}, 6: {5}, 7: {2, 6}, 8: {6},
 	9: {1}, 10: {3, 8}, 11: {2, 3}, 12: {1, 5},
 	13: {3}, 14: {3, 13}, 15: {13, 14}, 16: {5, 6, 15},
+	17: {1, 10},
 }
 
 // conceptLinks is keyed by Concept.Name.
@@ -251,6 +252,18 @@ var conceptLinks = map[string]links{
 		"The FlashAttention paper. Horace He's post on operator fusion."},
 	"KV Cache, Batching & PagedAttention": {[]string{"Virtual Memory & Paging", "Attention & the Transformer"},
 		"The PagedAttention (vLLM) paper. llama.cpp's source for a real KV cache."},
+
+	// ---- Stage 17
+	"Secure Design Principles": {[]string{"Thinking Like an Attacker: Threat Modelling", "Software Design & Abstraction", "Access Control: Who May Do What"},
+		"Saltzer & Schroeder (this stage's classic), the section on design principles. Building Secure and Reliable Systems: the chapter on design for least privilege."},
+	"Handling Untrusted Input": {[]string{"Web Vulnerabilities: Injection & XSS", "Safe Input & Undefined Behavior", "Parsing: Recursive Descent & Pratt"},
+		"OWASP ASVS: the chapter on validation, sanitization and encoding. OWASP Cheat Sheet Series (Stage 10): the Input Validation cheat sheet."},
+	"Writing Memory-Safe Code": {[]string{"Memory-Safety Bugs: Overflows & Use-After-Free", "Memory Management", "Memory, Addresses & Pointers"},
+		"SEI CERT C Coding Standard: the rules for strings (STR) and memory management (MEM). Building Secure and Reliable Systems: the chapter on writing code."},
+	"Security Code Review": {[]string{"Testing & Reliability", "Version Control with Git", "Thinking Like an Attacker: Threat Modelling"},
+		"Building Secure and Reliable Systems: the chapters on writing code and testing code. OWASP ASVS, used as a review checklist."},
+	"Automated Security Testing": {[]string{"Testing & Reliability", "Secrets & the Software Supply Chain", "From Code to Production"},
+		"OSS-Fuzz documentation: the getting-started guide. The Go fuzzing tutorial."},
 }
 
 // stageOfConcept finds which stage a concept belongs to (0 if unknown).

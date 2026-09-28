@@ -298,4 +298,15 @@ var classicGuides = map[int]ClassicGuide{
 			"GPT-2 training in plain C and CUDA, with no framework in the way.",
 			"Read train_gpt2.c from top to bottom and match each function to a concept from Stage 15."},
 	},
+	17: {
+		Anchor: ClassicRead{"Building Secure and Reliable Systems", "Adkins, Beyer, Blankinship, Lewandowski, Oprea & Stubblefield", 2020, "https://sre.google/books/building-secure-reliable-systems/",
+			"Google's engineers on designing, writing, testing and running systems that stay secure. Free to read online.",
+			"Read the design chapters first (least privilege, understandability), then the chapters on writing and testing code."},
+		Classic: ClassicRead{"The Protection of Information in Computer Systems", "Jerome Saltzer & Michael Schroeder", 1975, "https://www.cs.virginia.edu/~evans/cs551/saltzer/",
+			"The paper that named the design principles still taught today: least privilege, fail-safe defaults, complete mediation and more.",
+			"Read the section on design principles, then find one real breach from this track that broke each principle."},
+		Source: ClassicRead{"strlcpy.c (OpenBSD)", "Todd C. Miller", 0, "https://github.com/openbsd/src/blob/master/lib/libc/string/strlcpy.c",
+			"About 50 lines: a string copy that always takes the buffer size, always terminates, and tells you if it had to cut the string short.",
+			"Read it next to strcpy and strncpy's manual pages, and write down each mistake it makes impossible."},
+	},
 }
