@@ -112,7 +112,7 @@ It needs Go 1.22 or later, and nothing else: there are no dependencies to downlo
 
 ### Where your progress lives
 
-Your progress is one file, `academy_campus_registry.json`. Backups, downloaded PDFs and exports go in the same folder. The program creates the file on first run, in this folder:
+Your progress is one file, `academy_campus_registry.json`. Backups and exports go in the same folder; downloaded PDFs go in your Documents folder (see [Library](#library-pdfs-without-leaving-the-academy)). The program creates the file on first run, in this folder:
 
 | How you run it | Folder |
 |---|---|
@@ -364,11 +364,24 @@ Type any word, alias or part of one (`cast`, `segfault`, `GC`), browse by catego
 
 Press **`l`** on the main menu (or open a stage's **PDF library** in the Study Hall). The Library lists every free, legally hosted PDF in the curriculum, by stage:
 
-- **Whole textbooks whose authors publish the PDF:** *Beej's Guide to C Programming*, Jeff Erickson's *Algorithms*, *Mathematics for Computer Science* (MIT), *Beej's Guide to Network Programming*, *Mathematics for Machine Learning*, *Linear Algebra Done Right* (4th ed., open access) and *An Introduction to Statistical Learning* (Python edition).
+- **Whole textbooks whose authors publish the PDF:** *Beej's Guide to C Programming*, Jeff Erickson's *Algorithms*, *Mathematics for Computer Science* (MIT), *Beej's Guide to Network Programming*, *Mathematics for Machine Learning*, *Linear Algebra Done Right* (4th ed., open access), *Think Stats*, *Crypto 101* and NIST's security guides.
 - **Papers:** arXiv papers (the `arxiv.org/abs/…` page becomes its PDF), such as *Attention Is All You Need*, FlashAttention and PagedAttention.
 - **Classic texts:** Dijkstra, Thompson, Ritchie & Thompson, Codd, Saltzer–Reed–Clark, Brooks, LeCun et al., and more.
 
-Choose a number to download it, with a live progress bar, into `academy_library/` beside your registry. **Ctrl+C** cancels a download without leaving the app, and a download stops by itself if the server sends nothing for 30 seconds. Then open it in your system PDF viewer (`xdg-open`, `open` or the Windows default app) while the academy keeps running. A saved document can be opened, downloaded again or deleted. **`u`** saves a PDF from any https link you give it (an arXiv `abs` link works too), and **`o`** opens the library folder. Resources and classic readings with a PDF are marked **⬇ PDF** throughout the Study Hall.
+Choose a number to download it, with a live progress bar. **Ctrl+C** cancels a download without leaving the app, and a download stops by itself if the server sends nothing for 30 seconds. Then open it in your system PDF viewer (`xdg-open`, `open` or the Windows default app) while the academy keeps running. A saved document can be opened, downloaded again or deleted. **`u`** saves a PDF from any https link you give it (an arXiv `abs` link works too), and **`o`** opens the library folder. Resources and classic readings with a PDF are marked **⬇ PDF** throughout the Study Hall.
+
+Downloads go in a folder you can find in your file manager, arranged by stage and named after the document:
+
+```
+Documents/Academy Library/
+    Stage 01 - Programming Fundamentals in C/
+        Beej's Guide to C Programming.pdf
+    Stage 04 - Digital Logic & Computer Architecture/
+        First Draft of a Report on the EDVAC.pdf
+    My PDFs/                  PDFs you saved from your own links
+```
+
+The Library screen shows the full path, and **`o`** opens it. On Linux the Documents folder is the one your desktop names in `~/.config/user-dirs.dirs`. Set `ACADEMY_LIBRARY` to use another folder; with `ACADEMY_HOME` set, the Library is `$ACADEMY_HOME/Academy Library`. PDFs downloaded by versions before 1.3 (the flat `academy_library/` folder beside the registry) are moved into place and renamed the first time you open the Library. PDFs you copy into the folder yourself show up in the list as **Yours**.
 
 To prepare for offline study (Classic Mode's "offline blocks"), run `./academy -fetch-library` once: it downloads everything not yet saved and reports anything that failed.
 

@@ -44,6 +44,7 @@ def session(rng, keys, reg):
             os.environ[k] = "http://127.0.0.1:9"  # the discard port: connection refused
         for k in ("NO_PROXY", "no_proxy"):
             os.environ.pop(k, None)
+        os.environ["ACADEMY_LIBRARY"] = os.path.join(os.path.dirname(reg), "library")  # never the real Documents
         os.execv(BIN, ["academy", "-registry", reg])
     set_size(fd, rng.choice([24, 40, 60]), rng.choice([40, 60, 80, 120]))
     out = bytearray()

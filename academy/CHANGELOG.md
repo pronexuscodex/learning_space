@@ -4,6 +4,16 @@ All notable changes to the Systems & AI Academy are listed here. The
 format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 versions follow [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Changed
+- **Library PDFs now live where you can find them**: `Documents/Academy Library`, with one folder per stage (`Stage 04 - Digital Logic & Computer Architecture/…`) and a `My PDFs` folder for PDFs saved from your own links. Files are named after the document, not a code. The Library screen shows the folder's full path, and `o` opens it.
+- PDFs downloaded by earlier versions (the flat `academy_library` folder beside the registry) are moved into the new folders and renamed the first time the Library opens. Nothing is downloaded again.
+- `ACADEMY_LIBRARY` chooses another folder; with `ACADEMY_HOME` set, the Library sits inside it.
+
+### Fixed
+- PDFs you put in the Library folder yourself, in any sub-folder, are listed as **Yours** and can be opened or deleted from the app.
+
 ## [1.2.0] - 2026-09-28
 
 ### Added
