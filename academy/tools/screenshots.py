@@ -51,6 +51,7 @@ SHOTS = {
     "progress": (80, ["p"], r"PROGRESS REPORT", r"Achievements", 45),
     "library": (80, ["l"], r"LIBRARY", r"Stage 2 ·", 30),
     "techwatch": (80, ["w", "4"], r"MY TECH RADAR", r"press Enter", 30),
+    "share-card": (80, ["k"], r"╭", r"learning_space", 25),
     "start-here": (80, ["0"], r"WHY WE START WITH C", r"GET A C COMPILER", 20),
     "struggle-clock": (80, ["c", "y", "6", "1", "2", "5", "2", "y"], r"PRACTICE", r"learning happens", 30, -2),
 }

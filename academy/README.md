@@ -2,9 +2,11 @@
 
 # Systems & AI Academy: Campus Registry
 
-A terminal-based study companion for **self-learners**. It covers the core of a computer science degree plus modern AI in **21 stages**, starting with how computers work, and it assumes no prior knowledge. Every concept is explained from scratch and comes with **real-world exercises**.
+A terminal-based study companion for **self-learners**. It covers the core of a computer science degree plus modern AI and defensive security in **21 stages**, starting with how computers work, and it assumes no prior knowledge. Every concept is explained from scratch and comes with **real-world exercises**.
 
 It is written in Go, uses only the standard library, and keeps all your progress in one readable JSON file.
+
+![A 30-second tour of the academy](docs/demo.gif)
 
 New here? Build it (below), run it, and press **`0`** for the *Start Here* guide. The path starts at **Stage 0, How Computers Work**, then **Stage 1, C**.
 
@@ -680,6 +682,7 @@ Other tools in `tools/`:
 - `packages.py`: writes the Homebrew formula and the Scoop manifest from a release's `SHA256SUMS`; the release workflow runs it for you.
 - `monkey.py`: sends thousands of random keys and fails on any crash or hang.
 - `screenshots.py`: regenerates `docs/*.png` from the real app, using a demo registry and headless Chromium.
+- `demo_gif.py`: makes `docs/demo.gif`, the README tour, from the same real screens (needs Pillow as well).
 - `icons.py`: regenerates every icon asset from `assets/icon.svg` and `assets/icon-small.svg` (the pin-less version used at 16–32 px), using headless Chromium:
   - PNGs from 16 to 1024 px;
   - `assets/academy.ico`;
