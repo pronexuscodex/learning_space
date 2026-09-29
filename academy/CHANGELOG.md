@@ -4,7 +4,7 @@ All notable changes to the Systems & AI Academy are listed here. The
 format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 versions follow [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [1.3.0] - 2026-09-29
 
 ### Added
 - **One-command installer** for Windows (`install.ps1`) and for macOS and Linux (`install.sh`). No administrator rights are needed, and the checksum is verified before anything is installed. It puts `academy` on your PATH and adds the app with its icon to the Start Menu, Launchpad or the applications menu. On Windows it also appears in Settings → Apps, where it can be uninstalled. Running the same command again upgrades it.
