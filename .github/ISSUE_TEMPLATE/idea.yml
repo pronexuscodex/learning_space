@@ -1,0 +1,15 @@
+name: Idea or improvement
+description: A clearer explanation, a new exercise, a feature, a new topic.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would make the academy better?
+      description: If it is about a concept, name the stage and concept.
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Who does it help, and how?

@@ -77,6 +77,7 @@ Examples:
   academy -backups                         list automatic backups
   academy -restore 1                       restore the newest backup
   academy -where                           show where your progress and PDFs are
+  academy -card                            print your progress as a card to share
   academy -fetch-library                   download every free PDF for offline study
   ACADEMY_HOME=~/study academy             keep the registry, backups and PDFs in ~/study
   ACADEMY_LIBRARY=~/pdfs academy           save Library PDFs in ~/pdfs

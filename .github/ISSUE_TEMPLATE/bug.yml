@@ -1,0 +1,22 @@
+name: Something is wrong
+description: A bug, a crash, a broken link, a typo or a screen that looks wrong.
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What did you do, what did you expect, and what happened instead? A screenshot helps a lot.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: The output of `academy -version`.
+      placeholder: academy v1.3.0 (go1.27.1, windows/amd64)
+  - type: dropdown
+    id: install
+    attributes:
+      label: How did you install it?
+      options: [One-command installer, Homebrew, Scoop, Downloaded a release, Built from source]
