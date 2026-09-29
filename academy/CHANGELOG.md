@@ -4,7 +4,7 @@ All notable changes to the Systems & AI Academy are listed here. The
 format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 versions follow [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [1.4.0] - 2026-09-29
 
 ### Added
 - **Share card** (`k` on the menu, or `academy -card`): your progress on one screenshot-ready card, with concepts, exercises, stages, study time, streak, achievements and a bar per track, plus the project's address. Post it with #LearnInPublic.
