@@ -83,16 +83,35 @@ switch ($native) {
     default { throw "academy install: unsupported processor '$native' (64-bit Intel/AMD or ARM is needed)" }
 }
 
-if (-not $Version) {
+function Get-LatestTag {
     # The latest-release page redirects to its tag; no API token or rate limit.
-    $req = [Net.WebRequest]::Create("https://github.com/$Repo/releases/latest")
-    $req.Method = 'HEAD'
-    $resp = $req.GetResponse()
-    $Version = $resp.ResponseUri.AbsoluteUri.Split('/')[-1]
-    $resp.Close()
+    try {
+        $req = [Net.WebRequest]::Create("https://github.com/$Repo/releases/latest")
+        $req.Method = 'HEAD'
+        $resp = $req.GetResponse()
+        $tag = $resp.ResponseUri.AbsoluteUri.Split('/')[-1]
+        $resp.Close()
+        return $tag
+    } catch {
+        return ''
+    }
 }
-if ($Version -notmatch '^v\d+\.\d+\.\d+$') {
-    throw "academy install: '$Version' is not a release version; set `$env:ACADEMY_VERSION = 'vX.Y.Z', or leave it unset for the latest"
+
+if ($Version) {
+    if ($Version -notmatch '^v\d+\.\d+\.\d+$') {
+        throw "academy install: '$Version' is not a release version; set `$env:ACADEMY_VERSION = 'vX.Y.Z', or leave it unset for the latest"
+    }
+} else {
+    # While a release is being published, GitHub can briefly have no
+    # "latest" release; wait a little rather than fail at once.
+    $Version = Get-LatestTag
+    for ($i = 0; $i -lt 6 -and $Version -notmatch '^v\d+\.\d+\.\d+$'; $i++) {
+        Start-Sleep -Seconds 10
+        $Version = Get-LatestTag
+    }
+    if ($Version -notmatch '^v\d+\.\d+\.\d+$') {
+        throw 'academy install: could not find the latest release on GitHub; check your connection and try again in a few minutes, or set $env:ACADEMY_VERSION'
+    }
 }
 
 $name = "academy-$Version-windows-$arch"
@@ -103,8 +122,14 @@ try {
     Write-Host "Downloading $AppName $Version for windows/$arch..."
     $zip = Join-Path $tmp "$name.zip"
     $sums = Join-Path $tmp 'SHA256SUMS'
+    # A new release gets its files a few minutes after it is published.
+    try {
+        Invoke-WebRequest -UseBasicParsing "$base/SHA256SUMS" -OutFile $sums
+    } catch {
+        if ($env:ACADEMY_VERSION) { throw "academy install: there is no release $Version (see https://github.com/$Repo/releases)" }
+        throw "academy install: $Version has no files yet (it may have just been published); try again in a few minutes"
+    }
     Invoke-WebRequest -UseBasicParsing "$base/$name.zip" -OutFile $zip
-    Invoke-WebRequest -UseBasicParsing "$base/SHA256SUMS" -OutFile $sums
 
     $want = $null
     foreach ($line in Get-Content $sums) {

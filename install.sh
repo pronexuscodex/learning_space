@@ -87,21 +87,37 @@ fi
 need tar
 need gzip
 
-version=${ACADEMY_VERSION:-}
-if [ -z "$version" ]; then
+latest_tag() {
 	# The latest-release page redirects to its tag; no API token or rate limit.
 	if command -v curl >/dev/null 2>&1; then
-		url=$(curl -fsSLI --proto '=https' -o /dev/null -w '%{url_effective}' "https://github.com/$REPO/releases/latest")
+		url=$(curl -fsSLI --proto '=https' -o /dev/null -w '%{url_effective}' "https://github.com/$REPO/releases/latest" || true)
 	else
 		url=$(wget -q --https-only --max-redirect=5 -S --spider "https://github.com/$REPO/releases/latest" 2>&1 | sed -n 's/^ *[Ll]ocation: *//p' | tail -n 1)
 	fi
-	version=${url##*/}
-	version=$(printf '%s' "$version" | tr -d '\r')
+	printf '%s' "${url##*/}" | tr -d '\r'
+}
+is_version() {
+	case $1 in
+	v[0-9]*.[0-9]*.[0-9]*) return 0 ;;
+	*) return 1 ;;
+	esac
+}
+
+version=${ACADEMY_VERSION:-}
+if [ -n "$version" ]; then
+	is_version "$version" || fail "'$version' is not a release version; set ACADEMY_VERSION=vX.Y.Z, or leave it unset for the latest"
+else
+	# While a release is being published, GitHub can briefly have no
+	# "latest" release; wait a little rather than fail at once.
+	tries=0
+	version=$(latest_tag)
+	while ! is_version "$version" && [ $tries -lt 6 ]; do
+		tries=$((tries + 1))
+		sleep 10
+		version=$(latest_tag)
+	done
+	is_version "$version" || fail "could not find the latest release on GitHub; check your connection and try again in a few minutes, or set ACADEMY_VERSION=vX.Y.Z"
 fi
-case $version in
-v[0-9]*.[0-9]*.[0-9]*) ;;
-*) fail "'$version' is not a release version; set ACADEMY_VERSION=vX.Y.Z, or leave it unset for the latest" ;;
-esac
 
 name=academy-$version-$os-$arch
 base=https://github.com/$REPO/releases/download/$version
@@ -109,8 +125,12 @@ tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT INT TERM
 
 say "Downloading $APP_NAME $version for $os/$arch..."
+# A new release gets its files a few minutes after it is published.
+if ! fetch "$base/SHA256SUMS" "$tmp/SHA256SUMS" 2>/dev/null; then
+	[ -n "${ACADEMY_VERSION:-}" ] && fail "there is no release $version (see https://github.com/$REPO/releases)"
+	fail "$version has no files yet (it may have just been published); try again in a few minutes"
+fi
 fetch "$base/$name.tar.gz" "$tmp/$name.tar.gz"
-fetch "$base/SHA256SUMS" "$tmp/SHA256SUMS"
 
 want=$(awk -v f="$name.tar.gz" '$2 == f { print $1 }' "$tmp/SHA256SUMS")
 [ -n "$want" ] || fail "$name.tar.gz is not listed in SHA256SUMS"
