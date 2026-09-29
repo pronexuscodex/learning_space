@@ -6,6 +6,9 @@ name: Install
 # again as an upgrade, then uninstall and check nothing is left behind.
 on:
   push:
+    # Branches only: a release tag is tested after the Release workflow
+    # has attached its files (workflow_run below).
+    branches: ["**"]
     paths: ["install.sh", "install.ps1", ".github/workflows/install.yml"]
   pull_request:
     paths: ["install.sh", "install.ps1", ".github/workflows/install.yml"]
