@@ -42,10 +42,11 @@ func TestLibraryCatalogue(t *testing.T) {
 		if !strings.HasPrefix(d.PDF, "https://") || d.Title == "" || d.Stage < 0 || d.Stage > lastStageID() {
 			t.Errorf("bad document %+v", d)
 		}
-		if names[d.fileName()] {
-			t.Errorf("duplicate file name %s", d.fileName())
+		key := strings.ToLower(d.relPath()) // Windows and macOS ignore case
+		if names[key] {
+			t.Errorf("duplicate file name %s", d.relPath())
 		}
-		names[d.fileName()] = true
+		names[key] = true
 		if i > 0 && docs[i-1].Stage > d.Stage {
 			t.Error("documents should be ordered by stage")
 		}
@@ -63,8 +64,9 @@ func TestLibraryCatalogue(t *testing.T) {
 			t.Errorf("hasPDF(%s) = false", b.Page)
 		}
 	}
-	if got := (LibraryDoc{Stage: 3, Title: "Mathematics for Computer Science!"}).fileName(); got != "stage03-mathematics-for-computer-science.pdf" {
-		t.Errorf("fileName = %q", got)
+	want := filepath.Join("Stage 03 - Discrete Mathematics, Logic & Probability", "Mathematics for Computer Science!.pdf")
+	if got := (LibraryDoc{Stage: 3, Title: "Mathematics for Computer Science!"}).relPath(); got != want {
+		t.Errorf("relPath = %q, want %q", got, want)
 	}
 	if slug("../../etc/passwd", 60) != "etc-passwd" {
 		t.Error("slug must not keep path separators")
@@ -134,19 +136,113 @@ func TestDownloadPDF(t *testing.T) {
 func TestOwnDownloadsAndPartials(t *testing.T) {
 	dir := t.TempDir()
 	cat := libraryDocs()
-	os.WriteFile(filepath.Join(dir, cat[0].fileName()), []byte("%PDF-"), 0o644)
-	os.WriteFile(filepath.Join(dir, "my-notes.pdf"), []byte("%PDF-"), 0o644)
-	os.WriteFile(filepath.Join(dir, ".academy-download-123.part"), []byte("%PD"), 0o644)
+	put := func(rel string) {
+		p := filepath.Join(dir, rel)
+		os.MkdirAll(filepath.Dir(p), 0o755)
+		os.WriteFile(p, []byte("%PDF-"), 0o644)
+	}
+	put(cat[0].relPath())
+	put(filepath.Join(myPDFsFolder, "my notes.pdf"))
+	put(filepath.Join("Arranged by me", "Exam prep", "past paper.PDF")) // a folder the learner made
+	put(filepath.Join(stageFolder(1), ".academy-download-123.part"))
 	own := ownDownloads(dir, cat)
-	if len(own) != 1 || own[0].Title != "my-notes" {
+	if len(own) != 2 || own[0].Title != "past paper" || own[1].Title != "my notes" {
 		t.Fatalf("own downloads = %+v", own)
+	}
+	if own[1].relPath() != filepath.Join(myPDFsFolder, "my notes.pdf") {
+		t.Errorf("own download path = %q", own[1].relPath())
 	}
 	if _, ok := cat[0].downloaded(dir); !ok {
 		t.Fatal("catalogue file should count as downloaded")
 	}
 	cleanPartials(dir)
-	if _, err := os.Stat(filepath.Join(dir, ".academy-download-123.part")); !os.IsNotExist(err) {
-		t.Fatal("partial download should be removed")
+	if _, err := os.Stat(filepath.Join(dir, stageFolder(1), ".academy-download-123.part")); !os.IsNotExist(err) {
+		t.Fatal("partial download should be removed, in any sub-folder")
+	}
+}
+
+func TestLibraryFolderLocation(t *testing.T) {
+	reg := filepath.FromSlash("/data/academy/r.json")
+	docs := func() (string, error) { return filepath.FromSlash("/home/ada/Documents"), nil }
+	noDocs := func() (string, error) { return "", os.ErrNotExist }
+	env := func(kv ...string) func(string) string {
+		return func(k string) string {
+			for i := 0; i+1 < len(kv); i += 2 {
+				if kv[i] == k {
+					return kv[i+1]
+				}
+			}
+			return ""
+		}
+	}
+	for _, c := range []struct {
+		name string
+		got  string
+		want string
+	}{
+		{"Documents by default", libraryDirFor(reg, env(), docs), "/home/ada/Documents/Academy Library"},
+		{"ACADEMY_LIBRARY wins", libraryDirFor(reg, env("ACADEMY_LIBRARY", filepath.FromSlash("/pdfs"), "ACADEMY_HOME", filepath.FromSlash("/study")), docs), "/pdfs"},
+		{"inside ACADEMY_HOME", libraryDirFor(reg, env("ACADEMY_HOME", filepath.FromSlash("/study")), docs), "/study/Academy Library"},
+		{"no home folder: beside the registry", libraryDirFor(reg, env(), noDocs), "/data/academy/Academy Library"},
+	} {
+		if c.got != filepath.FromSlash(c.want) {
+			t.Errorf("%s: %s, want %s", c.name, c.got, filepath.FromSlash(c.want))
+		}
+	}
+	home := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, ".config"))
+	os.MkdirAll(filepath.Join(home, ".config"), 0o755)
+	os.WriteFile(filepath.Join(home, ".config", "user-dirs.dirs"), []byte("# written by xdg-user-dirs-update\nXDG_DOCUMENTS_DIR=\"$HOME/Dokumente\"\n"), 0o644)
+	if got := xdgDocuments(home); got != filepath.Join(home, "Dokumente") {
+		t.Errorf("xdgDocuments = %q", got)
+	}
+}
+
+func TestCleanNameIsSafeEverywhere(t *testing.T) {
+	for in, want := range map[string]string{
+		"NIST SP 800-207: Zero Trust Architecture": "NIST SP 800-207 - Zero Trust Architecture",
+		"../../etc/passwd":                         ".. .. etc passwd",
+		`a\b/c<d>e"f|g?h*i`:                        "a b c d e f g h i",
+		"trailing dots...":                         "trailing dots",
+		"CON":                                      "_CON",
+		"Networks, Sockets, & Distributed Topology": "Networks, Sockets, & Distributed Topology",
+		"bell\x07 and\u202eflip":                    "bell and flip",
+	} {
+		if got := cleanName(in, 100); got != want {
+			t.Errorf("cleanName(%q) = %q, want %q", in, got, want)
+		}
+	}
+	if got := cleanName(strings.Repeat("x", 300), 100); len(got) != 100 {
+		t.Errorf("long names are cut to 100, got %d", len(got))
+	}
+}
+
+func TestLegacyLibraryIsMovedAndArranged(t *testing.T) {
+	root := t.TempDir()
+	reg := filepath.Join(root, "academy_campus_registry.json")
+	old := filepath.Join(root, legacyLibraryName)
+	os.MkdirAll(old, 0o755)
+	doc := libraryDocs()[0]
+	os.WriteFile(filepath.Join(old, doc.legacyFileName()), []byte("%PDF-catalogue"), 0o644)
+	os.WriteFile(filepath.Join(old, "my-own-paper.pdf"), []byte("%PDF-own"), 0o644)
+	os.WriteFile(filepath.Join(old, ".academy-download-9.part"), []byte("%PD"), 0o644)
+	lib := filepath.Join(root, "Documents", libraryFolderName)
+
+	n, err := migrateLegacyLibrary(reg, lib)
+	if err != nil || n != 2 {
+		t.Fatalf("moved %d, err %v", n, err)
+	}
+	if b, _ := os.ReadFile(filepath.Join(lib, doc.relPath())); string(b) != "%PDF-catalogue" {
+		t.Error("the catalogue PDF should be in its stage folder with a readable name")
+	}
+	if b, _ := os.ReadFile(filepath.Join(lib, myPDFsFolder, "my-own-paper.pdf")); string(b) != "%PDF-own" {
+		t.Error("the learner's own PDF should be in My PDFs")
+	}
+	if _, err := os.Stat(old); !os.IsNotExist(err) {
+		t.Error("the empty old folder should be removed")
+	}
+	if n, err := migrateLegacyLibrary(reg, lib); n != 0 || err != nil {
+		t.Errorf("a second run should do nothing: %d, %v", n, err)
 	}
 }
 

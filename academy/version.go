@@ -76,10 +76,29 @@ Examples:
   academy -registry ~/study/academy.json   keep your progress somewhere else
   academy -backups                         list automatic backups
   academy -restore 1                       restore the newest backup
+  academy -where                           show where your progress and PDFs are
   academy -fetch-library                   download every free PDF for offline study
   ACADEMY_HOME=~/study academy             keep the registry, backups and PDFs in ~/study
+  ACADEMY_LIBRARY=~/pdfs academy           save Library PDFs in ~/pdfs
+
+Library PDFs are saved in Documents/Academy Library, one folder per stage.
 
 Inside the app, press 0 for Start Here and ? for every key.
 `)
 	}
+}
+
+// whereText answers "where is everything?" for -where.
+func whereText(exe, regPath string) string {
+	rows := [][2]string{
+		{"Program", exe},
+		{"Progress", regPath},
+		{"Backups", backupDir(regPath)},
+		{"PDFs", libraryDir(regPath)},
+	}
+	var b strings.Builder
+	for _, r := range rows {
+		fmt.Fprintf(&b, "%-9s %s\n", r[0]+":", r[1])
+	}
+	return b.String()
 }

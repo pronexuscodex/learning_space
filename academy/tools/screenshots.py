@@ -65,6 +65,7 @@ def run_session(cols, keys, registry, from_key=-1):
     if pid == 0:
         os.environ["TERM"] = "xterm-256color"
         os.environ.pop("NO_COLOR", None)
+        os.environ["ACADEMY_LIBRARY"] = tempfile.mkdtemp(prefix="academy-library-")  # never the real Documents
         os.execv(BIN, ["academy", "-registry", registry])
     fcntl.ioctl(fd, termios.TIOCSWINSZ, struct.pack("HHHH", 200, cols, 0, 0))
     out = bytearray()

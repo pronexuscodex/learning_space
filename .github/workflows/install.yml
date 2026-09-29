@@ -1,0 +1,121 @@
+name: Install
+
+# Runs the install scripts for real on Linux, macOS and Windows against the
+# latest published release: install, check everything a learner sees
+# (program, PATH, app menu or Start Menu entry, Settings > Apps), install
+# again as an upgrade, then uninstall and check nothing is left behind.
+on:
+  push:
+    paths: ["install.sh", "install.ps1", ".github/workflows/install.yml"]
+  pull_request:
+    paths: ["install.sh", "install.ps1", ".github/workflows/install.yml"]
+  workflow_run:
+    workflows: [Release]
+    types: [completed]
+  schedule:
+    - cron: "41 6 * * 1" # Mondays 06:41 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  unix:
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Lint
+        if: runner.os == 'Linux'
+        run: shellcheck install.sh
+      # A clean PATH, as on a fresh computer: runners already list ~/.local/bin.
+      - name: Install
+        env:
+          SHELL: /bin/bash
+        run: env PATH=/usr/bin:/bin:/usr/sbin:/sbin sh ./install.sh
+      - name: Check the install
+        run: |
+          set -eux
+          test -x "$HOME/.local/bin/academy"
+          "$HOME/.local/bin/academy" -version
+          grep -q 'Systems & AI Academy installer' "$HOME/.bashrc" "$HOME/.bash_profile" 2>/dev/null
+          if [ "$RUNNER_OS" = macOS ]; then
+            test -x "$HOME/Applications/Academy.app/Contents/MacOS/Academy"
+            plutil -lint "$HOME/Applications/Academy.app/Contents/Info.plist"
+            test -s "$HOME/Applications/Academy.app/Contents/Resources/Academy.icns"
+          else
+            test -s "$HOME/.local/share/applications/academy.desktop"
+            test -s "$HOME/.local/share/icons/hicolor/256x256/apps/academy.png"
+            if command -v desktop-file-validate >/dev/null; then desktop-file-validate "$HOME/.local/share/applications/academy.desktop"; fi
+          fi
+      - name: Install again (upgrade) without duplicating anything
+        env:
+          SHELL: /bin/bash
+        run: |
+          env PATH=/usr/bin:/bin:/usr/sbin:/sbin sh ./install.sh
+          n=$({ cat "$HOME/.bashrc" "$HOME/.bash_profile" 2>/dev/null || true; } | grep -c 'Systems & AI Academy installer')
+          test "$n" = 1
+      - name: Uninstall
+        run: |
+          set -eux
+          sh ./install.sh --uninstall
+          test ! -e "$HOME/.local/bin/academy"
+          test ! -e "$HOME/.local/share/applications/academy.desktop"
+          test ! -e "$HOME/Applications/Academy.app"
+
+  windows:
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
+    strategy:
+      fail-fast: false
+      matrix:
+        shell: [powershell, pwsh] # Windows PowerShell 5.1 and PowerShell 7
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: ${{ matrix.shell }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install the way learners do (irm | iex)
+        run: Get-Content -Raw ./install.ps1 | Invoke-Expression
+      - name: Check the install
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $dir = Join-Path $env:LOCALAPPDATA 'Programs\Academy'
+          if (-not (Test-Path "$dir\academy.exe")) { throw 'academy.exe missing' }
+          & "$dir\academy.exe" -version
+          if ($LASTEXITCODE -ne 0) { throw 'academy -version failed' }
+          $lnk = Join-Path ([Environment]::GetFolderPath('Programs')) 'Systems & AI Academy.lnk'
+          if (-not (Test-Path $lnk)) { throw 'Start Menu shortcut missing' }
+          $target = (New-Object -ComObject WScript.Shell).CreateShortcut($lnk).TargetPath
+          if ($target -ne "$dir\academy.exe") { throw "shortcut points at $target" }
+          $key = Get-ItemProperty 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\SystemsAIAcademy'
+          if ($key.DisplayName -ne 'Systems & AI Academy') { throw 'Settings > Apps entry missing' }
+          if (-not (Test-Path "$dir\uninstall.ps1")) { throw 'uninstall.ps1 missing' }
+          $userPath = [Environment]::GetEnvironmentVariable('Path', 'User')
+          if (-not (($userPath -split ';') -contains $dir)) { throw 'not on the user PATH' }
+      - name: Install again (upgrade) without duplicating anything
+        run: |
+          $ErrorActionPreference = 'Stop'
+          ./install.ps1
+          $dir = Join-Path $env:LOCALAPPDATA 'Programs\Academy'
+          $n = @([Environment]::GetEnvironmentVariable('Path', 'User') -split ';' | Where-Object { $_ -eq $dir }).Count
+          if ($n -ne 1) { throw "install folder is on PATH $n times" }
+      - name: Uninstall the way Settings > Apps does, keeping the learner's files
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $dir = Join-Path $env:LOCALAPPDATA 'Programs\Academy'
+          Set-Content -LiteralPath "$dir\academy_campus_registry.json" -Value '{}'
+          $cmd = (Get-ItemProperty 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\SystemsAIAcademy').UninstallString
+          Write-Host $cmd
+          Start-Process -FilePath cmd.exe -ArgumentList "/c $cmd" -Wait -NoNewWindow
+          if (-not (Test-Path "$dir\academy_campus_registry.json")) { throw 'uninstall deleted the learner''s progress' }
+          if (Test-Path "$dir\academy.exe") { throw 'academy.exe left behind' }
+          Remove-Item -LiteralPath $dir -Recurse -Force
+          if (Test-Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\SystemsAIAcademy') { throw 'Settings > Apps entry left behind' }
+          $lnk = Join-Path ([Environment]::GetFolderPath('Programs')) 'Systems & AI Academy.lnk'
+          if (Test-Path $lnk) { throw 'Start Menu shortcut left behind' }
+          if (([Environment]::GetEnvironmentVariable('Path', 'User') -split ';') -contains $dir) { throw 'PATH entry left behind' }

@@ -4,6 +4,21 @@ All notable changes to the Systems & AI Academy are listed here. The
 format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 versions follow [Semantic Versioning](https://semver.org/).
 
+## [1.3.0] - 2026-09-29
+
+### Added
+- **One-command installer** for Windows (`install.ps1`) and for macOS and Linux (`install.sh`). No administrator rights are needed, and the checksum is verified before anything is installed. It puts `academy` on your PATH and adds the app with its icon to the Start Menu, Launchpad or the applications menu. On Windows it also appears in Settings → Apps, where it can be uninstalled. Running the same command again upgrades it.
+- `academy -where` shows where the program, your progress, backups and PDFs are.
+
+### Changed
+- An installed academy (installer, `/usr/local/bin`, `Program Files` and similar) keeps your progress in your per-user data folder, like one installed by a package manager. A registry that an older version left beside the program keeps being used.
+- **Library PDFs now live where you can find them**: `Documents/Academy Library`, with one folder per stage (`Stage 04 - Digital Logic & Computer Architecture/…`) and a `My PDFs` folder for PDFs saved from your own links. Files are named after the document, not a code. The Library screen shows the folder's full path, and `o` opens it.
+- PDFs downloaded by earlier versions (the flat `academy_library` folder beside the registry) are moved into the new folders and renamed the first time the Library opens. Nothing is downloaded again.
+- `ACADEMY_LIBRARY` chooses another folder; with `ACADEMY_HOME` set, the Library sits inside it.
+
+### Fixed
+- PDFs you put in the Library folder yourself, in any sub-folder, are listed as **Yours** and can be opened or deleted from the app.
+
 ## [1.2.0] - 2026-09-28
 
 ### Added

@@ -50,6 +50,7 @@ def run(cols, rows=60):
     if os.path.exists(reg): os.remove(reg)
     pid, fd = pty.fork()
     if pid == 0:
+        os.environ["ACADEMY_LIBRARY"] = tempfile.mkdtemp(prefix="academy-library-")  # never the real Documents
         os.execv(os.environ.get("ACADEMY_BIN", os.path.join(D, "..", "academy")), ["academy", "-registry", reg])
     fcntl.ioctl(fd, termios.TIOCSWINSZ, struct.pack("HHHH", rows, cols, 0, 0))
     out = b""

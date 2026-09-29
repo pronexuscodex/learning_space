@@ -36,6 +36,36 @@ New here? Build it (below), run it, and press **`0`** for the *Start Here* guide
 
 ## Install
 
+### Recommended: the installer (one command)
+
+It installs the academy like any other app, without administrator rights: the program goes where your system keeps per-user apps, `academy` works in every new terminal, and the app appears in your app menu with its icon. The installer downloads the latest release from this repository and checks its SHA256 checksum before installing anything.
+
+**Windows** (PowerShell):
+
+```powershell
+irm https://raw.githubusercontent.com/pronexuscodex/learning_space/main/install.ps1 | iex
+```
+
+This adds **Systems & AI Academy** to the Start Menu and to **Settings → Apps → Installed apps**, where you can uninstall it like any other app.
+
+**macOS and Linux** (Terminal):
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/pronexuscodex/learning_space/main/install.sh | sh
+```
+
+On macOS, **Academy** appears in Launchpad and Spotlight and can be kept in the Dock. On Linux, **Systems & AI Academy** is added to your applications menu. Both open in a terminal window.
+
+| | Windows | macOS and Linux |
+|---|---|---|
+| Program | `%LocalAppData%\Programs\Academy\academy.exe` | `~/.local/bin/academy` |
+| Your progress and backups | `%LocalAppData%\academy` | `~/Library/Application Support/academy` (macOS), `~/.local/share/academy` (Linux) |
+| Your PDFs | `Documents\Academy Library` | `Documents/Academy Library` |
+
+To **upgrade**, run the same command again: your progress and PDFs are never touched. `academy -where` shows exactly where everything is. To **uninstall**, use Settings → Apps on Windows, or run `curl -fsSL https://raw.githubusercontent.com/pronexuscodex/learning_space/main/install.sh | sh -s -- --uninstall` on macOS and Linux. Uninstalling keeps your progress and PDFs, and lists where they are in case you want to delete them too.
+
+Installed this way, the program never shows the "unknown developer" or SmartScreen warnings that downloaded files get. To install a specific version, set `ACADEMY_VERSION=v1.2.0` first.
+
 ### With a package manager (from version 1.1.0)
 
 **macOS and Linux, with [Homebrew](https://brew.sh):**
@@ -112,7 +142,7 @@ It needs Go 1.22 or later, and nothing else: there are no dependencies to downlo
 
 ### Where your progress lives
 
-Your progress is one file, `academy_campus_registry.json`. Backups, downloaded PDFs and exports go in the same folder. The program creates the file on first run, in this folder:
+Your progress is one file, `academy_campus_registry.json`. Backups and exports go in the same folder; downloaded PDFs go in your Documents folder (see [Library](#library-pdfs-without-leaving-the-academy)). The program creates the file on first run, in this folder:
 
 | How you run it | Folder |
 |---|---|
@@ -121,10 +151,11 @@ Your progress is one file, `academy_campus_registry.json`. Backups, downloaded P
 | Installed with Homebrew on macOS | `~/Library/Application Support/academy` |
 | Installed with Homebrew on Linux | `~/.local/share/academy` (or `$XDG_DATA_HOME/academy`) |
 | Installed with Scoop or winget | `%LocalAppData%\academy` |
-| A downloaded or self-built binary | next to the binary |
+| Installed with the installer, or in a system folder such as `/usr/local/bin` or `Program Files` | the same per-user folder as above for your system |
+| A downloaded or self-built binary anywhere else | next to the binary (a portable copy, for example on a USB stick) |
 | `go run .` | the current directory, because the temporary build folder would be deleted |
 
-Package managers replace their install folder on every upgrade, which is why those installs keep your data elsewhere. To move from a downloaded copy to a package-manager install, move your registry and its folders into the new location, or set `ACADEMY_HOME` to the old folder.
+Installers and package managers replace their install folder on every upgrade, which is why those installs keep your data elsewhere. If an older version left a registry beside an installed binary, it keeps being used. Run `academy -where` to see which folders are in use. To move from a downloaded copy to a package-manager install, move your registry and its folders into the new location, or set `ACADEMY_HOME` to the old folder.
 
 Other flags: `-no-color`, `-check-links` (verify every resource URL), `-backups` (list automatic backups), `-restore N` (restore one) and `-fetch-library` (download every PDF in the Library for offline study).
 
@@ -364,11 +395,24 @@ Type any word, alias or part of one (`cast`, `segfault`, `GC`), browse by catego
 
 Press **`l`** on the main menu (or open a stage's **PDF library** in the Study Hall). The Library lists every free, legally hosted PDF in the curriculum, by stage:
 
-- **Whole textbooks whose authors publish the PDF:** *Beej's Guide to C Programming*, Jeff Erickson's *Algorithms*, *Mathematics for Computer Science* (MIT), *Beej's Guide to Network Programming*, *Mathematics for Machine Learning*, *Linear Algebra Done Right* (4th ed., open access) and *An Introduction to Statistical Learning* (Python edition).
+- **Whole textbooks whose authors publish the PDF:** *Beej's Guide to C Programming*, Jeff Erickson's *Algorithms*, *Mathematics for Computer Science* (MIT), *Beej's Guide to Network Programming*, *Mathematics for Machine Learning*, *Linear Algebra Done Right* (4th ed., open access), *Think Stats*, *Crypto 101* and NIST's security guides.
 - **Papers:** arXiv papers (the `arxiv.org/abs/…` page becomes its PDF), such as *Attention Is All You Need*, FlashAttention and PagedAttention.
 - **Classic texts:** Dijkstra, Thompson, Ritchie & Thompson, Codd, Saltzer–Reed–Clark, Brooks, LeCun et al., and more.
 
-Choose a number to download it, with a live progress bar, into `academy_library/` beside your registry. **Ctrl+C** cancels a download without leaving the app, and a download stops by itself if the server sends nothing for 30 seconds. Then open it in your system PDF viewer (`xdg-open`, `open` or the Windows default app) while the academy keeps running. A saved document can be opened, downloaded again or deleted. **`u`** saves a PDF from any https link you give it (an arXiv `abs` link works too), and **`o`** opens the library folder. Resources and classic readings with a PDF are marked **⬇ PDF** throughout the Study Hall.
+Choose a number to download it, with a live progress bar. **Ctrl+C** cancels a download without leaving the app, and a download stops by itself if the server sends nothing for 30 seconds. Then open it in your system PDF viewer (`xdg-open`, `open` or the Windows default app) while the academy keeps running. A saved document can be opened, downloaded again or deleted. **`u`** saves a PDF from any https link you give it (an arXiv `abs` link works too), and **`o`** opens the library folder. Resources and classic readings with a PDF are marked **⬇ PDF** throughout the Study Hall.
+
+Downloads go in a folder you can find in your file manager, arranged by stage and named after the document:
+
+```
+Documents/Academy Library/
+    Stage 01 - Programming Fundamentals in C/
+        Beej's Guide to C Programming.pdf
+    Stage 04 - Digital Logic & Computer Architecture/
+        First Draft of a Report on the EDVAC.pdf
+    My PDFs/                  PDFs you saved from your own links
+```
+
+The Library screen shows the full path, and **`o`** opens it. On Linux the Documents folder is the one your desktop names in `~/.config/user-dirs.dirs`. Set `ACADEMY_LIBRARY` to use another folder; with `ACADEMY_HOME` set, the Library is `$ACADEMY_HOME/Academy Library`. PDFs downloaded by versions before 1.3 (the flat `academy_library/` folder beside the registry) are moved into place and renamed the first time you open the Library. PDFs you copy into the folder yourself show up in the list as **Yours**.
 
 To prepare for offline study (Classic Mode's "offline blocks"), run `./academy -fetch-library` once: it downloads everything not yet saved and reports anything that failed.
 

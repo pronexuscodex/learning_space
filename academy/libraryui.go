@@ -1,7 +1,8 @@
 package main
 
-// The Library screen: download curriculum PDFs into academy_library/ and
-// open them in the system viewer, without leaving the academy.
+// The Library screen: download curriculum PDFs into the Library folder
+// (Documents/Academy Library, one sub-folder per stage) and open them in
+// the system viewer, without leaving the academy.
 
 import (
 	"context"
@@ -16,23 +17,20 @@ import (
 	"time"
 )
 
-// ownDownloads lists PDFs in the library folder that are not in the
-// catalogue (the learner's own downloads), sorted by name.
+// ownDownloads lists PDFs anywhere in the Library folder that are not in
+// the catalogue: saved from the learner's own links, or put there by hand.
 func ownDownloads(dir string, catalogue []LibraryDoc) []LibraryDoc {
 	known := map[string]bool{}
 	for _, d := range catalogue {
-		known[d.fileName()] = true
+		known[strings.ToLower(d.relPath())] = true
 	}
-	matches, _ := filepath.Glob(filepath.Join(dir, "*.pdf"))
-	sort.Strings(matches)
 	var out []LibraryDoc
-	for _, m := range matches {
-		name := filepath.Base(m)
-		if known[name] {
+	for _, rel := range walkPDFs(dir) {
+		if known[strings.ToLower(rel)] {
 			continue
 		}
-		title := strings.TrimSuffix(name, ".pdf")
-		out = append(out, LibraryDoc{Stage: NoStage, Kind: "Yours", Title: title})
+		title := strings.TrimSuffix(filepath.Base(rel), filepath.Ext(rel))
+		out = append(out, LibraryDoc{Stage: NoStage, Kind: "Yours", Title: title, File: rel})
 	}
 	return out
 }
@@ -84,9 +82,10 @@ func (a *App) renderLibrary(stage int, docs []LibraryDoc) {
 	}
 	a.println(heading(title, sty.Magenta, w))
 	a.println("")
-	for _, l := range wrap("Every document here is free and legally hosted by its authors, publisher or archive (arXiv). Downloads go to one folder beside your registry, so they stay with your progress and can be read offline.", w-4, "  ") {
+	for _, l := range wrap("Every document here is free and legally hosted by its authors, publisher or archive (arXiv). Downloads are saved in the folder below, one sub-folder per stage, so you can find, open and arrange them outside the academy too. Press o to open it.", w-4, "  ") {
 		a.println(sty.Gray(l))
 	}
+	a.println("  " + sty.Bold("📁 "+dir))
 	if len(docs) == 0 {
 		a.println("")
 		a.con.note("No downloadable PDFs for this stage. Its resource library [4] links to web books and courses.")
@@ -135,17 +134,17 @@ func (a *App) renderLibrary(stage int, docs []LibraryDoc) {
 		}
 	}
 	a.println("")
-	for _, l := range flow([]string{
-		sty.Green(fmt.Sprintf("%d of %d saved", have, len(docs))),
-		sty.Gray("folder: ") + dir,
-	}, sty.Gray(" · "), w, "  ") {
-		a.println(l)
-	}
+	a.println("  " + sty.Green(fmt.Sprintf("%d of %d saved", have, len(docs))))
 }
 
 // library is the interactive Library screen. stage 0 lists everything.
 func (a *App) library(stage int) error {
 	dir := libraryDir(a.path)
+	if n, err := migrateLegacyLibrary(a.path, dir); err != nil {
+		a.con.warn("Could not move every PDF from the old library folder: %v", err)
+	} else if n > 0 {
+		a.con.ok("Moved %d PDF(s) into %s, arranged by stage.", n, dir)
+	}
 	cleanPartials(dir)
 	for {
 		docs := a.libraryEntries(stage)
@@ -182,10 +181,7 @@ func (a *App) library(stage int) error {
 // one that is already saved.
 func (a *App) libraryItem(d LibraryDoc) error {
 	dir := libraryDir(a.path)
-	path := filepath.Join(dir, d.fileName())
-	if d.Kind == "Yours" {
-		path = filepath.Join(dir, d.Title+".pdf")
-	}
+	path := filepath.Join(dir, d.relPath())
 	a.printf("\n  %s\n", sty.Bold(d.Title))
 	if d.Page != "" {
 		a.printf("  %s\n", sty.Under(sty.Cyan(d.Page)))
@@ -226,6 +222,9 @@ func (a *App) libraryItem(d LibraryDoc) error {
 		if err := os.Remove(path); err != nil {
 			a.con.fail("Could not delete: %v", err)
 		} else {
+			if folder := filepath.Dir(path); folder != dir {
+				os.Remove(folder) // tidy up: only succeeds when the folder is now empty
+			}
 			a.con.ok("Deleted. You can download it again any time.")
 		}
 	}
@@ -326,12 +325,12 @@ func (a *App) downloadOwn() error {
 	if err != nil {
 		return err
 	}
-	file := slug(name, 60)
-	if file == "" {
+	file := cleanName(name, 100)
+	if strings.Trim(file, "_-. ") == "" {
 		a.con.warn("Use letters or digits in the title.")
 		return nil
 	}
-	path := filepath.Join(libraryDir(a.path), file+".pdf")
+	path := filepath.Join(libraryDir(a.path), myPDFsFolder, file+".pdf")
 	if _, err := os.Stat(path); err == nil {
 		ok, err := a.con.confirm(filepath.Base(path) + " exists. Replace it?")
 		if err != nil || !ok {

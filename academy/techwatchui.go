@@ -289,7 +289,7 @@ func (a *App) headlineItem(it FeedItem) error {
 		}
 	case "Download the PDF to the Library":
 		doc := LibraryDoc{Stage: NoStage, Kind: "Paper", Title: it.Title, Page: it.Link, PDF: pdf}
-		path := filepath.Join(libraryDir(a.path), doc.fileName())
+		path := filepath.Join(libraryDir(a.path), doc.relPath())
 		if err := a.download(pdf, path); err == nil {
 			return a.offerOpen(path)
 		}

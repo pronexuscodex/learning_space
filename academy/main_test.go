@@ -259,6 +259,15 @@ func TestRegistryPathFor(t *testing.T) {
 		{"Scoop", "C:/Users/me/scoop/apps/academy/current/academy.exe", "", "/home/me/.local/share/academy"},
 		{"winget", "C:/Users/me/AppData/Local/Microsoft/WinGet/Packages/academy/academy.exe", "", "/home/me/.local/share/academy"},
 		{"go run", filepath.Join(os.TempDir(), "go-build123", "b001", "exe", "academy"), "", "/work"},
+		{"install script, Linux and macOS", "/home/me/.local/bin/academy", "", "/home/me/.local/share/academy"},
+		{"install script, Windows", "C:/Users/me/AppData/Local/Programs/Academy/academy.exe", "", "/home/me/.local/share/academy"},
+		{"Program Files", "C:/Program Files/Academy/academy.exe", "", "/home/me/.local/share/academy"},
+		{"system install", "/usr/local/bin/academy", "", "/home/me/.local/share/academy"},
+		{"older registry beside an installed binary is kept", "/home/me/.local/bin/old/academy", "", "/home/me/.local/bin/old"},
+		{"portable copy on a USB stick", "/media/me/USB/academy/academy", "", "/media/me/USB/academy"},
+	}
+	exists := func(p string) bool {
+		return p == filepath.Join(filepath.FromSlash("/home/me/.local/bin/old"), registryFileName)
 	}
 	for _, c := range cases {
 		getenv := noEnv
@@ -271,7 +280,7 @@ func TestRegistryPathFor(t *testing.T) {
 				return ""
 			}
 		}
-		got := registryPathFor(filepath.FromSlash(c.exe), filepath.FromSlash("/work"), getenv, data)
+		got := registryPathFor(filepath.FromSlash(c.exe), filepath.FromSlash("/work"), getenv, data, exists)
 		want := filepath.Join(filepath.FromSlash(c.want), registryFileName)
 		if got != want {
 			t.Errorf("%s: got %s, want %s", c.name, got, want)
