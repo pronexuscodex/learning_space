@@ -322,6 +322,7 @@ The menu is grouped into four sections. Keys never change, whatever the layout: 
 
 | Key | Action |
 |---|--------|
+| k | **Share card**: your progress on one card, ready to screenshot and post (also `academy -card`) |
 | l | **Library**: download free books and papers as PDFs without leaving the academy, then open them in your PDF viewer (see below) |
 | + | **My resources**: add, edit, import and export your own books, courses, videos and sites |
 | w | **Tech watch**: a method for keeping up, live headlines from 19 curated feeds, a watch log and your tech radar (see below) |

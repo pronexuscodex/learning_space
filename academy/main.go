@@ -979,6 +979,7 @@ func main() {
 	fetchLibraryFlag := flag.Bool("fetch-library", false, "download every free PDF in the library for offline study, then exit")
 	restoreFlag := flag.String("restore", "", "restore the registry from a backup (a number from -backups, or a file path), then exit")
 	showVersion := flag.Bool("version", false, "print the version, then exit")
+	showCard := flag.Bool("card", false, "print your progress as a card to screenshot and share, then exit")
 	showWhere := flag.Bool("where", false, "print where the program, your progress, backups and PDFs are, then exit")
 	flag.Usage = usage(os.Stderr, flag.CommandLine)
 	flag.Parse()
@@ -1013,6 +1014,17 @@ func main() {
 	if *showWhere {
 		exe, _ := os.Executable()
 		fmt.Print(whereText(exe, path))
+		return
+	}
+	if *showCard {
+		reg, _, err := loadRegistry(path)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "✗ %v\n", err)
+			os.Exit(1)
+		}
+		for _, l := range reg.shareCard(time.Now(), termWidth()) {
+			fmt.Println(l)
+		}
 		return
 	}
 	if *fetchLibraryFlag {

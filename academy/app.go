@@ -229,6 +229,7 @@ func (a *App) printMenu() {
 			{item("g", "Weekly goals"), "", "Goals"},
 			{item("p", "Progress report"), hint("calendar & trends"), "Progress"},
 			{item("a", "Achievements"), "", "Achievements"},
+			{item("k", "Share card"), hint("post your progress"), "Share card"},
 		}},
 		{"RESOURCES", sty.Magenta, []entry{
 			{item("l", sty.Bold("Library")), hint("download PDFs"), "Library"},
@@ -899,6 +900,7 @@ func (a *App) showShortcuts() {
 	row("m", "roadmap: every stage's state and what it builds on; open any Study Hall")
 	row("g", "weekly goals: minutes, days and review cards, tracked on the dashboard")
 	row("a", "achievements")
+	row("k", "share card: your progress, ready to screenshot and post")
 	row("c", "Classic Mode on/off")
 	row("t", "tidy screen on/off: start every action on a clean screen")
 	row("clear / cls", "clear the screen now")
@@ -985,6 +987,8 @@ func (a *App) run() {
 			actionErr = a.setGoals()
 		case "a":
 			a.paged(true, a.showAchievements)
+		case "k":
+			a.showShareCard()
 		case "1":
 			a.paged(true, a.viewLedger)
 		case "2":
