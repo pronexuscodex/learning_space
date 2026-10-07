@@ -10,7 +10,7 @@ versions follow [Semantic Versioning](https://semver.org/).
 - **Type your choice at any pager pause.** On a long screen (a word list, the library, the roadmap, the ledger, help), typing a number, word or menu key at the "Enter for more" prompt now skips the rest of the screen and acts on it, instead of making you press Enter to the bottom first.
 
 ### Fixed
-- The LeNet paper (*Gradient-Based Learning Applied to Document Recognition*) now links to Stanford's copy, because yann.lecun.com stopped accepting secure (HTTPS) connections.
+- The LeNet paper (*Gradient-Based Learning Applied to Document Recognition*) now links to the Internet Archive's copy of the author's PDF, because yann.lecun.com stopped accepting secure (HTTPS) connections.
 
 ## [1.5.0] - 2026-10-07
 
