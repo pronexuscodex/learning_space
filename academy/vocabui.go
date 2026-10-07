@@ -16,7 +16,7 @@ func (a *App) wordOfTheDayLine() string {
 	width := a.cols()
 	label := "🔤 Word of the day: "
 	if width < 60 {
-		label = "🔤 Today: "
+		label = "🔤 Word: "
 	}
 	tail := sty.Gray("  (d)")
 	room := width - 2 - visibleLen(label) - visibleLen(tail)

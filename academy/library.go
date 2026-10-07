@@ -406,7 +406,7 @@ func fetchLibrary(regPath string, out io.Writer) int {
 	if n, err := migrateLegacyLibrary(regPath, dir); err != nil {
 		fmt.Fprintf(out, "  ! could not move every PDF from the old library folder: %v\n", err)
 	} else if n > 0 {
-		fmt.Fprintf(out, "  Moved %d PDF(s) from the old library folder.\n", n)
+		fmt.Fprintf(out, "  Moved %s from the old library folder.\n", count(n, "PDF"))
 	}
 	cleanPartials(dir)
 	client := newDownloadClient()

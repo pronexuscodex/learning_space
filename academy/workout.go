@@ -43,7 +43,7 @@ func (a *App) workoutLine() string {
 	if day != nil && day.complete() {
 		return "  " + sty.Bold(sty.Green("Today's workout done")) + " " + parts
 	}
-	return "  " + sty.Gray("Today") + " " + parts + " " + sty.Gray("→ [j] workout")
+	return "  " + sty.Green("➜ Today's workout") + " " + parts + " " + sty.Gray("(press j)")
 }
 
 // dailyWorkout runs today's remaining workout steps.

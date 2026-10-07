@@ -119,7 +119,7 @@ func (a *App) hintGate(stageID int, key string, opened time.Time, level string) 
 	if ok {
 		return true, nil
 	}
-	a.con.say(sty.Yellow("🔒"), fmt.Sprintf("The hint unlocks in %d more minute(s). Productive struggle is where the learning happens.", int(left.Minutes())+1), sty.Yellow)
+	a.con.say(sty.Yellow("🔒"), "The hint unlocks in "+count(int(left.Minutes())+1, "more minute")+". Productive struggle is where the learning happens.", sty.Yellow)
 	choice, err := a.con.promptChoice("What now?", []string{
 		"Keep working (come back later)",
 		"Log what I have tried so far",
@@ -338,6 +338,6 @@ func (a *App) thinkingReport(w int, now time.Time) {
 		}
 	}
 	if n := a.reg.workoutsCompleted(); n > 0 || len(a.reg.Workouts) > 0 {
-		line("Workouts", sty.Bold(fmt.Sprint(n)), fmt.Sprintf("completed · %d day(s) you thought first", a.reg.thinkFirstDays()))
+		line("Workouts", sty.Bold(fmt.Sprint(n)), "completed · "+count(a.reg.thinkFirstDays(), "day")+" you thought first")
 	}
 }

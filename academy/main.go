@@ -1085,37 +1085,40 @@ func main() {
 			}()
 		}
 	}
+	app.rememberOriginal() // before anything is written, for "undo this session"
 	fmt.Print(banner(app.cols()))
 	if loaded.Seeded {
-		app.con.note("No registry found. Seeded a new campus at %s", path)
-		app.con.ok("Welcome! New here? Press %s for the Start Here guide.", sty.Bold(sty.Green("0")))
+		app.con.ok("Welcome! New here? Press %s for the Start Here guide, or %s for today's workout.", sty.Bold(sty.Green("0")), sty.Bold(sty.Green("j")))
+		app.con.note("Your progress saves itself as you go (academy -where shows where).")
 		if err := app.commit(); err != nil {
 			fmt.Fprintf(os.Stderr, "✗ could not create registry: %v\n", err)
 			os.Exit(1)
 		}
 	} else {
-		app.con.note("Loaded registry from %s", path)
 		if loaded.Migrated {
 			app.con.ok("Upgraded your registry to the current curriculum; your progress and labs are kept.")
 		}
 		if loaded.NewStages > 0 {
-			app.con.ok("%d new stage(s) added to your campus. Commit (5 or 7) to save them.", loaded.NewStages)
+			app.con.ok("%s added to your campus.", count(loaded.NewStages, "new stage"))
 		}
 		if loaded.Refreshed > 0 {
-			app.con.ok("The curriculum was updated (Stage 1 now teaches C): new titles and reading were added, and all your progress is kept. Commit to save.")
+			app.con.ok("The curriculum was updated: new titles and reading were added, and all your progress is kept.")
 		}
+		app.autosave() // an upgrade is saved at once (the old file is backed up first)
 	}
 
-	// Commit on Ctrl-C / SIGTERM as well, so an interrupt never loses work.
+	// Save on Ctrl-C, SIGTERM and SIGHUP as well, so quitting never loses work.
 	// During a download, Ctrl-C cancels just the download.
 	sigs := make(chan os.Signal, 1)
-	signal.Notify(sigs, os.Interrupt, syscall.SIGTERM)
+	// SIGHUP is what closing the terminal window sends on macOS and Linux;
+	// on Windows, closing the console window arrives as SIGTERM.
+	signal.Notify(sigs, os.Interrupt, syscall.SIGTERM, syscall.SIGHUP)
 	go func() {
 		for sig := range sigs {
 			if sig == os.Interrupt && app.interruptOp() {
 				continue
 			}
-			fmt.Println("\nInterrupt received — committing.")
+			fmt.Println("\nSaving before exit.")
 			app.commitAndExit()
 		}
 	}()

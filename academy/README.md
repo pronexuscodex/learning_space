@@ -162,7 +162,7 @@ Installers and package managers replace their install folder on every upgrade, w
 
 Other flags: `-no-color`, `-check-links` (verify every resource URL), `-backups` (list automatic backups), `-restore N` (restore one) and `-fetch-library` (download every PDF in the Library for offline study).
 
-**Upgrading from the 7-stage version:** your existing registry file is migrated automatically. The original stages move to their new numbers (1→5, 2→6, 3→7, 4→8, 5→13, 6→15, 7→16), your labs, hours, readings and concept progress are kept, and the nine new stages are added. Commit once to save the upgraded file.
+**Upgrading from the 7-stage version:** your existing registry file is migrated automatically. The original stages move to their new numbers (1→5, 2→6, 3→7, 4→8, 5→13, 6→15, 7→16), your labs, hours, readings and concept progress are kept, and the nine new stages are added. The upgraded file is saved at once, after a backup of the old one.
 
 ## The curriculum
 
@@ -334,10 +334,10 @@ The menu is grouped into four sections. Keys never change, whatever the layout: 
 | Key | Action |
 |---|--------|
 | f | **Focus timer**: a live countdown (`p` pause, `s` stop, bell when done) logged as a study session under a stage |
-| 2 | **Enroll in a New Lab**: pick a track (`F`/`A`/`S`/`B`), a stage, then a name, notes and initial hours |
-| 3 | **Log Study/Lab Hours**: add hours (`1.5`, `1h30m`, `45m`) with an optional note |
-| 4 | **Advance Academic Status**: graduate stages or labs, mark literature as read, set compilation status |
-| 1 | **View Campus Ledger**: a colour card per stage, with reading, concept and exercise progress bars, labs and hours |
+| 2 | **Start a lab project**: pick a track (`F`/`A`/`S`/`B`), a stage, then a name, notes and initial hours |
+| 3 | **Log study hours**: add hours (`1.5`, `1h30m`, `45m`) with an optional note |
+| 4 | **Update progress**: graduate stages or labs, mark literature as read, set compilation status |
+| 1 | **Ledger**: a colour card per stage, with reading, concept and exercise progress bars, labs and hours |
 | g | **Weekly goals**: study minutes, study days and review cards per week (Monday to Sunday), tracked on the dashboard: cyan on track, yellow behind, green done |
 | p | **Progress report**: a GitHub-style activity calendar, the last 7 days against the 7 before, time and mastery per track, deck health and your most-forgotten cards |
 | a | **Achievements**: 28 milestones (first concept, 7- and 30-day streaks, 100 and 1,000 reviews, a mastered concept, a passed mastery check, a whole track, graduation…), announced the moment you earn them |
@@ -357,9 +357,8 @@ The menu is grouped into four sections. Keys never change, whatever the layout: 
 | Key | Action |
 |---|--------|
 | o | **Settings**: colour theme (default, high contrast, colour-blind friendly, monochrome), plain symbols instead of emoji, confidence ratings, Classic Mode, tidy screen |
-| 7 | Checkpoint: commit and keep working |
-| 5 | **Atomic Commit & Exit** |
-| 8 | Exit without saving (asks for confirmation) |
+| 5 | **Exit**. Your progress is saved automatically after every action, so closing the window is fine too |
+| 8 | **Undo this session**: puts your progress back exactly as it was when you opened the academy, then exits (asks first) |
 | c | **Classic Mode** on/off: struggle clock, lab notebook, classic corners and type-ins |
 | t | **Tidy screen** on/off: every action starts on a clean screen |
 | ? | **Keys & shortcuts** (also `h` or `help`) · `clear` / `cls` clears the screen |
@@ -368,7 +367,7 @@ Above the menu, a dashboard shows hours, labs, stages, texts, concepts, exercise
 
 Long screens (the ledger, Start Here, glossaries, resources, concept cards, the notebook) are shown one terminal page at a time: press **Enter** for the next page or **q** to return to the menu. Paging switches on only when you are typing at a real terminal (it uses `$LINES` if set, else 24 rows); piped or scripted input is unaffected.
 
-To cancel a prompt, type `q` at number prompts or `:q` at text prompts. Ctrl-D and Ctrl-C/SIGTERM also commit before exiting.
+To cancel a prompt, type `q` at number prompts or `:q` at text prompts. Ctrl-D, Ctrl-C and closing the window (SIGTERM, SIGHUP) save before exiting.
 
 ![Stages](docs/stages.png)
 
@@ -527,8 +526,8 @@ Press **`c`** on the main menu. Classic Mode brings back the habits that made st
 | **Ctrl+L** | any prompt | clears the screen and redraws it (the main menu is redrawn too), keeping what you have typed |
 | Backspace | any prompt | deletes the previous character |
 | Ctrl+U / Ctrl+W | any prompt | erases the whole line / the previous word |
-| Ctrl+D | empty prompt | ends input: commits your work and exits |
-| Ctrl+C | anywhere | commits your work and exits |
+| Ctrl+D | empty prompt | ends input: saves and exits |
+| Ctrl+C | anywhere | saves and exits |
 | Enter / q | long screens | next page / stop paging |
 | a number or key | long screens | answers the next prompt straight away: on a long list, type the item's number at "Enter for more" without paging to the end |
 
@@ -563,7 +562,8 @@ Colour is turned on automatically when output goes to a terminal. It is turned o
 ## Data safety
 
 - **Atomic writes:** the program writes a temporary file in the same directory, fsyncs it, renames it over the registry, then fsyncs the directory. A crash leaves either the old file or the new one, never a half-written file.
-- **Automatic backups:** before each commit, the previous registry is copied to `academy_backups/` beside it (identical copies are skipped, and the newest 10 are kept). `./academy -backups` lists them; `./academy -restore 2` (or `-restore path/to/file.json`) restores one after checking that it loads cleanly, and backs up the file it replaces first, so a restore can be undone the same way. Restore while the academy is closed.
+- **Automatic saving:** your progress is written to disk after every action, and when you exit, press Ctrl+C or close the window. Nothing to remember, nothing to lose.
+- **Automatic backups:** the first time something changes in a session, the registry as it was is copied to `academy_backups/` beside it, so the newest 10 backups cover your last 10 sessions (identical copies are skipped). `./academy -backups` lists them; `./academy -restore 2` (or `-restore path/to/file.json`) restores one after checking that it loads cleanly, and backs up the file it replaces first, so a restore can be undone the same way. Restore while the academy is closed.
 - **Corrupt-file guard:** if the registry won't parse or fails validation, the program refuses to start rather than overwrite it.
 - **Input rigor:** the program removes control characters, trims whitespace, and rejects input that is too long instead of cutting it off. It re-prompts when a number can't be parsed. Hours must be finite, non-negative, and at most 24 per log entry. Duplicate lab names within a stage are rejected, and so are unknown menu options.
 

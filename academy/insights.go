@@ -101,7 +101,7 @@ func (r *Registry) nextSteps(now time.Time) []Suggestion {
 	var out []Suggestion
 	if due := len(r.dueCards(now)); due > 0 {
 		out = append(out, Suggestion{Kind: SuggestReview,
-			Title: fmt.Sprintf("Review %d due card(s)", due),
+			Title: "Review " + count(due, "due card"),
 			Why:   "Reviews protect what you have already learned, so they come first. Most sessions take 5–15 minutes."})
 	}
 
@@ -408,10 +408,10 @@ func (r *Registry) exportMarkdown(now time.Time) string {
 	var b strings.Builder
 	cs := r.stats(now, 60)
 	fmt.Fprintf(&b, "# My Systems & AI Academy notes\n\n_Exported %s._\n\n", now.Format("2006-01-02 15:04"))
-	fmt.Fprintf(&b, "- Study time: **%.1f h** · streak: **%d day(s)**\n", cs.hours, cs.streak)
+	fmt.Fprintf(&b, "- Study time: **%.1f h** · streak: **%s**\n", cs.hours, count(cs.streak, "day"))
 	fmt.Fprintf(&b, "- Concepts understood: **%d/%d** · mastered: **%d** · exercises: **%d/%d**\n",
 		cs.conceptsStudied, cs.concepts, cs.mastered, cs.exercisesDone, cs.exercises)
-	fmt.Fprintf(&b, "- Review deck: %d card(s), %d due\n\n", len(r.unlockedCards()), cs.due)
+	fmt.Fprintf(&b, "- Review deck: %s, %d due\n\n", count(len(r.unlockedCards()), "card"), cs.due)
 
 	for _, s := range r.stageOrder() {
 		g, _ := guideFor(s.ID)

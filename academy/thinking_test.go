@@ -139,9 +139,7 @@ func TestWorkoutDays(t *testing.T) {
 		t.Fatal("no workout before one is started")
 	}
 	d := r.workoutFor(now)
-	for _, s := range workoutSteps[:len(workoutSteps)-1] {
-		d.Done = append(d.Done, s)
-	}
+	d.Done = append(d.Done, workoutSteps[:len(workoutSteps)-1]...)
 	if d.complete() || r.workoutsCompleted() != 0 {
 		t.Fatal("a workout with a step left is not complete")
 	}

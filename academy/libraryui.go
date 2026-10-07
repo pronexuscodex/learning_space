@@ -143,7 +143,7 @@ func (a *App) library(stage int) error {
 	if n, err := migrateLegacyLibrary(a.path, dir); err != nil {
 		a.con.warn("Could not move every PDF from the old library folder: %v", err)
 	} else if n > 0 {
-		a.con.ok("Moved %d PDF(s) into %s, arranged by stage.", n, dir)
+		a.con.ok("Moved %s into %s, arranged by stage.", count(n, "PDF"), dir)
 	}
 	cleanPartials(dir)
 	for {

@@ -74,7 +74,6 @@ const (
 	WatchDone   = "dropped"
 )
 
-var watchStatuses = []string{WatchToRead, WatchRead, WatchTried, WatchDone}
 var radarRings = []string{"adopt", "trial", "assess", "hold"}
 var radarMeaning = map[string]string{
 	"adopt":  "use it by default",
