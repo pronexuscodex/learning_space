@@ -51,6 +51,9 @@ KEYS = [
   "5\r",                    # commit & exit
 ]
 
+# The library's live download line ("⬇ 190 KB of 358 KB ███░░░ 53%", with
+# "v" for the arrow in plain symbols).
+DOWNLOAD = re.compile(r"^\s*\S [\d.]+ [KM]?B of [\d.]+ [KM]?B \S+ \d+%")
 PAGER = re.compile(r"── (Enter (for )?more · q (to )?stop|end · (press )?Enter (to )?continue)( · or type( your choice)?)? ──")
 
 def run(cols, rows=60):
@@ -97,7 +100,9 @@ def run(cols, rows=60):
         # A pager prompt is an input point too: on a slow machine the next
         # keys can be typed while it is showing, and the terminal echoes
         # them after it. Measure only the app's own part of the line.
-        m = PAGER.search(line)
+        # The same goes for a library download's progress line: keys typed
+        # while it runs are echoed after it.
+        m = PAGER.search(line) or DOWNLOAD.match(line)
         if m:
             line = line[:m.end()]
         if width(line) > cols:
