@@ -4,6 +4,21 @@ All notable changes to the Systems & AI Academy are listed here. The
 format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 versions follow [Semantic Versioning](https://semver.org/).
 
+## [1.5.0] - 2026-10-07
+
+### Added
+- **Think first**: features that make you work things out yourself before reaching for the answer, and a Start Here section explaining why, based on learning research.
+  - **Today's workout** (`j`): one guided daily session of warm-up review, blank-page recall, one new concept, a mixed exercise from a different topic, and a short reflection ("Did you ask an AI before trying yourself?"). Steps are saved as you go, and the dashboard shows today's progress.
+  - **The hint ladder**: stuck on an exercise? Rung 1 gives the questions an engineer asks, rung 2 says where to look it up (concept card, glossary words in the task, reading pointer, man pages and specs), and only rung 3 shows the hint.
+  - **Honest solve log**: after each exercise, say how you got there. Anything solved with the hint or with someone else's help (an AI, a forum answer) comes back three days later, to redo from a blank page.
+  - **Blank-page recall**: write everything you remember about a concept, then compare with the card and score yourself. Weak recalls return the next day, strong ones weeks later. It is in the workout and on every understood concept.
+  - **Calibration**: say how sure you are before a review answer appears. The Progress report shows whether your confidence can be trusted.
+  - A *Thinking for yourself* section in the Progress report, a *Solved myself* line on the share card, and five achievements: First Principles, Blank Page, Made It Mine, In Training and Know What You Know.
+- **Settings** (`o`): colour themes (default, high contrast, colour-blind friendly, monochrome), plain symbols instead of emoji, and confidence ratings on or off, alongside Classic Mode and tidy screen.
+
+### Fixed
+- The review card's title no longer runs past the edge of narrow terminals when the concept name is long.
+
 ## [1.4.0] - 2026-09-29
 
 ### Added

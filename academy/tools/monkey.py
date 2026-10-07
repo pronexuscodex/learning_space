@@ -17,7 +17,7 @@ D = os.path.dirname(os.path.abspath(__file__))
 BIN = os.environ.get("ACADEMY_BIN", os.path.join(D, "..", "academy"))
 ANSI = re.compile(rb"\x1b\[[0-9;?]*[A-Za-z]")
 
-MENU = list("0123456799nmd/fpxl+wgackt?") + ["r", "s", "clear", "help", "my"]
+MENU = list("0123456799nmd/fpxl+wgacktjo?") + ["r", "s", "clear", "help", "my"]
 TOKENS = (
     [k + "\r" for k in MENU] * 3
     + [f"{n}\r" for n in range(0, 25)] * 2

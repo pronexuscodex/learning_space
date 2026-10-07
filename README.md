@@ -45,6 +45,8 @@ Then open **Systems & AI Academy**, or type `academy`. You can also use [Homebre
 | 📖 **281-word dictionary** | Every programming word explained in plain language, with related words. |
 | 📚 **Library** | 33 free, legal books and papers that download as PDFs into `Documents/Academy Library`, arranged by stage. |
 | 📰 **Tech watch** | Headlines from 19 hand-picked feeds, such as arXiv, LWN and Krebs, and your own radar of trends. |
+| 🧭 **Think first** | A guided daily workout, a hint ladder that points you to the docs before the answer, an honest solve log with redo-from-scratch, blank-page recall and confidence calibration. They build skill you keep without leaning on AI. |
+| 🎨 **Comfortable to use** | Colour themes, including high contrast and colour-blind friendly, plain symbols for any terminal, and layouts that work from 40 columns up. |
 | 🔥 **Streaks, goals, achievements** | And a **share card** to post your progress (`k` in the app). |
 
 Everything runs offline and stays on your computer, apart from the optional downloads. It's one small program with no dependencies, written in Go.

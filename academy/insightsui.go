@@ -544,6 +544,8 @@ func (a *App) progressReport() {
 		}
 	}
 
+	a.thinkingReport(w, now)
+
 	// Goals and achievements.
 	if g := a.reg.Goals; g != (Goals{}) {
 		wp := a.reg.weekToDate(now)

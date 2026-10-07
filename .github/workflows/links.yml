@@ -6,9 +6,9 @@ name: Links
 # a website being down for an hour must not block unrelated work.
 on:
   push:
-    paths: ["academy/**.go", ".github/workflows/links.yml"]
+    paths: ["academy/**.go", "**/README.md", ".github/workflows/links.yml"]
   pull_request:
-    paths: ["academy/**.go"]
+    paths: ["academy/**.go", "**/README.md"]
   schedule:
     - cron: "17 6 * * 1" # Mondays 06:17 UTC
   workflow_dispatch:
@@ -30,3 +30,15 @@ jobs:
           cache-dependency-path: academy/go.mod
       - name: Check every link
         run: go run . -no-color -check-links
+      # Research cited in the READMEs: every doi.org link must name a DOI
+      # that the DOI registry knows (responseCode 1).
+      - name: Check research citations (DOIs)
+        if: always()
+        working-directory: .
+        run: |
+          fail=0
+          for doi in $(grep -ohE 'https://doi\.org/[^) ]+' README.md academy/README.md | sed 's|https://doi.org/||' | sort -u); do
+            code=$(curl -fsS --retry 3 "https://doi.org/api/handles/$doi" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("responseCode"))' || echo error)
+            if [ "$code" = 1 ]; then echo "  ✓ $doi"; else echo "  ✗ $doi ($code)"; fail=1; fi
+          done
+          exit $fail

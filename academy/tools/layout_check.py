@@ -37,6 +37,11 @@ KEYS = [
   "m\r", "\r"*3, "2\r", "10\r",  # roadmap → open stage 2's Study Hall → back
   "a\r", "\r"*3,            # achievements
   "k\r",                    # share card
+  "j\r", "2\r", "1\r", "1\r", "y\r", "Everything in a computer is a number made of bits\r",  # workout: skip review, nothing to recall yet, learn the first concept
+  "1\r", "2\r", "2\r", "2\r", "y\r", "3\r",  # practice: climb all three rungs, done, "with the hint"
+  "1\r", "Choosing between bits and bytes\r", "n\r",  # reflect
+  "p\r", "\r"*4,          # progress report, now with "Thinking for yourself"
+  "o\r", "1\r", "3\r", "2\r", "6\r",  # settings: colour-blind theme, plain symbols (the rest of the run checks them)
   "l\r", "1\r", "q\r",  # library → try downloading the first PDF → back
   "d\r", "type casting\r", "1\r", "\r", "c\r", "4\r", "1\r", "\r", "a\r", "q\r", "q\r", "q\r",  # dictionary: word → related → categories → A–Z
   "+\r", "a\r", "Modern C, a free book on writing C well\r", "https://example.org/modern-c.pdf\r", "1\r", "5\r", "A long note that should wrap neatly at every terminal width\r", "q\r",  # my resources

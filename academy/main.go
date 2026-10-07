@@ -266,6 +266,13 @@ type Registry struct {
 	ClassicMode    bool                 `json:"classic_mode"`
 	Notebook       []NotebookEntry      `json:"notebook"`
 	ExerciseOpened map[string]time.Time `json:"exercise_opened"` // exercise key → first opened (the struggle clock)
+
+	// Thinking for yourself (see thinking.go).
+	Solves      []SolveRecord  `json:"solves,omitempty"`   // how each exercise was solved, honestly reported
+	Recalls     []RecallRecord `json:"recalls,omitempty"`  // blank-page recalls
+	Calibration Calibration    `json:"calibration"`        // confidence before reveal vs. recall
+	Workouts    []WorkoutDay   `json:"workouts,omitempty"` // the Daily Workout, one entry per day
+	Settings    Settings       `json:"settings"`           // display and practice preferences
 }
 
 // findStage returns the stage with the given global ID and its track.
@@ -482,6 +489,7 @@ func (r *Registry) validate() error {
 	if r.ExerciseOpened == nil {
 		r.ExerciseOpened = map[string]time.Time{}
 	}
+	r.normalizeThinking()
 	if r.NextLabID <= maxLab {
 		r.NextLabID = maxLab + 1
 	}
@@ -1022,7 +1030,11 @@ func main() {
 			fmt.Fprintf(os.Stderr, "✗ %v\n", err)
 			os.Exit(1)
 		}
+		sty.theme = reg.Settings.Theme
 		for _, l := range reg.shareCard(time.Now(), termWidth()) {
+			if reg.Settings.PlainSymbols {
+				l = plainText(l)
+			}
 			fmt.Println(l)
 		}
 		return
@@ -1058,6 +1070,7 @@ func main() {
 
 	app.con.cols = app.cols
 	layoutWidth = app.cols
+	app.applySettings()
 	if app.con.raw && app.con.screen {
 		if resized := watchResize(); resized != nil {
 			go func() {

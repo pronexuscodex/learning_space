@@ -12,14 +12,34 @@ import (
 	"unicode"
 )
 
-// Style emits ANSI SGR sequences only when enabled.
-type Style struct{ on bool }
+// Style emits ANSI SGR sequences only when enabled, in a colour theme.
+type Style struct {
+	on    bool
+	theme string // ThemeDefault, ThemeContrast, ThemeColorblind or ThemeMono
+}
 
-// sty is the process-wide style, configured once in main.
+// sty is the process-wide style, configured in main and in Settings.
 var sty Style
+
+// themeCodes remap the standard SGR codes per theme ("" drops the code).
+var themeCodes = map[string]map[string]string{
+	// Bright colours, white instead of grey, no faint text.
+	ThemeContrast: {"90": "37", "2": "", "31": "91", "32": "92", "33": "93", "34": "94", "35": "95", "36": "96"},
+	// Okabe–Ito inspired 256-colour palette: blue and orange carry the
+	// good/bad meaning instead of green and red.
+	ThemeColorblind: {"31": "38;5;208", "32": "38;5;39", "33": "38;5;220", "34": "38;5;33", "35": "38;5;213", "36": "38;5;117"},
+	// No colour at all: grey becomes faint; bold and layout remain.
+	ThemeMono: {"31": "", "32": "", "33": "", "34": "", "35": "", "36": "", "90": "2"},
+}
 
 func (s Style) paint(code, text string) string {
 	if !s.on || text == "" {
+		return text
+	}
+	if c, ok := themeCodes[s.theme][code]; ok {
+		code = c
+	}
+	if code == "" {
 		return text
 	}
 	return "\x1b[" + code + "m" + text + "\x1b[0m"

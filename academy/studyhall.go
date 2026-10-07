@@ -238,6 +238,7 @@ func (a *App) studyConceptAt(stageID int, g StageGuide, idx int) error {
 		"Continue",
 		"Write or update my own explanation",
 		"Mark as needing review (removes its cards from the Daily Review)",
+		"Blank-page recall: write what you remember, then check",
 	})
 	if err != nil {
 		return err
@@ -259,6 +260,8 @@ func (a *App) studyConceptAt(stageID int, g StageGuide, idx int) error {
 			s.setStudied(c.Name, false)
 		})
 		a.con.ok("%s moved back to review.", sty.Bold(c.Name))
+	case 3:
+		return a.freeRecall(stageID, idx)
 	}
 	return nil
 }
@@ -518,66 +521,27 @@ func (a *App) workExercise(stageID int, c Concept, i int) error {
 		}
 	}
 
-	show, err := a.con.confirm("Show the hint?")
+	rung, err := a.hintLadder(stageID, c, e, key, opened, classic)
 	if err != nil {
 		return err
-	}
-	if show && classic {
-		a.mu.Lock()
-		stuck := a.reg.stuckLogged(key)
-		a.mu.Unlock()
-		if ok, left := hintUnlocked(opened, e.Level, stuck, time.Now()); !ok {
-			a.con.say(sty.Yellow("🔒"), fmt.Sprintf("The hint unlocks in %d more minute(s). Productive struggle is where the learning happens.", int(left.Minutes())+1), sty.Yellow)
-			choice, err := a.con.promptChoice("What now?", []string{
-				"Keep working (come back later)",
-				"Log what I have tried so far",
-				"I'm truly stuck: write down what I tried and unlock the hint now",
-			})
-			if err != nil {
-				return err
-			}
-			switch choice {
-			case 0:
-				show = false
-			case 1:
-				text, err := a.con.promptText("What have you tried?", maxNotesLen, true)
-				if err != nil {
-					return err
-				}
-				a.addNote(stageID, key, NoteTried, text)
-				a.con.ok("Logged. Keep going; the clock is still running.")
-				show = false
-			case 2:
-				for {
-					text, err := a.con.promptText("What did you try, and where exactly are you stuck?", maxNotesLen, true)
-					if err != nil {
-						return err
-					}
-					if len([]rune(text)) < 20 {
-						a.con.warn("Say a little more (at least a sentence). Describing the problem often solves it.")
-						continue
-					}
-					a.addNote(stageID, key, NoteStuck, text)
-					break
-				}
-			}
-		}
-	}
-	if show {
-		a.println("")
-		for i, l := range wrap(e.Hint, w-14, "") {
-			lead := "           "
-			if i == 0 {
-				lead = sty.Bold(sty.Yellow("💡 Hint")) + "    "
-			}
-			a.printf("  %s%s\n", lead, sty.Yellow(l))
-		}
 	}
 
 	a.mu.Lock()
 	_, s := a.reg.findStage(stageID)
 	already := s.hasDone(c.Name, i)
+	redo := a.reg.redoPending(key)
 	a.mu.Unlock()
+
+	if already && redo {
+		yes, err := a.con.confirm("Did you solve it again, from a blank page?")
+		if err != nil || !yes {
+			if err == nil {
+				a.con.note("It stays on your redo list until you can do it without help. Come back to it after a break.")
+			}
+			return err
+		}
+		return a.recordSolve(stageID, c, i, rung)
+	}
 
 	label := "Mark this exercise as done?"
 	if already {
@@ -600,10 +564,10 @@ func (a *App) workExercise(stageID int, c Concept, i int) error {
 	})
 	if already {
 		a.con.ok("Exercise unticked.")
-	} else {
-		a.con.ok("Nice work! %s exercise done.", levelBadgePlain(e.Level))
+		return nil
 	}
-	return nil
+	a.con.ok("Nice work! %s exercise done.", levelBadgePlain(e.Level))
+	return a.recordSolve(stageID, c, i, rung)
 }
 
 // levelBadgePlain is the level name without decoration, for sentences.
