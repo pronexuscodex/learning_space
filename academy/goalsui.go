@@ -106,7 +106,7 @@ track for the days gone so far, yellow means behind, green means done.
 	if g == (Goals{}) {
 		a.con.ok("Goals cleared.")
 	} else {
-		a.con.ok("Goals saved. They appear on the dashboard; commit to keep them.")
+		a.con.ok("Goals saved. They appear on the dashboard.")
 	}
 	return nil
 }

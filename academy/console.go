@@ -103,8 +103,18 @@ func promptLabel(label, hint string) string {
 		lines[i] = "  " + sty.Bold(lines[i])
 	}
 	s := strings.Join(lines, "\n") // long questions wrap; the input stays on the last line
-	if hint != "" && visibleLen(lines[len(lines)-1])+visibleLen(hint)+6 <= w*2/3 {
-		s += " " + sty.Gray("("+hint+")")
+	if hint != "" {
+		if visibleLen(lines[len(lines)-1])+visibleLen(hint)+6 <= w*2/3 {
+			s += " " + sty.Gray("("+hint+")")
+		} else {
+			// Too long to share the line: the hint goes on its own line
+			// above the question, never dropped (it often says what to type).
+			var above []string
+			for _, l := range wrap(hint, w-4, "  ") {
+				above = append(above, sty.Gray(l))
+			}
+			s = strings.Join(above, "\n") + "\n" + s
+		}
 	}
 	return s + sty.Cyan(" › ")
 }

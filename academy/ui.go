@@ -392,3 +392,15 @@ func heading(title string, color func(string) string, width int) string {
 	}
 	return out + "\n" + color(rule)
 }
+
+// count says "1 card" or "3 cards": a number with its noun, pluralised
+// with a plain s (pass the plural for irregular nouns).
+func count(n int, noun string, plural ...string) string {
+	if n == 1 {
+		return "1 " + noun
+	}
+	if len(plural) > 0 {
+		return strconv.Itoa(n) + " " + plural[0]
+	}
+	return strconv.Itoa(n) + " " + noun + "s"
+}

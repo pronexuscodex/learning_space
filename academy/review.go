@@ -26,15 +26,6 @@ func masteryBadge(level int) string {
 	return sty.Gray(g)
 }
 
-// masteryLegend explains the glyphs in one line.
-func masteryLegend() string {
-	parts := make([]string, len(masteryNames))
-	for i, n := range masteryNames {
-		parts[i] = masteryBadge(i) + " " + sty.Gray(n)
-	}
-	return strings.Join(parts, "  ")
-}
-
 // dailyReview runs a spaced-repetition session over every due card,
 // interleaved across stages.
 func (a *App) dailyReview() error {
@@ -54,7 +45,7 @@ func (a *App) dailyReview() error {
 		return nil
 	}
 
-	a.printf("  %s\n", sty.Bold(fmt.Sprintf("%d card(s) due out of %d.", len(due), unlocked)))
+	a.printf("  %s\n", sty.Bold(fmt.Sprintf("%s due out of %d.", count(len(due), "card"), unlocked)))
 	for _, l := range wrap("Recall each answer before you reveal it; that effort is what builds memory.", a.cols()-4, "  ") {
 		a.println(l)
 	}
@@ -95,7 +86,7 @@ func (a *App) dailyReview() error {
 		a.mu.Unlock()
 		a.printf("\n  %s %s %s   %s\n", sty.Gray("Session"), bar(correct, reviewed, 20, sty.Green),
 			sty.Bold(fmt.Sprintf("%d/%d recalled", correct, reviewed)),
-			sty.Gray(fmt.Sprintf("%d card(s) due by tomorrow", left)))
+			sty.Gray(count(left, "card")+" due by tomorrow"))
 	}
 	return nil
 }

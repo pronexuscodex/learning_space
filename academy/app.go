@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"strconv"
 	"strings"
@@ -26,6 +27,13 @@ type App struct {
 
 	opMu      sync.Mutex
 	interrupt func() // set while Ctrl+C should cancel an operation, not quit
+
+	// Saving is automatic. The registry as it was when the academy opened
+	// is kept, so "undo this session" can put it back, and one backup is
+	// made per session (the first save), so backups span days, not clicks.
+	original []byte // nil: there was no registry file
+	backedUp bool
+	onDisk   bool // the file has been written this session
 }
 
 // onInterrupt makes Ctrl+C call f instead of committing and quitting, until
@@ -49,20 +57,63 @@ func (a *App) interruptOp() bool {
 	return true
 }
 
-// commit atomically persists the registry to disk.
+// commit atomically persists the registry to disk. The first save of a
+// session backs up the file as it was before.
 func (a *App) commit() error {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	a.reg.LastCommit = time.Now().UTC().Truncate(time.Second)
-	if err := backupRegistry(a.path, time.Now()); err != nil {
-		// A failed backup must not block saving the learner's work.
-		a.con.warn("Could not back up the previous registry: %v", err)
+	if !a.backedUp {
+		if err := backupRegistry(a.path, time.Now()); err != nil {
+			// A failed backup must not block saving the learner's work.
+			a.con.warn("Could not back up the previous registry: %v", err)
+		}
+		a.backedUp = true
 	}
 	if err := atomicWriteJSON(a.path, a.reg); err != nil {
 		return err
 	}
 	a.dirty = false
+	a.onDisk = true
 	return nil
+}
+
+// autosave saves when something changed. It runs after every action, so
+// closing the window or a crash loses at most the action in progress.
+func (a *App) autosave() {
+	a.mu.Lock()
+	dirty := a.dirty
+	a.mu.Unlock()
+	if !dirty {
+		return
+	}
+	if err := a.commit(); err != nil {
+		a.con.fail("Could not save your progress: %v. It is still in memory; the academy will try again after your next action.", err)
+	}
+}
+
+// rememberOriginal keeps the registry file as it is now, for undo.
+func (a *App) rememberOriginal() {
+	if data, err := os.ReadFile(a.path); err == nil {
+		a.original = data
+	}
+}
+
+// undoSession puts the registry back as it was when the academy opened.
+func (a *App) undoSession() error {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if !a.onDisk {
+		return nil // nothing was written this session
+	}
+	if a.original == nil {
+		err := os.Remove(a.path)
+		if errors.Is(err, fs.ErrNotExist) {
+			return nil
+		}
+		return err
+	}
+	return atomicWriteFile(a.path, a.original)
 }
 
 // mutate runs fn under the lock and marks state dirty.
@@ -123,7 +174,6 @@ func compileBadge(c CompileStatus) string {
 func (a *App) printDashboard() {
 	a.mu.Lock()
 	cs := a.reg.stats(time.Now(), 60)
-	dirty := a.dirty
 	classic := a.reg.ClassicMode
 	a.mu.Unlock()
 	w := a.cols()
@@ -135,7 +185,7 @@ func (a *App) printDashboard() {
 	}
 	a.println("")
 	for _, l := range flow([]string{
-		stat("Hours", fmt.Sprintf("%.2f", cs.hours)),
+		stat("Study", fmt.Sprintf("%.1f h", cs.hours)),
 		stat("Labs", fmt.Sprintf("%d", cs.labs)) + sty.Gray(fmt.Sprintf(" (%d★)", cs.labsGrad)),
 		stat("Stages", fmt.Sprintf("%d/%d", cs.stagesGrad, cs.stages)),
 		stat("Texts", fmt.Sprintf("%d/%d", cs.textsRead, cs.texts)),
@@ -168,17 +218,18 @@ func (a *App) printDashboard() {
 			a.println(l)
 		}
 	}
-	if dirty {
-		a.printf("  %s\n", sty.Yellow("● uncommitted changes"))
-	}
 	for _, l := range a.goalsLine() {
 		a.println(l)
 	}
 	a.println(a.wordOfTheDayLine())
-	if h := a.nextHint(); h != "" {
+	a.mu.Lock()
+	day := a.reg.todayWorkout(time.Now())
+	a.mu.Unlock()
+	if day == nil || !day.complete() {
+		a.println(a.workoutLine())
+	} else if h := a.nextHint(); h != "" {
 		a.println("  " + h)
 	}
-	a.println(a.workoutLine())
 }
 
 // printMenu draws the dashboard and the menu. Wide terminals get two
@@ -224,10 +275,10 @@ func (a *App) printMenu() {
 		}},
 		{"PRACTISE & TRACK", sty.Cyan, []entry{
 			{item("f", "Focus timer"), hint("Pomodoro"), "Focus timer"},
-			{item("2", "Enroll in a New Lab"), "", "Enroll lab"},
-			{item("3", "Log Study/Lab Hours"), "", "Log hours"},
-			{item("4", "Advance Academic Status"), "", "Advance"},
-			{item("1", "View Campus Ledger"), "", "Ledger"},
+			{item("2", "Start a lab project"), "", "Start lab"},
+			{item("3", "Log study hours"), "", "Log hours"},
+			{item("4", "Update progress"), hint("graduate, mark read"), "Update"},
+			{item("1", "Ledger"), hint("every stage at a glance"), "Ledger"},
 			{item("g", "Weekly goals"), "", "Goals"},
 			{item("p", "Progress report"), hint("calendar & trends"), "Progress"},
 			{item("a", "Achievements"), "", "Achievements"},
@@ -239,14 +290,13 @@ func (a *App) printMenu() {
 			{item("w", sty.Bold("Tech watch")), hint("keep up with trends"), "Tech watch"},
 			{item("x", "Export notes"), hint("to Markdown"), "Export"},
 		}},
-		{"SAVE & SETTINGS", sty.Yellow, []entry{
+		{"SETTINGS & EXIT", sty.Yellow, []entry{
 			{item("o", "Settings"), hint("theme, symbols, modes"), "Settings"},
-			{item("7", "Checkpoint"), hint("save, keep going"), "Checkpoint"},
-			{item("5", "Atomic Commit & Exit"), "", "Commit & exit"},
-			{item("8", sty.Gray("Exit without saving")), "", "Quit, no save"},
+			{item("?", "Keys & shortcuts"), hint("Ctrl+L clears"), "Keys"},
 			{item("c", "Classic Mode "+mode), "", "Classic " + stripANSI(mode)},
 			{item("t", "Tidy screen "+tidyMode), "", "Tidy " + stripANSI(tidyMode)},
-			{item("?", "Keys & shortcuts"), hint("Ctrl+L clears"), "Keys"},
+			{item("5", "Exit"), hint("progress saves itself"), "Exit"},
+			{item("8", sty.Gray("Undo this session")), "", "Undo session"},
 		}},
 	}
 
@@ -351,7 +401,7 @@ func (a *App) viewLedger() {
 	for _, l := range flow([]string{
 		sty.Gray("Campus total") + " " + sty.Bold(fmt.Sprintf("%.2fh", roundHours(grand))) + fmt.Sprintf(" across %d lab(s)", a.reg.labCount()),
 		sty.Gray("Last 14d") + " " + sparkline(cs.activity[len(cs.activity)-14:]),
-		sty.Gray("last commit") + " " + formatTime(a.reg.LastCommit),
+		sty.Gray("last saved") + " " + formatTime(a.reg.LastCommit),
 	}, "   ", w, "  ") {
 		a.println(l)
 	}
@@ -467,12 +517,11 @@ func (a *App) listStages(track *Track) {
 			s := &t.Stages[si]
 			studied, concepts := conceptProgress(s)
 			exDone, exTotal := exerciseProgress(s)
-			mark := sty.Yellow("◐")
-			if s.Status == StatusGraduated {
-				mark = sty.Green("★")
-			}
-			counts := fmt.Sprintf("concepts %d/%d · ex %d/%d", studied, concepts, exDone, exTotal)
-			titleW := w - 14 - len(counts) - 1
+			state := a.reg.stageState(s)
+			mark := stateStyle(state)(stageStateGlyphs[state])
+			// Right-aligned in a fixed column, so two-digit counts line up.
+			counts := fmt.Sprintf("%25s", fmt.Sprintf("concepts %d/%d · ex %d/%d", studied, concepts, exDone, exTotal))
+			titleW := w - 14 - visibleLen(counts) - 1
 			if titleW < 24 { // too narrow for the counts: give the title the room
 				titleW, counts = w-14, ""
 			}
@@ -544,7 +593,14 @@ func (a *App) pickTrack() (*Track, error) {
 // pickStage prompts for a stage ID, optionally restricted to one track.
 func (a *App) pickStage(track *Track) (int, error) {
 	a.listStages(track)
-	return a.con.promptInt("Stage ID", func(id int) error {
+	legend := make([]string, len(stageStateNames))
+	for i, name := range stageStateNames {
+		legend[i] = stateStyle(i)(stageStateGlyphs[i]) + " " + sty.Gray(name)
+	}
+	for _, l := range flow(legend, "  ", a.cols(), "    ") {
+		a.println(l)
+	}
+	return a.con.promptInt("Which stage?", func(id int) error {
 		a.mu.Lock()
 		defer a.mu.Unlock()
 		t, s := a.reg.findStage(id)
@@ -859,10 +915,10 @@ func (a *App) setCompileStatus() error {
 func (a *App) commitAndExit() {
 	restoreTerminal()
 	if err := a.commit(); err != nil {
-		fmt.Fprintf(os.Stderr, "✗ commit failed: %v\n  (in-memory changes were NOT saved)\n", err)
+		fmt.Fprintf(os.Stderr, "✗ saving failed: %v\n  (your latest changes were NOT saved)\n", err)
 		os.Exit(1)
 	}
-	a.con.ok("Registry committed atomically to %s", a.path)
+	a.con.ok("Progress saved. See you next time!")
 	os.Exit(0)
 }
 
@@ -884,8 +940,8 @@ func (a *App) showShortcuts() {
 	row("Backspace", "delete the previous character")
 	row("Ctrl+U", "erase the whole line")
 	row("Ctrl+W", "erase the previous word")
-	row("Ctrl+D", "end input: commits your work and exits (on an empty line)")
-	row("Ctrl+C", "commit your work and exit")
+	row("Ctrl+D", "end input: saves and exits (on an empty line)")
+	row("Ctrl+C", "save and exit (closing the window saves too)")
 	row("q  or  :q", "cancel the current prompt (q for numbers, :q for text)")
 	a.println("")
 	a.printf("  %s\n", sty.Bold("Main menu"))
@@ -923,7 +979,7 @@ func (a *App) showShortcuts() {
 	}
 }
 
-// run is the interactive loop. Ctrl-D (EOF) is treated as commit & exit.
+// run is the interactive loop. Ctrl-D (EOF) is treated as save & exit.
 func (a *App) run() {
 	for {
 		a.printMenu()
@@ -940,7 +996,7 @@ func (a *App) run() {
 			fmt.Fprint(a.con.out, clearSeq)
 		}
 		if err != nil {
-			a.con.note("Input closed — committing.")
+			a.con.note("Input closed — saving.")
 			a.commitAndExit()
 		}
 
@@ -1010,20 +1066,24 @@ func (a *App) run() {
 			a.commitAndExit()
 		case "6":
 			actionErr = a.studyHall()
-		case "7":
+		case "7", "save":
 			if err := a.commit(); err != nil {
-				a.con.fail("Checkpoint failed: %v", err)
+				a.con.fail("Saving failed: %v", err)
 			} else {
-				a.con.ok("Checkpoint written to %s", a.path)
+				a.con.ok("Saved. (The academy also saves by itself after every action.)")
 			}
 		case "8":
-			ok, err := a.con.confirm("Discard all uncommitted changes and exit?")
+			ok, err := a.con.confirm("Undo everything you did since you opened the academy, and exit?")
 			if err != nil {
 				a.commitAndExit()
 			}
 			if ok {
 				restoreTerminal()
-				a.con.note("Exited without saving.")
+				if err := a.undoSession(); err != nil {
+					fmt.Fprintf(os.Stderr, "✗ could not undo: %v\n", err)
+					os.Exit(1)
+				}
+				a.con.note("This session was undone. Your progress is as it was when you opened the academy.")
 				os.Exit(0)
 			}
 		case "":
@@ -1036,11 +1096,12 @@ func (a *App) run() {
 		case errors.Is(actionErr, errCancel):
 			a.con.note("Cancelled — nothing changed.")
 		case errors.Is(actionErr, io.EOF):
-			a.con.note("Input closed — committing.")
+			a.con.note("Input closed — saving.")
 			a.commitAndExit()
 		case actionErr != nil:
 			a.con.fail("%v", actionErr)
 		}
 		a.announceAchievements()
+		a.autosave()
 	}
 }

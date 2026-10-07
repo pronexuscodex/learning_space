@@ -6,7 +6,15 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+- **Closing the terminal window no longer loses your session.** On macOS and Linux, closing the window (SIGHUP) quit without saving, which is now the usual way to leave an app opened from Launchpad or the app menu.
+- Prompt instructions were silently dropped when the question was long. For example, "How sure are you?" appeared without "1 guessing · 2 fairly sure · 3 certain". They now appear on their own line above the question.
+- The Study Hall marked every stage "in progress" (◐), even stages you had not started. It now shows your real state (locked, ready, in progress, understood, mastered), with a legend, as the Roadmap does.
+
 ### Changed
+- **Progress saves automatically** after every action. There is no more "commit", "checkpoint" or "uncommitted changes". One backup is made per session, so the 10 kept backups cover your last 10 sessions instead of the last 10 saves. "Exit without saving" became **Undo this session**, which restores your progress exactly as it was when you opened the academy.
+- The home screen has one call to action: today's workout until it is done, then the next step. The registry path is no longer printed at every start (`academy -where` shows it).
+- Plainer menu labels: Start a lab project, Log study hours, Update progress, Ledger; "Which stage?" instead of "Stage ID"; study time shown as hours with one decimal; proper plurals ("1 card", "3 cards").
 - Long lists no longer make you press Enter page after page before you can choose. At any "Enter for more" pause, type the item's number (or any menu key) and it is used straight away.
 
 ## [1.5.0] - 2026-10-07

@@ -525,7 +525,7 @@ func (a *App) progressReport() {
 	}
 	a.printf("\n  %s\n", sty.Bold("Review deck"))
 	for _, l := range flow([]string{
-		fmt.Sprintf("%d card(s)", len(cards)),
+		count(len(cards), "card"),
 		sty.Green(fmt.Sprintf("%d mature (21+ days)", mature)),
 		sty.Cyan(fmt.Sprintf("%d learning", young)),
 		sty.Gray(fmt.Sprintf("%d new", len(cards)-mature-young)),

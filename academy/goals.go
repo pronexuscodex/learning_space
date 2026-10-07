@@ -355,7 +355,7 @@ func backupCommand(path string, list bool, restore string) int {
 	}
 	if list {
 		if len(backups) == 0 {
-			fmt.Printf("No backups yet in %s. One is made each time you commit.\n", backupDir(path))
+			fmt.Printf("No backups yet in %s. One is made each session in which something changes.\n", backupDir(path))
 			return 0
 		}
 		fmt.Printf("Backups of %s, newest first:\n", path)
