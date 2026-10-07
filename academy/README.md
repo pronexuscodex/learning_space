@@ -529,7 +529,8 @@ Press **`c`** on the main menu. Classic Mode brings back the habits that made st
 | Ctrl+U / Ctrl+W | any prompt | erases the whole line / the previous word |
 | Ctrl+D | empty prompt | ends input: commits your work and exits |
 | Ctrl+C | anywhere | commits your work and exits |
-| Enter / q | long screens | next page / back to the menu |
+| Enter / q | long screens | next page / stop paging |
+| a number or key | long screens | answers the next prompt straight away: on a long list, type the item's number at "Enter for more" without paging to the end |
 
 On Linux, macOS and the BSDs, the academy reads keys one at a time (a small built-in line editor using termios from Go's standard library), so Ctrl+L works instantly and arrow keys are ignored instead of printing `^[[A`. The terminal is always restored on exit, including after Ctrl+C. Elsewhere (for example Windows), input stays line-based: press **Ctrl+L then Enter**, or type `clear`.
 

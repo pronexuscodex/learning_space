@@ -38,6 +38,10 @@ type console struct {
 	shown     int
 	cols      func() int // current layout width (nil: 80)
 
+	// pending is an answer typed ahead at a pager prompt; the next
+	// readLine returns it instead of waiting for input.
+	pending *string
+
 	// closed is set once input has ended (Ctrl+D or end of a pipe). It is
 	// sticky, so every later prompt also sees the end of input and the
 	// app always reaches its commit-and-exit path.
@@ -129,6 +133,12 @@ func isCancel(s string) bool {
 // readLine prints prompt and returns one sanitized line. It returns io.EOF
 // when input is exhausted (Ctrl-D / closed pipe). Ctrl+L clears the screen.
 func (c *console) readLine(prompt string) (string, error) {
+	if c.pending != nil {
+		s := *c.pending
+		c.pending = nil
+		fmt.Fprintln(c.out, prompt+s) // show the answer where it is used
+		return s, nil
+	}
 	if c.closed {
 		return "", io.EOF
 	}
@@ -299,3 +309,6 @@ func (c *console) confirm(label string) (bool, error) {
 		c.warn("Please answer y or n.")
 	}
 }
+
+// typeAhead makes s the answer to the next prompt.
+func (c *console) typeAhead(s string) { c.pending = &s }

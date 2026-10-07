@@ -4,6 +4,11 @@ All notable changes to the Systems & AI Academy are listed here. The
 format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 versions follow [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Changed
+- Long lists no longer make you press Enter page after page before you can choose. At any "Enter for more" pause, type the item's number (or any menu key) and it is used straight away.
+
 ## [1.5.0] - 2026-10-07
 
 ### Added
