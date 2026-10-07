@@ -4,6 +4,11 @@ All notable changes to the Systems & AI Academy are listed here. The
 format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 versions follow [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Changed
+- **Type your choice at any pager pause.** On a long screen (a word list, the library, the roadmap, the ledger, help), typing a number, word or menu key at the "Enter for more" prompt now skips the rest of the screen and acts on it, instead of making you press Enter to the bottom first.
+
 ## [1.5.0] - 2026-10-07
 
 ### Added

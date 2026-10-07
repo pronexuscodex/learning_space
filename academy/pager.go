@@ -38,6 +38,12 @@ func termHeight() int {
 // paged renders a screen and shows it one page at a time. With finalPause,
 // it also waits after the last page, so the screen stays visible until
 // the learner is ready to return to the menu.
+//
+// At any pager prompt, Enter shows the next page and q stops paging.
+// Anything else (a number, a word to look up, a menu letter) skips the
+// rest of the screen and is handed to the prompt that follows, so a
+// learner who has spotted their choice never has to page to the bottom
+// first.
 func (a *App) paged(finalPause bool, render func()) {
 	if !a.pager {
 		render()
@@ -58,13 +64,28 @@ func (a *App) paged(finalPause bool, render func()) {
 		if last && !finalPause {
 			return
 		}
-		prompt := sty.Gray("  ── ") + sty.Bold(sty.Cyan("Enter")) + sty.Gray(" for more · ") + sty.Bold(sty.Cyan("q")) + sty.Gray(" to stop ──")
-		if last {
-			prompt = sty.Gray("  ── end · press ") + sty.Bold(sty.Cyan("Enter")) + sty.Gray(" to continue ──")
-		}
-		s, err := a.con.readLine(prompt + " ")
-		if err != nil || isCancel(s) {
+		s, err := a.con.readLine(a.pagerPrompt(last) + " ")
+		switch {
+		case err != nil || isCancel(s):
+			return
+		case s != "":
+			a.con.typeAhead(s)
 			return
 		}
 	}
 }
+
+// pagerPrompt is the line shown between pages, or after the last one.
+// Where there is room it says that a choice can be typed right there.
+func (a *App) pagerPrompt(last bool) string {
+	prompt := sty.Gray("  ── ") + sty.Bold(sty.Cyan("Enter")) + sty.Gray(" for more · ") + sty.Bold(sty.Cyan("q")) + sty.Gray(" to stop")
+	if last {
+		prompt = sty.Gray("  ── end · press ") + sty.Bold(sty.Cyan("Enter")) + sty.Gray(" to continue")
+	}
+	if visibleLen(prompt)+len(pagerTypeHint)+4 <= a.cols() {
+		prompt += sty.Gray(pagerTypeHint)
+	}
+	return prompt + sty.Gray(" ──")
+}
+
+const pagerTypeHint = " · or type your choice"

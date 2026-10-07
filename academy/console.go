@@ -42,6 +42,17 @@ type console struct {
 	// sticky, so every later prompt also sees the end of input and the
 	// app always reaches its commit-and-exit path.
 	closed bool
+
+	// pending holds an answer typed ahead at a pager prompt. The next
+	// prompt takes it as if it had been typed there, so a choice made
+	// while a long screen is paging is acted on straight away.
+	pending    string
+	hasPending bool
+}
+
+// typeAhead hands s to the next prompt.
+func (c *console) typeAhead(s string) {
+	c.pending, c.hasPending = s, true
 }
 
 // setOnClear installs (or removes, with nil) the redraw hook, under the
@@ -129,6 +140,12 @@ func isCancel(s string) bool {
 // readLine prints prompt and returns one sanitized line. It returns io.EOF
 // when input is exhausted (Ctrl-D / closed pipe). Ctrl+L clears the screen.
 func (c *console) readLine(prompt string) (string, error) {
+	if c.hasPending {
+		s := c.pending
+		c.pending, c.hasPending = "", false
+		fmt.Fprintln(c.out, prompt+s) // show it where it lands, as if typed here
+		return s, nil
+	}
 	if c.closed {
 		return "", io.EOF
 	}
