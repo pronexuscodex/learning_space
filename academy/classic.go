@@ -280,7 +280,7 @@ var classicGuides = map[int]ClassicGuide{
 		Anchor: ClassicRead{"Deep Learning", "Goodfellow, Bengio & Courville", 2016, "https://www.deeplearningbook.org/",
 			"The standard reference for the theory behind neural networks, free online.",
 			"Read Part II alongside Karpathy's lectures: the lecture for intuition, the book for precision."},
-		Classic: ClassicRead{"Gradient-Based Learning Applied to Document Recognition", "LeCun, Bottou, Bengio & Haffner", 1998, "https://yann.lecun.com/exdb/publis/pdf/lecun-98.pdf",
+		Classic: ClassicRead{"Gradient-Based Learning Applied to Document Recognition", "LeCun, Bottou, Bengio & Haffner", 1998, "https://vision.stanford.edu/cs598_spring07/papers/Lecun98.pdf",
 			"The LeNet paper: convolutional networks reading handwritten digits (and bank cheques) in the 1990s.",
 			"Read the introduction and the section describing LeNet-5, then sketch its layers from memory."},
 		Source: ClassicRead{"micrograd", "Andrej Karpathy", 2020, "https://github.com/karpathy/micrograd",
