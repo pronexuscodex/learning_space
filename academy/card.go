@@ -38,6 +38,9 @@ func (r *Registry) shareCard(now time.Time, cols int) []string {
 		streak = sty.Bold(sty.Yellow(fmt.Sprintf("%d day%s", cs.streak, plural(cs.streak))))
 	}
 	row("Streak", streak)
+	if sr := r.selfReliance(); sr.total() > 0 {
+		row("Solved myself", fmt.Sprintf("%s / %d", sty.Bold(fmt.Sprint(sr.own())), sr.total()))
+	}
 	row("Achievements", fmt.Sprintf("%s / %d", sty.Bold(fmt.Sprint(len(r.Achievements))), len(achievements)))
 	add("")
 

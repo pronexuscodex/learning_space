@@ -178,6 +178,7 @@ func (a *App) printDashboard() {
 	if h := a.nextHint(); h != "" {
 		a.println("  " + h)
 	}
+	a.println(a.workoutLine())
 }
 
 // printMenu draws the dashboard and the menu. Wide terminals get two
@@ -213,6 +214,7 @@ func (a *App) printMenu() {
 	}{
 		{"LEARN", sty.Green, []entry{
 			{item("0", sty.Bold(sty.Green("Start Here"))), hint("begin here"), "Start Here"},
+			{item("j", sty.Bold(sty.Green("Today's workout"))), hint("guided daily session"), "Workout"},
 			{item("6", sty.Bold("Study Hall")), hint("learn & practise"), "Study Hall"},
 			{item("9", review), "", "Review"},
 			{item("n", sty.Bold(sty.Green("What's next"))), hint("best next step"), "What's next"},
@@ -238,6 +240,7 @@ func (a *App) printMenu() {
 			{item("x", "Export notes"), hint("to Markdown"), "Export"},
 		}},
 		{"SAVE & SETTINGS", sty.Yellow, []entry{
+			{item("o", "Settings"), hint("theme, symbols, modes"), "Settings"},
 			{item("7", "Checkpoint"), hint("save, keep going"), "Checkpoint"},
 			{item("5", "Atomic Commit & Exit"), "", "Commit & exit"},
 			{item("8", sty.Gray("Exit without saving")), "", "Quit, no save"},
@@ -900,6 +903,8 @@ func (a *App) showShortcuts() {
 	row("m", "roadmap: every stage's state and what it builds on; open any Study Hall")
 	row("g", "weekly goals: minutes, days and review cards, tracked on the dashboard")
 	row("a", "achievements")
+	row("o", "settings: colour theme, plain symbols, confidence ratings, modes")
+	row("j", "today's workout: review, recall, learn, mixed practice, reflect")
 	row("k", "share card: your progress, ready to screenshot and post")
 	row("c", "Classic Mode on/off")
 	row("t", "tidy screen on/off: start every action on a clean screen")
@@ -965,6 +970,10 @@ func (a *App) run() {
 			a.paged(true, a.showShortcuts)
 		case "n":
 			actionErr = a.whatsNext()
+		case "j":
+			actionErr = a.dailyWorkout()
+		case "o":
+			actionErr = a.settingsScreen()
 		case "/", "s", "search":
 			actionErr = a.searchScreen()
 		case "f":

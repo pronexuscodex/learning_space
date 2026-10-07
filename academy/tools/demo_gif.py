@@ -20,10 +20,12 @@ COLS, ROWS = 80, 30
 # (caption, keys, first line regex, last line regex, seconds on screen)
 SCENES = [
     ("21 stages, from how a CPU works to building AI", [], r"Hours ", r"└─", 3.0),
+    ("today's workout: one guided session a day", ["j"], r"TODAY'S WORKOUT", r"Ready\?", 3.5),
     ("the Study Hall: pick a stage", ["6"], r"STUDY HALL", r"\[16\]", 2.5),
     ("every concept: analogy, example, diagram", ["6", "1", "1", "5"], r"┏━", None, 3.5),
     ("under the hood: the real bytes and commands", ["6", "1", "1", "6"], r"🔧 Under the hood", None, 3.0),
     ("real exercises, three per concept", ["6", "0", "2", "3", "3"], r"REAL-WORLD", r"\(y/n\)|›", 3.0),
+    ("stuck? questions first, then where to look, then the hint", ["6", "0", "2", "3", "3", "2", "2"], r"🧭 Rung 1", r"this exercise\.", 4.0),
     ("spaced repetition, so you keep what you learn", ["9"], r"DAILY REVIEW", r"Your answer", 3.0),
     ("a dictionary of every programming word", ["d", "type casting"], r"┏━ Type casting", r"┗", 3.0),
     ("free books and papers, downloaded in the app", ["l"], r"LIBRARY", None, 3.0),
@@ -37,6 +39,10 @@ def frame(chrome, demo, n, caption, keys, first, last, out_dir):
     shutil.copy(demo, reg)
     lines = shots.terminal_lines(shots.run_session(COLS, keys, reg))
     start = next((i for i, l in enumerate(lines) if re.search(first, shots.plain(l))), None)
+    if start is None:  # the scene spans several keys: look from the first one
+        shutil.copy(demo, reg)
+        lines = shots.terminal_lines(shots.run_session(COLS, keys, reg, 0))
+        start = next((i for i, l in enumerate(lines) if re.search(first, shots.plain(l))), None)
     if start is None:
         raise SystemExit(f"scene {n}: start marker {first!r} not found")
     if start > 0 and set(shots.plain(lines[start - 1]).strip()) == {"═"}:

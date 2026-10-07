@@ -602,6 +602,29 @@ supports:
 - Your own words: when you mark a concept as understood, you explain it in your own words. Your explanation is shown back to you at review time.
 - Connections: every concept links to related ones, so each new idea hooks onto something you already know.
 
+THINK FIRST: LEARNING IN THE AGE OF AI
+An AI can write the answer in seconds, and that is exactly why it can
+quietly stop you from learning: the effort of working something out is
+what builds understanding, and handing that effort away skips it.
+Researchers call this cognitive offloading (Risko & Gilbert, 2016). In a
+field experiment with high-school maths students, those given an
+unrestricted AI assistant did better during practice but worse on the
+exam once the AI was taken away; a version built to give hints rather
+than answers avoided most of that harm (Bastani and colleagues, PNAS,
+2025). Strong engineers use AI too, but they understand what it gives
+them, check it, and can work without it.
+The academy's rule, in this order:
+- 1. Think first. Give every problem an honest attempt: say what is asked, what you know, and try the smallest case. Being stuck for a while is not failure; it is the part that teaches (Bjork's "desirable difficulties").
+- 2. Look it up second. Your concept card, the glossary, the man pages, the language reference, the RFC. Reading primary sources is the engineer's core skill.
+- 3. Ask an AI last, and only to check your own answer or explain an error you can already reproduce. Never paste the exercise and copy the answer back.
+- 4. If you needed help, redo it from a blank page a few days later. Only what you can do alone is yours.
+How the academy helps you keep the rule:
+- Today's workout [j]: one guided session a day: warm-up review, blank-page recall, one new idea, a mixed exercise, and a short reflection.
+- The hint ladder: when stuck, you get questions to think with first, then where to look it up, and only then the hint.
+- Honest solve log: after each exercise you say how you got there. Anything solved with the hint or someone else's help comes back three days later to redo alone.
+- Blank-page recall: write everything you remember about a concept, then compare. Effortful recall beats rereading, which mostly creates a feeling of knowing (Dunlosky and colleagues, 2013).
+- Calibration: in reviews you say how sure you are before the answer appears. The Progress report [p] shows whether your confidence can be trusted.
+
 MASTERY LEVELS
 Each concept climbs a ladder: ○ new → ◔ understood → ◑ practised (two
 exercises done) → ◕ retained (every review card remembered a week apart)
@@ -626,8 +649,9 @@ Every concept has three exercises, and each has a hint:
 - Practice: a small program that makes the idea concrete.
 - Real-world: a task from a real situation, such as a shop, a bank, your own files or a real dataset.
 
-Open the Exercise Gym in any stage's Study Hall to see hints and tick
-exercises off. Try each one before you peek at the hint.
+Open the Exercise Gym in any stage's Study Hall to work an exercise and
+tick it off. When you are stuck, climb the hint ladder one rung at a time:
+questions to think with, then where to look it up, then the hint.
 
 WHY WE START WITH C
 C shows you what is really going on under the hood. In C every value has a size and an address, you decide where memory comes from, and a compiler turns your text into instructions for the actual processor. Once you have seen that, every other language makes sense: Python's lists, Go's slices and Java's objects are the same arrays, pointers and memory with the dangerous parts managed for you.
@@ -663,6 +687,7 @@ WHERE TO START
 - Stuck on a word? Open the Glossary in the stage's Study Hall.
 
 A SIMPLE STUDY RHYTHM
+- The easiest way to follow everything below: press j for Today's workout and let it guide you.
 - Start every session with the Daily Review [9]. It takes 5 to 15 minutes and protects everything you have learned.
 - Then one new concept. Read it slowly, then close your eyes and explain it out loud.
 - Do its warm-up the same day and its practice exercise the next.
@@ -703,5 +728,5 @@ internet access to re-verify all of them.
 
 YOUR DATA
 Everything you do, including review schedules and your own explanations,
-is saved in one readable JSON file next to the program. Nothing is sent
-anywhere.`
+is saved in one readable JSON file on your computer (run academy -where to
+see where). Nothing is sent anywhere.`

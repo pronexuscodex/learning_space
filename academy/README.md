@@ -19,6 +19,7 @@ New here? Build it (below), run it, and press **`0`** for the *Start Here* guide
 - [How each concept is taught](#how-each-concept-is-taught)
 - [Exercises](#exercises)
 - [Built to be remembered, not just read](#built-to-be-remembered-not-just-read)
+- [Think first: learning without leaning on AI](#think-first-learning-without-leaning-on-ai)
 - [Menu](#menu)
 - [Study Hall](#study-hall)
 - [Programmer's dictionary](#programmers-dictionary)
@@ -29,7 +30,7 @@ New here? Build it (below), run it, and press **`0`** for the *Start Here* guide
 - [Accurate resources](#accurate-resources)
 - [Keyboard](#keyboard)
 - [Resizing the terminal](#resizing-the-terminal)
-- [Colours](#colours)
+- [Colours and settings](#colours-and-settings)
 - [Data safety](#data-safety)
 - [Schema (abridged)](#schema-abridged)
 - [Tests](#tests)
@@ -291,6 +292,26 @@ Each understood concept adds **three review cards** to your deck: its key idea, 
 
 ![Daily review](docs/daily-review.png)
 
+## Think first: learning without leaning on AI
+
+An AI can write the answer in seconds, which is exactly why it can stop you from learning: the effort of working something out is what builds understanding. In a field experiment with high-school maths students, those given an unrestricted AI assistant did better during practice but worse on the exam once it was taken away; a version that gave hints instead of answers avoided most of that harm ([Bastani et al., PNAS 2025](https://doi.org/10.1073/pnas.2422633122)). Researchers call handing your thinking to a tool *cognitive offloading* ([Risko & Gilbert, 2016](https://doi.org/10.1016/j.tics.2016.07.002)).
+
+The academy's rule, in order: **think first, look it up second, ask an AI last**, and then only to check your own answer. Five features help you keep it:
+
+| Feature | What it does | Why it works |
+|---|---|---|
+| **Today's workout** (`j`) | One guided session a day, about 30 to 45 minutes: warm-up review, blank-page recall, one new concept, a mixed exercise and a short reflection. Each step is saved, so you can stop and resume. The dashboard shows today's progress. | Strings the best-supported techniques together, in the order that works, every day. |
+| **The hint ladder** | When you are stuck: rung 1 asks the questions an engineer asks (what is asked, the smallest case, explain it to a rubber duck); rung 2 says where to look it up (your concept card, the glossary words in the task, the reading pointer, man pages and specs); only rung 3 shows the hint. In Classic Mode the hint stays behind the struggle clock. | Being stuck for a while is a *desirable difficulty* (Bjork); looking it up in primary sources is the engineer's core skill. |
+| **Honest solve log** | After each exercise you say how you got there: on your own, with the docs, with the hint, or with an AI or someone else's answer. Anything solved with the hint or with help comes back three days later, to redo from a blank page. | Only what you can do alone is yours; the redo turns a borrowed answer into real retrieval. |
+| **Blank-page recall** | Write everything you remember about a concept, then compare with the card and score yourself. Weak recalls come back the next day, strong ones weeks later. | Free recall is among the most effective study techniques; rereading mostly creates a feeling of knowing ([Dunlosky et al., 2013](https://doi.org/10.1177/1529100612453266)). |
+| **Calibration** | In reviews you say how sure you are (guessing, fairly sure, certain) before the answer appears. The Progress report shows how often each level is right, and tells you if you are over- or underconfident. | Knowing what you don't know (metacognition) decides what you study next. |
+
+The **Progress report** (`p`) has a *Thinking for yourself* section: how many exercises you solved yourself, your redo list, your recalls, calibration and workouts. The share card shows *Solved myself* too, and five new achievements reward the habits: First Principles, Blank Page, Made It Mine, In Training and Know What You Know.
+
+![The hint ladder](docs/hint-ladder.png)
+
+![Today's workout](docs/workout.png)
+
 ## Menu
 
 The menu is grouped into four sections. Keys never change, whatever the layout: wide terminals show two or three columns with hints, and narrow ones show two compact columns.
@@ -300,6 +321,7 @@ The menu is grouped into four sections. Keys never change, whatever the layout: 
 | Key | Action |
 |---|--------|
 | 0 | **Start Here**: what the academy covers, how memory works, how to practise, where to begin and a study rhythm |
+| j | **Today's workout**: the guided daily session (review, blank-page recall, one new idea, mixed practice, reflect) |
 | 6 | **Study Hall**: concepts, exercise gym, glossary, resources, lab blueprints, quiz and mastery check |
 | 9 | **Daily Review**: your due spaced-repetition cards, interleaved across stages (`r` works too) |
 | n | **What's next**: up to four recommended steps (due reviews, next concept, an open exercise, a ready mastery check or type-in, a focus session) and one key to start any of them |
@@ -318,7 +340,7 @@ The menu is grouped into four sections. Keys never change, whatever the layout: 
 | 1 | **View Campus Ledger**: a colour card per stage, with reading, concept and exercise progress bars, labs and hours |
 | g | **Weekly goals**: study minutes, study days and review cards per week (Monday to Sunday), tracked on the dashboard: cyan on track, yellow behind, green done |
 | p | **Progress report**: a GitHub-style activity calendar, the last 7 days against the 7 before, time and mastery per track, deck health and your most-forgotten cards |
-| a | **Achievements**: 23 milestones (first concept, 7- and 30-day streaks, 100 and 1,000 reviews, a mastered concept, a passed mastery check, a whole track, graduation…), announced the moment you earn them |
+| a | **Achievements**: 28 milestones (first concept, 7- and 30-day streaks, 100 and 1,000 reviews, a mastered concept, a passed mastery check, a whole track, graduation…), announced the moment you earn them |
 
 **Resources**
 
@@ -334,6 +356,7 @@ The menu is grouped into four sections. Keys never change, whatever the layout: 
 
 | Key | Action |
 |---|--------|
+| o | **Settings**: colour theme (default, high contrast, colour-blind friendly, monochrome), plain symbols instead of emoji, confidence ratings, Classic Mode, tidy screen |
 | 7 | Checkpoint: commit and keep working |
 | 5 | **Atomic Commit & Exit** |
 | 8 | Exit without saving (asks for confirmation) |
@@ -528,9 +551,13 @@ The layout follows your terminal's **live size**. It reads the size with an ioct
 - **Input that wraps across rows** is still erased and redrawn correctly by Backspace, Ctrl+U and Ctrl+W.
 - **Checking it:** `tools/layout_check.py` drives every major screen through a real pseudo-terminal at any widths you give it and reports lines wider than the terminal. It currently finds none from 40 to 200 columns.
 
-## Colours
+## Colours and settings
 
 Colour is turned on automatically when output goes to a terminal. It is turned off by `-no-color`, by setting `NO_COLOR`, by `TERM=dumb`, or when output is piped. Text follows the live terminal width (40–110 columns; `$COLUMNS` or 80 when it cannot be read).
+
+**Settings** (`o`) choose a colour theme: *Default*, *High contrast* (bright text, no faint grey), *Colour-blind friendly* (blue and orange carry the meaning instead of green and red) or *Monochrome* (no colour, only bold and layout). *Plain symbols* replaces emoji with ordinary characters of the same width, for terminals or fonts that draw emoji badly (some Windows consoles). Settings are saved in your registry.
+
+![Settings](docs/settings.png)
 
 ## Data safety
 

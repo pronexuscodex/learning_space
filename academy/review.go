@@ -122,8 +122,14 @@ func (a *App) reviewCard(card Card, n, total int) (int, error) {
 	if card.Kind == CardWord {
 		source = "Programmer's dictionary"
 	}
-	a.printf("  %s %s %s %s\n", sty.Green("┏━"), sty.Gray(fmt.Sprintf("%d/%d ·", n, total)),
-		sty.Bold(sty.Green(strings.ToUpper(card.Kind))), sty.Gray(source))
+	head := fmt.Sprintf("  %s %s %s", sty.Green("┏━"), sty.Gray(fmt.Sprintf("%d/%d ·", n, total)),
+		sty.Bold(sty.Green(strings.ToUpper(card.Kind))))
+	if room := w - visibleLen(head) - 2; room >= 12 {
+		a.printf("%s %s\n", head, sty.Gray(truncate(source, room)))
+	} else { // narrow: the source gets its own line
+		a.println(head)
+		a.printf("  %s %s\n", edge, sty.Gray(truncate(source, w-6)))
+	}
 	for _, l := range wrap(card.Q, w-6, "") {
 		a.printf("  %s %s\n", edge, sty.Bold(l))
 	}
@@ -135,6 +141,32 @@ func (a *App) reviewCard(card Card, n, total int) (int, error) {
 	}
 	if isCancel(attempt) {
 		return 0, errCancel
+	}
+
+	// Saying how sure you are before seeing the answer trains you to know
+	// what you know (calibration).
+	a.mu.Lock()
+	askConf := !a.reg.Settings.NoConfidence
+	a.mu.Unlock()
+	conf := -1
+	if askConf {
+		for conf < 0 {
+			s, err := a.con.readLine(promptLabel("How sure are you?", "1 guessing · 2 fairly sure · 3 certain · Enter skips"))
+			if err != nil {
+				return 0, err
+			}
+			if isCancel(s) {
+				return 0, errCancel
+			}
+			switch s {
+			case "":
+				conf = len(confNames) // skipped
+			case "1", "2", "3":
+				conf = int(s[0] - '1')
+			default:
+				a.con.warn("Type 1, 2 or 3, or press Enter to skip.")
+			}
+		}
 	}
 
 	a.printf("  %s\n", sty.Bold(sty.Cyan("Answer")))
@@ -163,7 +195,11 @@ func (a *App) reviewCard(card Card, n, total int) (int, error) {
 	a.mutate(func(r *Registry) {
 		r.Reviews[card.ID] = schedule(r.Reviews[card.ID], grade, now)
 		r.ReviewHistory[now.Format("2006-01-02")]++
+		r.Calibration.record(conf, grade >= GradeHard)
 	})
+	if conf == ConfSure && grade == GradeAgain {
+		a.con.note("You were certain, and it slipped. Those are the most valuable cards to notice.")
+	}
 	return grade, nil
 }
 

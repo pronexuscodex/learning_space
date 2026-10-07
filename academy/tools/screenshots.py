@@ -51,6 +51,9 @@ SHOTS = {
     "progress": (80, ["p"], r"PROGRESS REPORT", r"Achievements", 45),
     "library": (80, ["l"], r"LIBRARY", r"Stage 2 ·", 30),
     "techwatch": (80, ["w", "4"], r"MY TECH RADAR", r"press Enter", 30),
+    "workout": (80, ["j"], r"TODAY'S WORKOUT", r"Ready\?", 30),
+    "hint-ladder": (80, ["6", "0", "2", "3", "3", "2", "2"], r"Stuck\?", r"this exercise\.", 40, -3),
+    "settings": (80, ["o", "1"], r"SETTINGS", r"Monochrome", 30, -2),
     "share-card": (80, ["k"], r"╭", r"learning_space", 25),
     "start-here": (80, ["0"], r"WHY WE START WITH C", r"GET A C COMPILER", 20),
     "struggle-clock": (80, ["c", "y", "6", "1", "2", "5", "2", "y"], r"PRACTICE", r"learning happens", 30, -2),
@@ -58,6 +61,10 @@ SHOTS = {
 
 SGR_COLORS = {"30": "#45475a", "31": "#f38ba8", "32": "#a6e3a1", "33": "#f9e2af", "34": "#89b4fa",
               "35": "#cba6f7", "36": "#94e2d5", "37": "#cdd6f4", "90": "#7f849c"}
+# Bright colours (high-contrast theme) and the 256-colour entries the
+# colour-blind theme uses.
+SGR_COLORS.update({"91": "#ff9cb4", "92": "#c3f7bd", "93": "#fff2b8", "94": "#b4cdff", "95": "#e2c6ff", "96": "#b8fbee", "37": "#e6e9f5"})
+XTERM_256 = {"208": "#ff8700", "39": "#00afff", "220": "#ffd700", "33": "#0087ff", "213": "#ff87ff", "117": "#87d7ff"}
 CSI = re.compile(r"\x1b\[([0-9;?]*)([A-Za-z])")
 
 
@@ -163,7 +170,15 @@ def to_html(line):
         pos = m.end()
         if m.group(2) != "m":
             continue
-        for p in (m.group(1) or "0").split(";"):
+        params = (m.group(1) or "0").split(";")
+        k = 0
+        while k < len(params):
+            p = params[k]
+            k += 1
+            if p == "38" and k + 1 < len(params) and params[k] == "5":
+                style["color"] = XTERM_256.get(params[k + 1], "#cdd6f4")
+                k += 2
+                continue
             if p in ("0", ""):
                 style = {}
             elif p == "1":

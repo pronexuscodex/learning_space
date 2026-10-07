@@ -180,6 +180,19 @@ var achievements = []Achievement{
 		func(r *Registry, cs campusStats) bool { return len(r.WordDeck) >= 20 }},
 	{"curator", "Curator", "Added 5 of your own resources.",
 		func(r *Registry, cs campusStats) bool { return len(r.MyResources) >= 5 }},
+	{"first-principles", "First Principles", "Solved 10 exercises yourself, without the hint or anyone's answer.",
+		func(r *Registry, cs campusStats) bool { return r.selfReliance().own() >= 10 }},
+	{"blank-page", "Blank Page", "Did 10 blank-page recalls.",
+		func(r *Registry, cs campusStats) bool { return len(r.Recalls) >= 10 }},
+	{"redo-alone", "Made It Mine", "Redid an exercise alone after needing help with it.",
+		func(r *Registry, cs campusStats) bool { return r.redidAlone() }},
+	{"workout-7", "In Training", "Completed 7 daily workouts.",
+		func(r *Registry, cs campusStats) bool { return r.workoutsCompleted() >= 7 }},
+	{"calibrated", "Know What You Know", "When certain, right at least 90% of the time over 30 rated answers.",
+		func(r *Registry, cs campusStats) bool {
+			acc, ok := r.Calibration.accuracy(ConfSure)
+			return ok && r.Calibration[ConfSure][0] >= 30 && acc >= 0.9
+		}},
 	{"type-in", "Typed It In", "Completed a Classic Mode type-in.",
 		func(r *Registry, cs campusStats) bool {
 			return r.anyStage(func(s *Stage) bool { return s.TypeInDone })
