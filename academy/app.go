@@ -914,6 +914,7 @@ func (a *App) showShortcuts() {
 	a.printf("  %s\n", sty.Bold("Long screens"))
 	row("Enter", "next page")
 	row("q", "stop paging and continue")
+	row("a choice", "type it at the pause: skips the rest of the screen and acts on it")
 	a.println("")
 	a.printf("  %s\n", sty.Gray(truncate(versionLine(), a.cols()-4)))
 	if !a.con.raw {
@@ -926,7 +927,9 @@ func (a *App) showShortcuts() {
 // run is the interactive loop. Ctrl-D (EOF) is treated as commit & exit.
 func (a *App) run() {
 	for {
-		a.printMenu()
+		if !a.con.hasPending { // a choice typed at a pager prompt goes straight through
+			a.printMenu()
+		}
 		a.con.setOnClear(a.printMenu) // Ctrl+L and resizes redraw the menu on a clean screen
 		choice, err := a.con.readLine(sty.Bold(sty.Cyan("  academy")) + sty.Cyan(" › "))
 		a.con.setOnClear(nil)

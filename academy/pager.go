@@ -38,6 +38,12 @@ func termHeight() int {
 // paged renders a screen and shows it one page at a time. With finalPause,
 // it also waits after the last page, so the screen stays visible until
 // the learner is ready to return to the menu.
+//
+// At any pager prompt, Enter shows the next page and q stops paging.
+// Anything else (a number, a word to look up, a menu letter) skips the
+// rest of the screen and is handed to the prompt that follows, so a
+// learner who has spotted their choice never has to page to the bottom
+// first.
 func (a *App) paged(finalPause bool, render func()) {
 	if !a.pager {
 		render()
@@ -58,13 +64,37 @@ func (a *App) paged(finalPause bool, render func()) {
 		if last && !finalPause {
 			return
 		}
-		prompt := sty.Gray("  ── ") + sty.Bold(sty.Cyan("Enter")) + sty.Gray(" for more · ") + sty.Bold(sty.Cyan("q")) + sty.Gray(" to stop ──")
-		if last {
-			prompt = sty.Gray("  ── end · press ") + sty.Bold(sty.Cyan("Enter")) + sty.Gray(" to continue ──")
-		}
-		s, err := a.con.readLine(prompt + " ")
-		if err != nil || isCancel(s) {
+		s, err := a.con.readLine(a.pagerPrompt(last) + " ")
+		switch {
+		case err != nil || isCancel(s):
+			return
+		case s != "":
+			a.con.typeAhead(s)
 			return
 		}
 	}
 }
+
+// pagerPrompt is the line shown between pages, or after the last one.
+// It always says that a choice can be typed right there: in full where
+// there is room, in a shorter form on narrow terminals.
+func (a *App) pagerPrompt(last bool) string {
+	key := func(k string) string { return sty.Bold(sty.Cyan(k)) }
+	long := sty.Gray("  ── ") + key("Enter") + sty.Gray(" for more · ") + key("q") + sty.Gray(" to stop")
+	short := sty.Gray("  ── ") + key("Enter") + sty.Gray(" more · ") + key("q") + sty.Gray(" stop")
+	if last {
+		long = sty.Gray("  ── end · press ") + key("Enter") + sty.Gray(" to continue")
+		short = sty.Gray("  ── end · ") + key("Enter") + sty.Gray(" continue")
+	}
+	for _, p := range []string{long + sty.Gray(pagerTypeHint), short + sty.Gray(pagerTypeHint), short + sty.Gray(pagerShortHint)} {
+		if visibleLen(p)+4 <= a.cols() {
+			return p + sty.Gray(" ──")
+		}
+	}
+	return short + sty.Gray(" ──")
+}
+
+const (
+	pagerTypeHint  = " · or type your choice"
+	pagerShortHint = " · or type"
+)

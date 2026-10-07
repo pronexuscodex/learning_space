@@ -366,7 +366,7 @@ The menu is grouped into four sections. Keys never change, whatever the layout: 
 
 Above the menu, a dashboard shows hours, labs, stages, texts, concepts, exercises, **mastered concepts** and **cards due for review**, plus mastery-weighted campus progress, a 14-day activity sparkline, and a study streak (logged hours, focus sessions and review days all count). If you have set weekly goals, a **This week** line tracks them. Below it, a **➜ Next** line names your best next step; press `n` to start it.
 
-Long screens (the ledger, Start Here, glossaries, resources, concept cards, the notebook) are shown one terminal page at a time: press **Enter** for the next page or **q** to return to the menu. Paging switches on only when you are typing at a real terminal (it uses `$LINES` if set, else 24 rows); piped or scripted input is unaffected.
+Long screens (the ledger, Start Here, glossaries, resources, concept cards, the notebook) are shown one terminal page at a time: press **Enter** for the next page or **q** to return to the menu. You can also type your choice (a list number, a word, a menu key) at any pause: the rest of the screen is skipped and the choice is acted on straight away, so you never have to page to the bottom first. Paging switches on only when you are typing at a real terminal (it uses `$LINES` if set, else 24 rows); piped or scripted input is unaffected.
 
 To cancel a prompt, type `q` at number prompts or `:q` at text prompts. Ctrl-D and Ctrl-C/SIGTERM also commit before exiting.
 

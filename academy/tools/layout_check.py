@@ -51,7 +51,10 @@ KEYS = [
   "5\r",                    # commit & exit
 ]
 
-PAGER = re.compile(r"── (Enter for more · q to stop|end · press Enter to continue) ──")
+# The library's live download line ("⬇ 190 KB of 358 KB ███░░░ 53%", with
+# "v" for the arrow in plain symbols).
+DOWNLOAD = re.compile(r"^\s*\S [\d.]+ [KM]?B of [\d.]+ [KM]?B \S+ \d+%")
+PAGER = re.compile(r"── (Enter (for )?more · q (to )?stop|end · (press )?Enter (to )?continue)( · or type( your choice)?)? ──")
 
 def run(cols, rows=60):
     reg = os.path.join(tempfile.gettempdir(), f"academy-layout-{cols}.json")
@@ -71,7 +74,7 @@ def run(cols, rows=60):
                 try: out += os.read(fd, 1 << 16)
                 except OSError: return
     read(1.0)
-    pause = re.compile(r"Enter for more · q to stop ──\s*$")
+    pause = re.compile(r"Enter (for )?more · q (to )?stop( · or type( your choice)?)? ──\s*$")
     for k in KEYS:
         # A long screen may pause ("Enter for more"). If the script is not
         # about to press Enter anyway, press it first, as a person would,
@@ -97,7 +100,9 @@ def run(cols, rows=60):
         # A pager prompt is an input point too: on a slow machine the next
         # keys can be typed while it is showing, and the terminal echoes
         # them after it. Measure only the app's own part of the line.
-        m = PAGER.search(line)
+        # The same goes for a library download's progress line: keys typed
+        # while it runs are echoed after it.
+        m = PAGER.search(line) or DOWNLOAD.match(line)
         if m:
             line = line[:m.end()]
         if width(line) > cols:
