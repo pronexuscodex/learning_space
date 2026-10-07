@@ -181,7 +181,7 @@ var classicGuides = map[int]ClassicGuide{
 		Anchor: ClassicRead{"Operating Systems: Three Easy Pieces", "Remzi & Andrea Arpaci-Dusseau", 2018, "https://pages.cs.wisc.edu/~remzi/OSTEP/",
 			"A free, conversational and deep OS textbook, organised around virtualisation, concurrency and persistence.",
 			"Read it in order, running the homework simulators at the end of each chapter."},
-		Classic: ClassicRead{"The UNIX Time-Sharing System", "Dennis M. Ritchie & Ken Thompson", 1974, "https://sipb.mit.edu/iap/6.828/readings/ritchie78unix.pdf",
+		Classic: ClassicRead{"The UNIX Time-Sharing System", "Dennis M. Ritchie & Ken Thompson", 1974, "https://web.archive.org/web/2024id_/https://pdos.csail.mit.edu/6.828/2017/readings/ritchie78unix.pdf",
 			"The paper that introduced Unix to the world. (This copy is the revised 1978 version.)",
 			"List every design idea in it that you still use today: files, processes, pipes, the shell…"},
 		Source: ClassicRead{"xv6: a teaching Unix", "MIT PDOS", 0, "https://github.com/mit-pdos/xv6-riscv",
