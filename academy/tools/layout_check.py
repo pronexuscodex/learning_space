@@ -51,6 +51,8 @@ KEYS = [
   "5\r",                    # commit & exit
 ]
 
+PAGER = re.compile(r"── (Enter for more · q to stop|end · press Enter to continue) ──")
+
 def run(cols, rows=60):
     reg = os.path.join(tempfile.gettempdir(), f"academy-layout-{cols}.json")
     if os.path.exists(reg): os.remove(reg)
@@ -92,6 +94,12 @@ def run(cols, rows=60):
             continue
         if " › " in line and not line.rstrip().endswith("›"):  # echoed typing: the terminal wraps it
             continue
+        # A pager prompt is an input point too: on a slow machine the next
+        # keys can be typed while it is showing, and the terminal echoes
+        # them after it. Measure only the app's own part of the line.
+        m = PAGER.search(line)
+        if m:
+            line = line[:m.end()]
         if width(line) > cols:
             bad.append((width(line), line))
     return bad
