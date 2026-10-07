@@ -58,12 +58,21 @@ func (a *App) paged(finalPause bool, render func()) {
 		if last && !finalPause {
 			return
 		}
-		prompt := sty.Gray("  ── ") + sty.Bold(sty.Cyan("Enter")) + sty.Gray(" for more · ") + sty.Bold(sty.Cyan("q")) + sty.Gray(" to stop ──")
+		prompt := sty.Gray("  ── ") + sty.Bold(sty.Cyan("Enter")) + sty.Gray(" for more · ") + sty.Bold(sty.Cyan("q")) + sty.Gray(" to stop · or type your choice ──")
 		if last {
 			prompt = sty.Gray("  ── end · press ") + sty.Bold(sty.Cyan("Enter")) + sty.Gray(" to continue ──")
 		}
+		if visibleLen(prompt) > a.cols() { // narrow screens: the short form
+			prompt = sty.Gray("  ── ") + sty.Bold(sty.Cyan("Enter")) + sty.Gray(" more · ") + sty.Bold(sty.Cyan("q")) + sty.Gray(" stop ──")
+		}
 		s, err := a.con.readLine(prompt + " ")
 		if err != nil || isCancel(s) {
+			return
+		}
+		// Anything else typed here is the answer to what comes next (a
+		// number from the list, a menu key): no need to page to the end.
+		if s != "" {
+			a.con.typeAhead(s)
 			return
 		}
 	}
