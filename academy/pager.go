@@ -76,16 +76,25 @@ func (a *App) paged(finalPause bool, render func()) {
 }
 
 // pagerPrompt is the line shown between pages, or after the last one.
-// Where there is room it says that a choice can be typed right there.
+// It always says that a choice can be typed right there: in full where
+// there is room, in a shorter form on narrow terminals.
 func (a *App) pagerPrompt(last bool) string {
-	prompt := sty.Gray("  ── ") + sty.Bold(sty.Cyan("Enter")) + sty.Gray(" for more · ") + sty.Bold(sty.Cyan("q")) + sty.Gray(" to stop")
+	key := func(k string) string { return sty.Bold(sty.Cyan(k)) }
+	long := sty.Gray("  ── ") + key("Enter") + sty.Gray(" for more · ") + key("q") + sty.Gray(" to stop")
+	short := sty.Gray("  ── ") + key("Enter") + sty.Gray(" more · ") + key("q") + sty.Gray(" stop")
 	if last {
-		prompt = sty.Gray("  ── end · press ") + sty.Bold(sty.Cyan("Enter")) + sty.Gray(" to continue")
+		long = sty.Gray("  ── end · press ") + key("Enter") + sty.Gray(" to continue")
+		short = sty.Gray("  ── end · ") + key("Enter") + sty.Gray(" continue")
 	}
-	if visibleLen(prompt)+len(pagerTypeHint)+4 <= a.cols() {
-		prompt += sty.Gray(pagerTypeHint)
+	for _, p := range []string{long + sty.Gray(pagerTypeHint), short + sty.Gray(pagerTypeHint), short + sty.Gray(pagerShortHint)} {
+		if visibleLen(p)+4 <= a.cols() {
+			return p + sty.Gray(" ──")
+		}
 	}
-	return prompt + sty.Gray(" ──")
+	return short + sty.Gray(" ──")
 }
 
-const pagerTypeHint = " · or type your choice"
+const (
+	pagerTypeHint  = " · or type your choice"
+	pagerShortHint = " · or type"
+)

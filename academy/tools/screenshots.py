@@ -223,7 +223,7 @@ def shoot(name, chrome, demo):
             if re.search(last, plain(lines[i])):
                 end = min(i + 1, start + limit)
                 break
-    chosen = [l for l in lines[start:end] if not re.search(r"press Enter to continue|Enter for more", plain(l))]
+    chosen = [l for l in lines[start:end] if not re.search(r"Enter (to )?continue|Enter (for )?more", plain(l))]
     while chosen and not plain(chosen[-1]).strip():
         chosen.pop()
     body = "\n".join(to_html(l) for l in chosen)

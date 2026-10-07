@@ -98,4 +98,12 @@ func TestPagerPromptFitsWidth(t *testing.T) {
 	if !strings.Contains(stripANSI((&App{width: 80, con: &console{}}).pagerPrompt(false)), "or type your choice") {
 		t.Error("80 columns should mention typing a choice")
 	}
+	// A narrow terminal (a phone, a split pane) still learns it can type.
+	for _, cols := range []int{40, 48} {
+		for _, last := range []bool{false, true} {
+			if p := stripANSI((&App{width: cols, con: &console{}}).pagerPrompt(last)); !strings.Contains(p, "or type") {
+				t.Errorf("%d columns should still mention typing: %q", cols, p)
+			}
+		}
+	}
 }

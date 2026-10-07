@@ -51,7 +51,7 @@ KEYS = [
   "5\r",                    # commit & exit
 ]
 
-PAGER = re.compile(r"── (Enter for more · q to stop|end · press Enter to continue)( · or type your choice)? ──")
+PAGER = re.compile(r"── (Enter (for )?more · q (to )?stop|end · (press )?Enter (to )?continue)( · or type( your choice)?)? ──")
 
 def run(cols, rows=60):
     reg = os.path.join(tempfile.gettempdir(), f"academy-layout-{cols}.json")
@@ -71,7 +71,7 @@ def run(cols, rows=60):
                 try: out += os.read(fd, 1 << 16)
                 except OSError: return
     read(1.0)
-    pause = re.compile(r"Enter for more · q to stop( · or type your choice)? ──\s*$")
+    pause = re.compile(r"Enter (for )?more · q (to )?stop( · or type( your choice)?)? ──\s*$")
     for k in KEYS:
         # A long screen may pause ("Enter for more"). If the script is not
         # about to press Enter anyway, press it first, as a person would,
