@@ -97,26 +97,45 @@ latest_tag() {
 	printf '%s' "${url##*/}" | tr -d '\r'
 }
 is_version() {
-	case $1 in
-	v[0-9]*.[0-9]*.[0-9]*) return 0 ;;
-	*) return 1 ;;
-	esac
+	printf '%s' "$1" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$'
+}
+has_files() { # has_files TAG: the release's SHA256SUMS is attached
+	if command -v curl >/dev/null 2>&1; then
+		curl -fsSLI --proto '=https' -o /dev/null "https://github.com/$REPO/releases/download/$1/SHA256SUMS" 2>/dev/null
+	else
+		wget -q --https-only --spider "https://github.com/$REPO/releases/download/$1/SHA256SUMS" 2>/dev/null
+	fi
+}
+newest_good_tag() {
+	# The newest release with a proper vX.Y.Z tag and its files attached
+	# (the release list is newest first; tag_name comes before assets).
+	api="https://api.github.com/repos/$REPO/releases?per_page=20"
+	if command -v curl >/dev/null 2>&1; then
+		json=$(curl -fsSL --proto '=https' "$api" 2>/dev/null || true)
+	else
+		json=$(wget -qO- --https-only "$api" 2>/dev/null || true)
+	fi
+	printf '%s\n' "$json" | awk '
+		/"tag_name":/ { t = $0; sub(/.*"tag_name": *"/, "", t); sub(/".*/, "", t); tag = t; pre = 0; next }
+		/"prerelease": *true/ { pre = 1 }
+		/"name": *"SHA256SUMS"/ { if (!pre && tag ~ /^v[0-9]+\.[0-9]+\.[0-9]+$/) { print tag; exit } }'
 }
 
 version=${ACADEMY_VERSION:-}
 if [ -n "$version" ]; then
 	is_version "$version" || fail "'$version' is not a release version; set ACADEMY_VERSION=vX.Y.Z, or leave it unset for the latest"
 else
-	# While a release is being published, GitHub can briefly have no
-	# "latest" release; wait a little rather than fail at once.
-	tries=0
 	version=$(latest_tag)
-	while ! is_version "$version" && [ $tries -lt 6 ]; do
-		tries=$((tries + 1))
-		sleep 10
-		version=$(latest_tag)
-	done
-	is_version "$version" || fail "could not find the latest release on GitHub; check your connection and try again in a few minutes, or set ACADEMY_VERSION=vX.Y.Z"
+	# The newest release may still be building, or may have been published
+	# with a mistyped tag: then install the newest one that is complete.
+	if ! is_version "$version" || ! has_files "$version"; then
+		good=$(newest_good_tag)
+		[ -n "$good" ] || fail "could not find a release to install; check your connection and try again in a few minutes, or set ACADEMY_VERSION=vX.Y.Z"
+		if [ -n "$version" ] && [ "$good" != "$version" ]; then
+			say "The newest release ($version) is not ready to install; installing $good instead."
+		fi
+		version=$good
+	fi
 fi
 
 name=academy-$version-$os-$arch

@@ -332,7 +332,7 @@ Keys never change, whatever the layout: wide terminals show two or three columns
 | 9 | **Daily Review**: your due spaced-repetition cards, interleaved across stages (`r` works too) |
 | n | **What's next**: up to four recommended steps (due reviews, next concept, an open exercise, a ready mastery check or type-in, a focus session) and one key to start any of them |
 | m | **Roadmap**: all 21 stages by track, each marked locked · ready · in progress · understood · mastered, with concept progress, "you are here", and which stages a locked one still needs; open any stage's Study Hall from it |
-| d | **Programmer's dictionary**: 270+ jargon words explained plainly (see below) |
+| d | **Programmer's dictionary**: 320+ jargon words explained plainly (see below) |
 | / | **Search** (also `s`): every concept, glossary term, resource, blueprint and classic; all words must match, titles rank first; open a hit directly |
 
 **Practise & track**
@@ -408,13 +408,15 @@ Concepts link across stages. For example, logic gates (Stage 4) become the CPU; 
 
 ## Programmer's dictionary
 
-Press **`d`**. Programmers use hundreds of words without explaining them, and every one is a chance to get lost. The dictionary explains 270+ of them in 12 categories: basics, types & data, functions & structure, memory & C, tools & workflow, systems & concurrency, networks & web, data & databases, algorithms, security, AI & ML, and programmer culture. Each entry has:
+Press **`d`**. Programmers use hundreds of words without explaining them, and every one is a chance to get lost. The dictionary explains 320+ of them in 12 categories: basics, types & data, functions & structure, memory & C, tools & workflow, systems & concurrency, networks & web, data & databases, algorithms, security, AI & ML, and programmer culture. Each entry has:
 
 - **What it means**, in plain words;
 - **Think of it like**: an everyday comparison;
 - **In code**: a real example, in Python or, for memory and machine topics, in C;
 - **⚠ Watch out**: the usual confusion or mistake;
 - **Related** words you can jump to by number.
+
+The words that matter most in systems, security and AI (pointer, stack and heap, virtual memory, system calls, threads, race conditions, deadlock, hash tables, Big-O, TCP, encryption and hashing, injection, buffer overflows, compilers, transactions, gradient descent, embeddings, models and more) also have a **Go deeper** section: a few paragraphs on how the thing actually works underneath, the trade-offs and the classic failure modes, so you can reason about it rather than just recognise the word. The deeper words cover what you meet in real engineering work: page faults, the TLB, copy-on-write, write-ahead logs, LSM trees, consensus and quorums, the CAP theorem, Lamport clocks, attention and transformers, the KV cache, quantization, side channels, tail latency, SLOs and more.
 
 For example, *type casting* explains explicit and implicit conversion, shows `int("42")`, `(int)3.99` and why `"3" + 3` fails in Python but gives `"33"` in JavaScript, and warns that casting a float truncates instead of rounding.
 
@@ -430,7 +432,7 @@ Press **`l`** on the main menu (or open a stage's **PDF library** in the Study H
 - **Papers:** arXiv papers (the `arxiv.org/abs/…` page becomes its PDF), such as *Attention Is All You Need*, FlashAttention and PagedAttention.
 - **Classic texts:** Dijkstra, Thompson, Ritchie & Thompson, Codd, Saltzer–Reed–Clark, Brooks, Turing, and more.
 
-Choose a number to download it, with a live progress bar. **Ctrl+C** cancels a download without leaving the app, and a download stops by itself if the server sends nothing for 30 seconds. Then open it in your system PDF viewer (`xdg-open`, `open` or the Windows default app) while the academy keeps running. A saved document can be opened, downloaded again or deleted. **`u`** saves a PDF from any https link you give it (an arXiv `abs` link works too), and **`o`** opens the library folder. Resources and classic readings with a PDF are marked **⬇ PDF** throughout the Study Hall.
+Choose a number to download it, with a live progress bar. **Ctrl+C** cancels a download without leaving the app, and a download stops by itself if the server sends nothing for 30 seconds. Then open it in your system PDF viewer (`xdg-open`, `open` or the Windows default app) while the academy keeps running. A saved document can be opened, downloaded again or deleted. **`a`** downloads every document you don't have yet in one go, so the whole library is on your disk even if a link breaks later. **`u`** saves a PDF from any https link you give it (an arXiv `abs` link works too), and **`o`** opens the library folder. Resources and classic readings with a PDF are marked **⬇ PDF** throughout the Study Hall.
 
 Downloads go in a folder you can find in your file manager, arranged by stage and named after the document:
 
@@ -446,6 +448,8 @@ Documents/Academy Library/
 The Library screen shows the full path, and **`o`** opens it. On Linux the Documents folder is the one your desktop names in `~/.config/user-dirs.dirs`. Set `ACADEMY_LIBRARY` to use another folder; with `ACADEMY_HOME` set, the Library is `$ACADEMY_HOME/Academy Library`. PDFs downloaded by versions before 1.3 (the flat `academy_library/` folder beside the registry) are moved into place and renamed the first time you open the Library. PDFs you copy into the folder yourself show up in the list as **Yours**.
 
 To prepare for offline study (Classic Mode's "offline blocks"), run `./academy -fetch-library` once: it downloads everything not yet saved and reports anything that failed.
+
+**Broken links don't take the books with them.** When a document's link is dead (the site is down, the file moved, or it returns an error page instead of a PDF), the academy asks the [Internet Archive's Wayback Machine](https://web.archive.org/) for its saved copy of that exact link and downloads that instead, saying so on screen. The academy doesn't ship the PDFs inside the app: most are copyrighted works that their authors let you download for free from their own sites, not redistribute, so the app fetches them from the author or from the public archive. Once downloaded, they are yours to keep. The weekly link check also confirms that the archive fallback still works.
 
 Downloads are careful:
 - only `https://` links, including every redirect;

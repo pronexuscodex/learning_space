@@ -82,7 +82,7 @@ func (a *App) renderLibrary(stage int, docs []LibraryDoc) {
 	}
 	a.println(heading(title, sty.Magenta, w))
 	a.println("")
-	for _, l := range wrap("Every document here is free and legally hosted by its authors, publisher or archive (arXiv). Downloads are saved in the folder below, one sub-folder per stage, so you can find, open and arrange them outside the academy too. Press o to open it.", w-4, "  ") {
+	for _, l := range wrap("Every document here is free and legally hosted by its authors, publisher or archive (arXiv). Downloads are saved in the folder below, one sub-folder per stage, so you can find, open and arrange them outside the academy too, and keep them even if a link breaks. Press a to download them all, o to open the folder. If an original link has broken, the Internet Archive's saved copy is used.", w-4, "  ") {
 		a.println(sty.Gray(l))
 	}
 	a.println("  " + sty.Bold("📁 "+dir))
@@ -150,7 +150,7 @@ func (a *App) library(stage int) error {
 		docs := a.libraryEntries(stage)
 		a.paged(false, func() { a.renderLibrary(stage, docs) })
 		a.println("")
-		s, err := a.con.readLine(promptLabel("Number to download or open · u your own PDF link · o open folder", "q back"))
+		s, err := a.con.readLine(promptLabel("Number to download or open · a download all · u your own PDF link · o open folder", "q back"))
 		if err != nil {
 			return err
 		}
@@ -160,6 +160,10 @@ func (a *App) library(stage int) error {
 			return nil
 		case s == "o":
 			a.openPath(dir, true)
+		case s == "a":
+			if err := a.downloadAll(docs, dir); err != nil && !errors.Is(err, errCancel) {
+				return err
+			}
 		case s == "u":
 			if err := a.downloadOwn(); err != nil && !errors.Is(err, errCancel) {
 				return err
@@ -167,7 +171,7 @@ func (a *App) library(stage int) error {
 		default:
 			n, convErr := strconv.Atoi(strings.TrimPrefix(s, "#"))
 			if convErr != nil || n < 1 || n > len(docs) {
-				a.con.warn("Choose a number from 1 to %d, u, o or q.", len(docs))
+				a.con.warn("Choose a number from 1 to %d, a, u, o or q.", len(docs))
 				continue
 			}
 			if err := a.libraryItem(docs[n-1]); err != nil && !errors.Is(err, errCancel) {
@@ -256,7 +260,7 @@ func (a *App) download(link, path string) error {
 	ctx, cancel := context.WithTimeout(ctx, 15*time.Minute)
 	defer cancel()
 	start := time.Now()
-	n, err := downloadPDF(ctx, newDownloadClient(), link, path, maxDownloadSize, progress)
+	n, archived, err := downloadWithFallback(ctx, newDownloadClient(), link, path, maxDownloadSize, progress)
 	if progress != nil {
 		fmt.Fprint(a.con.out, "\r\x1b[K")
 	}
@@ -272,6 +276,9 @@ func (a *App) download(link, path string) error {
 		return err
 	}
 	a.con.ok("Saved %s (%s in %s) to %s", filepath.Base(path), humanBytes(n), time.Since(start).Round(100*time.Millisecond), filepath.Dir(path))
+	if archived {
+		a.con.note("The original link is broken, so this copy came from the Internet Archive (web.archive.org).")
+	}
 	return nil
 }
 
@@ -341,4 +348,47 @@ func (a *App) downloadOwn() error {
 		return nil
 	}
 	return a.offerOpen(path)
+}
+
+// downloadAll downloads every listed document that is not saved yet, so
+// the whole library is on the learner's computer and stays there whatever
+// happens to the links. Ctrl+C stops after the current file.
+func (a *App) downloadAll(docs []LibraryDoc, dir string) error {
+	var todo []LibraryDoc
+	for _, d := range docs {
+		if d.PDF == "" {
+			continue // a file of your own: already here
+		}
+		if _, ok := d.downloaded(dir); !ok {
+			todo = append(todo, d)
+		}
+	}
+	if len(todo) == 0 {
+		a.con.ok("Everything here is already saved in %s.", dir)
+		return nil
+	}
+	yes, err := a.con.confirm(fmt.Sprintf("Download %s now? It can take a few minutes; Ctrl+C stops.", count(len(todo), "document")))
+	if err != nil || !yes {
+		return err
+	}
+	saved, failed := 0, 0
+	for i, d := range todo {
+		a.printf("\n  %s %s\n", sty.Gray(fmt.Sprintf("%d/%d", i+1, len(todo))), sty.Bold(truncate(d.Title, a.cols()-12)))
+		err := a.download(d.PDF, filepath.Join(dir, d.relPath()))
+		switch {
+		case errors.Is(err, errCancelled):
+			a.con.warn("Stopped. %s saved; the rest can be downloaded later with a again.", count(saved, "document"))
+			return nil
+		case err != nil:
+			failed++
+		default:
+			saved++
+		}
+	}
+	if failed > 0 {
+		a.con.warn("%s saved, %d could not be downloaded (see above). Try those again later.", count(saved, "document"), failed)
+	} else {
+		a.con.ok("All %s saved in %s.", count(saved, "document"), dir)
+	}
+	return nil
 }

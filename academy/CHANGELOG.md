@@ -6,7 +6,14 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [1.6.0] - 2026-10-08
 
+### Added
+- **Download the whole Library at once.** Press **`a`** in the Library to download every document you don't have yet, with a summary at the end; Ctrl+C stops it. Your copies stay in your Documents folder, so the books are there even if a link later breaks.
+- **Broken links fall back to the Internet Archive.** When a book's or paper's link is dead or no longer returns a PDF, the Library and `-fetch-library` download the Wayback Machine's saved copy of that link instead, and say so. `-check-links` reports a broken PDF link whose archived copy works, so maintainers know learners are still covered, and the weekly Links workflow checks that the archive fallback works.
+- **A deeper dictionary: 324 words, up from 278.** 46 new words for real engineering work, such as page fault, context switch, TLB, copy-on-write, false sharing, two's complement, calling convention, write-ahead log, LSM tree, Bloom filter, replication, consensus, quorum, the CAP theorem, two-phase commit, Lamport clocks, dynamic programming, amortized analysis, softmax, attention, transformers, the KV cache, quantization, the bias-variance tradeoff, precision and recall, defense in depth, nonces, side channels, the TLS handshake, tail latency, SLOs, observability and flaky tests.
+- **Go deeper** on 22 core words (pointer, stack, heap, process, thread, dictionary/hash table, cache, race condition, deadlock, encryption, hash function, virtual memory, system call, Big-O, TCP, gradient descent, embedding, injection, buffer overflow, compiler, transaction, model): a few paragraphs on how it works underneath, its trade-offs and its classic failure modes.
+
 ### Fixed
+- The installers no longer fail when the newest release is published without its files (for example with a malformed tag such as `v.1.6.0`). They install the newest release that has its files and checksums, and say so.
 - Stage 15's classic reading, the LeNet paper, pointed at yann.lecun.com, which has refused connections for weeks. It now links to the paper's permanent DOI record, and the reading notes where the authors' free copy lives.
 - The link check (`-check-links` and the weekly Links workflow) failed on any momentary network error. It now asks a failing link again a few seconds later, and reports a site that stays unreachable as a warning. It still fails on links that need fixing: a 404, a moved page, or a "PDF" that isn't one.
 - **Closing the terminal window no longer loses your session.** On macOS and Linux, closing the window (SIGHUP) quit without saving, which is now the usual way to leave an app opened from Launchpad or the app menu.

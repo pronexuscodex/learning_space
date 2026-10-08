@@ -47,6 +47,33 @@ func TestVocabularyIsComplete(t *testing.T) {
 	}
 }
 
+func TestDeeperNotesBelongToWords(t *testing.T) {
+	if len(deeper) < 20 {
+		t.Fatalf("expected at least 20 Go deeper notes, got %d", len(deeper))
+	}
+	for name, text := range deeper {
+		w, ok := lookupWord(name)
+		if !ok || w.Word != name {
+			t.Errorf("Go deeper note %q must use the exact name of a dictionary word", name)
+		}
+		for _, para := range strings.Split(text, "\n\n") {
+			if strings.TrimSpace(para) == "" || strings.Contains(para, "\n") {
+				t.Errorf("%q: paragraphs are separated by one blank line, with no stray line breaks", name)
+			}
+		}
+	}
+}
+
+func TestRenderWordShowsGoDeeper(t *testing.T) {
+	var out strings.Builder
+	a := &App{con: &console{out: &out}, width: 80}
+	w, _ := lookupWord("Pointer")
+	a.renderWord(w, false)
+	if !strings.Contains(out.String(), "Go deeper") {
+		t.Error("a word with a deeper note must show it")
+	}
+}
+
 func TestVocabularyLookupAndSearch(t *testing.T) {
 	w, ok := lookupWord("type conversion")
 	if !ok || w.Word != "Type casting" {

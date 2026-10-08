@@ -42,3 +42,11 @@ jobs:
             if [ "$code" = 1 ]; then echo "  ✓ $doi"; else echo "  ✗ $doi ($code)"; fail=1; fi
           done
           exit $fail
+      # The Library falls back to the Internet Archive when a PDF's link
+      # breaks: check, for real, that the archive still answers the way
+      # the academy expects (a snapshot timestamp, then the raw PDF bytes).
+      - name: Internet Archive fallback still works
+        if: always()
+        env:
+          ACADEMY_LIVE_ARCHIVE: "1"
+        run: go test -count=1 -run TestArchiveLive -v .

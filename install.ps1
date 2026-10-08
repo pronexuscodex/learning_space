@@ -97,20 +97,50 @@ function Get-LatestTag {
     }
 }
 
+function Test-ReleaseFiles([string]$Tag) {
+    # The release's SHA256SUMS is attached.
+    try {
+        $req = [Net.WebRequest]::Create("https://github.com/$Repo/releases/download/$Tag/SHA256SUMS")
+        $req.Method = 'HEAD'
+        $resp = $req.GetResponse()
+        $resp.Close()
+        return $true
+    } catch {
+        return $false
+    }
+}
+
+function Get-NewestGoodTag {
+    # The newest release with a proper vX.Y.Z tag and its files attached.
+    try {
+        $releases = Invoke-RestMethod -UseBasicParsing "https://api.github.com/repos/$Repo/releases?per_page=20"
+    } catch {
+        return ''
+    }
+    foreach ($r in $releases) {
+        if ($r.draft -or $r.prerelease -or $r.tag_name -notmatch '^v\d+\.\d+\.\d+$') { continue }
+        if ($r.assets | Where-Object { $_.name -eq 'SHA256SUMS' }) { return $r.tag_name }
+    }
+    return ''
+}
+
 if ($Version) {
     if ($Version -notmatch '^v\d+\.\d+\.\d+$') {
         throw "academy install: '$Version' is not a release version; set `$env:ACADEMY_VERSION = 'vX.Y.Z', or leave it unset for the latest"
     }
 } else {
-    # While a release is being published, GitHub can briefly have no
-    # "latest" release; wait a little rather than fail at once.
     $Version = Get-LatestTag
-    for ($i = 0; $i -lt 6 -and $Version -notmatch '^v\d+\.\d+\.\d+$'; $i++) {
-        Start-Sleep -Seconds 10
-        $Version = Get-LatestTag
-    }
-    if ($Version -notmatch '^v\d+\.\d+\.\d+$') {
-        throw 'academy install: could not find the latest release on GitHub; check your connection and try again in a few minutes, or set $env:ACADEMY_VERSION'
+    # The newest release may still be building, or may have been published
+    # with a mistyped tag: then install the newest one that is complete.
+    if ($Version -notmatch '^v\d+\.\d+\.\d+$' -or -not (Test-ReleaseFiles $Version)) {
+        $good = Get-NewestGoodTag
+        if (-not $good) {
+            throw 'academy install: could not find a release to install; check your connection and try again in a few minutes, or set $env:ACADEMY_VERSION'
+        }
+        if ($Version -and $good -ne $Version) {
+            Write-Host "The newest release ($Version) is not ready to install; installing $good instead."
+        }
+        $Version = $good
     }
 }
 

@@ -418,14 +418,18 @@ func fetchLibrary(regPath string, out io.Writer) int {
 			continue
 		}
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
-		n, err := downloadPDF(ctx, client, d.PDF, dest, maxDownloadSize, nil)
+		n, archived, err := downloadWithFallback(ctx, client, d.PDF, dest, maxDownloadSize, nil)
 		cancel()
 		if err != nil {
 			failed++
 			fmt.Fprintf(out, "  ✗ %-60s %v\n", truncate(d.Title, 60), err)
 			continue
 		}
-		fmt.Fprintf(out, "  ✓ %-60s %s\n", truncate(d.Title, 60), humanBytes(n))
+		note := ""
+		if archived {
+			note = " (from the Internet Archive: the original link is broken)"
+		}
+		fmt.Fprintf(out, "  ✓ %-60s %s%s\n", truncate(d.Title, 60), humanBytes(n), note)
 	}
 	fmt.Fprintf(out, "Library: %s\n", dir)
 	if failed > 0 {
