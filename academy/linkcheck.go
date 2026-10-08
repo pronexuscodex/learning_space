@@ -124,7 +124,8 @@ func checkPDF(client *http.Client, url string) (int, error) {
 	}
 	head := make([]byte, 5)
 	if _, err := io.ReadFull(resp.Body, head); err != nil || !bytes.Equal(head, []byte("%PDF-")) {
-		return resp.StatusCode, errNotPDF
+		// Say what came instead, so the report is something to act on.
+		return resp.StatusCode, fmt.Errorf("%w; got %q from %s", errNotPDF, resp.Header.Get("Content-Type"), resp.Request.URL)
 	}
 	return resp.StatusCode, nil
 }
