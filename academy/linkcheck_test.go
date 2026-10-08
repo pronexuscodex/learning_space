@@ -42,6 +42,21 @@ func TestLinkCheckClassifiesAnswers(t *testing.T) {
 			t.Errorf("%s: %s (HTTP %d, %v), want %s", path, got, l.Status, l.Err, want)
 		}
 	}
+	// No answer at all (here: nothing listening) is a warning, not a
+	// failure; a fake PDF is a failure even though the server answered.
+	down := linkResult{URL: "http://127.0.0.1:1/nothing-here"}
+	down.Status, down.Err = checkLink(srv.Client(), down.URL)
+	if !down.unreachable() || down.guarded() {
+		t.Errorf("a refused connection must count as unreachable: %d %v", down.Status, down.Err)
+	}
+	fake := linkResult{URL: srv.URL + "/fake.pdf", PDF: true}
+	fake.Status, fake.Err = checkPDF(srv.Client(), fake.URL)
+	if fake.unreachable() || fake.ok() {
+		t.Error("a page that is not a PDF must fail, not warn")
+	}
+	if teapot := (linkResult{Status: 418}); !teapot.guarded() {
+		t.Error("418, a common anti-bot answer, is guarded")
+	}
 	// Library files must really be PDFs, not error pages served as 200 OK.
 	if _, err := checkPDF(srv.Client(), srv.URL+"/real.pdf"); err != nil {
 		t.Errorf("real PDF: %v", err)
