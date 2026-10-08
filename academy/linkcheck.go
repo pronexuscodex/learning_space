@@ -174,10 +174,8 @@ func runLinkCheck(out io.Writer) int {
 	// are then still served, though the link should be fixed.
 	for i := range links {
 		if l := &links[i]; l.PDF && !l.ok() && !l.guarded() {
-			if alt, err := archivedCopy(context.Background(), client, l.URL); err == nil {
-				if _, err := checkPDF(client, alt); err == nil {
-					l.Archived = true
-				}
+			if _, err := checkPDF(client, archiveURL(context.Background(), client, l.URL)); err == nil {
+				l.Archived = true
 			}
 		}
 	}
