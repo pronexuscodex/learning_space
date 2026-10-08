@@ -6,6 +6,7 @@ package main
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -17,6 +18,9 @@ import (
 // resourcesVerifiedOn is when the resource URLs were last checked against
 // live sources while the curriculum was written.
 const resourcesVerifiedOn = "2026-09-24"
+
+// retryDelay is the pause before asking an unreachable link again.
+var retryDelay = 5 * time.Second
 
 // linkResult is the outcome of checking one URL.
 type linkResult struct {
@@ -32,10 +36,18 @@ type linkResult struct {
 func (l linkResult) ok() bool { return l.Err == nil && l.Status >= 200 && l.Status < 400 }
 
 // guarded reports a server that answered but refuses automated clients
-// (401, 403, 429): the page is there, a person with a browser can open it,
-// so it is a warning, not a dead link.
+// (401, 403, 418, 429): the page is there, a person with a browser can
+// open it, so it is a warning, not a dead link.
 func (l linkResult) guarded() bool {
-	return l.Err == nil && (l.Status == 401 || l.Status == 403 || l.Status == 429)
+	return l.Err == nil && (l.Status == 401 || l.Status == 403 || l.Status == 418 || l.Status == 429)
+}
+
+// unreachable reports a link that got no HTTP answer at all, even after a
+// retry: the site is down, slow or blocked from here. Nothing says the
+// link is wrong, so it is a warning; a red check must mean something to
+// fix (a 404, a moved page, a "PDF" that is not one).
+func (l linkResult) unreachable() bool {
+	return l.Err != nil && l.Status == 0 && !errors.Is(l.Err, errNotPDF)
 }
 
 // allResourceLinks lists every resource and classic-corner reading that
@@ -112,7 +124,8 @@ func checkPDF(client *http.Client, url string) (int, error) {
 	}
 	head := make([]byte, 5)
 	if _, err := io.ReadFull(resp.Body, head); err != nil || !bytes.Equal(head, []byte("%PDF-")) {
-		return resp.StatusCode, errNotPDF
+		// Say what came instead, so the report is something to act on.
+		return resp.StatusCode, fmt.Errorf("%w; got %q from %s", errNotPDF, resp.Header.Get("Content-Type"), resp.Request.URL)
 	}
 	return resp.StatusCode, nil
 }
@@ -140,7 +153,21 @@ func runLinkCheck(out io.Writer) int {
 	}
 	wg.Wait()
 
-	failed, guarded := 0, 0
+	// Servers have bad moments (a timeout, a refused connection, an error
+	// page for a few seconds): ask again once, a little later, before
+	// reporting anything. Only a failure that repeats is reported.
+	for i := range links {
+		if l := &links[i]; !l.ok() && !l.guarded() {
+			time.Sleep(retryDelay)
+			if l.PDF {
+				l.Status, l.Err = checkPDF(client, l.URL)
+			} else {
+				l.Status, l.Err = checkLink(client, l.URL)
+			}
+		}
+	}
+
+	failed, guarded, unreachable := 0, 0, 0
 	for _, l := range links {
 		mark := sty.Green("✓")
 		detail := sty.Gray(fmt.Sprintf("%d", l.Status))
@@ -148,6 +175,10 @@ func runLinkCheck(out io.Writer) int {
 			guarded++
 			mark = sty.Yellow("⚠")
 			detail = sty.Yellow(fmt.Sprintf("HTTP %d: reachable, but refuses automated checks", l.Status))
+		} else if l.unreachable() {
+			unreachable++
+			mark = sty.Yellow("⚠")
+			detail = sty.Yellow("no answer, twice (site down, slow or blocked): " + l.Err.Error())
 		} else if !l.ok() {
 			failed++
 			mark = sty.Red("✗")
@@ -162,9 +193,12 @@ func runLinkCheck(out io.Writer) int {
 			fmt.Fprintf(out, "      %s\n", sty.Gray(l.URL))
 		}
 	}
-	fmt.Fprintf(out, "\n  %d of %d links OK", len(links)-failed-guarded, len(links))
+	fmt.Fprintf(out, "\n  %d of %d links OK", len(links)-failed-guarded-unreachable, len(links))
 	if guarded > 0 {
 		fmt.Fprintf(out, "; %d refuse automated checks (open them in a browser)", guarded)
+	}
+	if unreachable > 0 {
+		fmt.Fprintf(out, "; %d did not answer (try them again later)", unreachable)
 	}
 	if failed > 0 {
 		fmt.Fprintf(out, "; %d failed (a firewall or proxy can also cause failures)", failed)
