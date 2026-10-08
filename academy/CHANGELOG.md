@@ -8,7 +8,7 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 - Stage 15's classic reading, the LeNet paper, pointed at yann.lecun.com, which has refused connections for weeks. It now links to the paper's permanent DOI record, and the reading notes where the authors' free copy lives.
-- The link check (`-check-links` and the weekly Links workflow) failed on any momentary network error. It now retries a link that gives no answer, and reports a site that stays unreachable as a warning. It still fails on links that need fixing: a 404, a moved page, or a "PDF" that isn't one.
+- The link check (`-check-links` and the weekly Links workflow) failed on any momentary network error. It now asks a failing link again a few seconds later, and reports a site that stays unreachable as a warning. It still fails on links that need fixing: a 404, a moved page, or a "PDF" that isn't one.
 - **Closing the terminal window no longer loses your session.** On macOS and Linux, closing the window (SIGHUP) quit without saving, which is now the usual way to leave an app opened from Launchpad or the app menu.
 - Prompt instructions were silently dropped when the question was long. For example, "How sure are you?" appeared without "1 guessing · 2 fairly sure · 3 certain". They now appear on their own line above the question.
 - The Study Hall marked every stage "in progress" (◐), even stages you had not started. It now shows your real state (locked, ready, in progress, understood, mastered), with a legend, as the Roadmap does.

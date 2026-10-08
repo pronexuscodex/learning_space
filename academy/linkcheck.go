@@ -153,10 +153,11 @@ func runLinkCheck(out io.Writer) int {
 	}
 	wg.Wait()
 
-	// A timeout or a refused connection is often momentary: ask again once,
-	// a little later, before reporting it.
+	// Servers have bad moments (a timeout, a refused connection, an error
+	// page for a few seconds): ask again once, a little later, before
+	// reporting anything. Only a failure that repeats is reported.
 	for i := range links {
-		if l := &links[i]; l.unreachable() {
+		if l := &links[i]; !l.ok() && !l.guarded() {
 			time.Sleep(retryDelay)
 			if l.PDF {
 				l.Status, l.Err = checkPDF(client, l.URL)
