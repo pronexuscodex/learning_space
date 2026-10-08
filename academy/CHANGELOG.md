@@ -12,6 +12,11 @@ versions follow [Semantic Versioning](https://semver.org/).
 - The Study Hall marked every stage "in progress" (◐), even stages you had not started. It now shows your real state (locked, ready, in progress, understood, mastered), with a legend, as the Roadmap does.
 
 ### Changed
+- **A simpler home screen.** It shows three numbers (streak, today's minutes, cards due), the stage you are on, one call to action and a short menu of 11 everyday actions instead of 26. Start Here stays in the menu for your first few concepts.
+  - `?` now opens **All screens & keys**: the full grouped menu, then every key. Type any key on that page to go there.
+  - Every key still works from the home screen.
+  - Prefer everything at once? Settings → *Home screen: detailed* brings back the full dashboard and menu.
+  - The detailed numbers are always in the Progress report, under *At a glance*.
 - **Progress saves automatically** after every action. There is no more "commit", "checkpoint" or "uncommitted changes". One backup is made per session, so the 10 kept backups cover your last 10 sessions instead of the last 10 saves. "Exit without saving" became **Undo this session**, which restores your progress exactly as it was when you opened the academy.
 - The home screen has one call to action: today's workout until it is done, then the next step. The registry path is no longer printed at every start (`academy -where` shows it).
 - Plainer menu labels: Start a lab project, Log study hours, Update progress, Ledger; "Which stage?" instead of "Stage ID"; study time shown as hours with one decimal; proper plurals ("1 card", "3 cards").

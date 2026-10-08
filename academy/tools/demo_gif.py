@@ -19,7 +19,7 @@ COLS, ROWS = 80, 30
 
 # (caption, keys, first line regex, last line regex, seconds on screen)
 SCENES = [
-    ("21 stages, from how a CPU works to building AI", [], r"Study [0-9]", r"└─", 3.0),
+    ("21 stages, from how a CPU works to building AI", [], r"Today [0-9]+ min", r"└─", 3.0),
     ("today's workout: one guided session a day", ["j"], r"TODAY'S WORKOUT", r"Ready\?", 3.5),
     ("the Study Hall: pick a stage", ["6"], r"STUDY HALL", r"\[16\]", 2.5),
     ("every concept: analogy, example, diagram", ["6", "1", "1", "5"], r"┏━", None, 3.5),
