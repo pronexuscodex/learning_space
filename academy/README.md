@@ -314,7 +314,13 @@ The **Progress report** (`p`) has a *Thinking for yourself* section: how many ex
 
 ## Menu
 
-The menu is grouped into four sections. Keys never change, whatever the layout: wide terminals show two or three columns with hints, and narrow ones show two compact columns.
+**The home screen is simple by default.** It shows three numbers (your streak, today's study minutes, and the cards due), the stage you are working on, one call to action (today's workout, then your best next step) and a short menu of the things you do most days:
+
+![Home screen](docs/menu.png)
+
+**`?` shows every screen**, grouped into the four sections below, followed by every key; type any key on that page to go straight there. Every key works from the home screen too, whether or not it is listed. If you prefer to see everything at once, **Settings** (`o`) → *Home screen: detailed* brings back the full dashboard (study hours, labs, stages, books read, concepts, exercises, mastery, campus progress, the 14-day activity line, weekly goals and the word of the day) and the full menu. Those numbers are always in the Progress report (`p`), under *At a glance*.
+
+Keys never change, whatever the layout: wide terminals show two or three columns with hints, and narrow ones show two compact columns.
 
 **Learn**
 
@@ -356,12 +362,12 @@ The menu is grouped into four sections. Keys never change, whatever the layout: 
 
 | Key | Action |
 |---|--------|
-| o | **Settings**: colour theme (default, high contrast, colour-blind friendly, monochrome), plain symbols instead of emoji, confidence ratings, Classic Mode, tidy screen |
+| o | **Settings**: colour theme (default, high contrast, colour-blind friendly, monochrome), plain symbols instead of emoji, confidence ratings, Classic Mode, tidy screen, simple or detailed home screen |
 | 5 | **Exit**. Your progress is saved automatically after every action, so closing the window is fine too |
 | 8 | **Undo this session**: puts your progress back exactly as it was when you opened the academy, then exits (asks first) |
 | c | **Classic Mode** on/off: struggle clock, lab notebook, classic corners and type-ins |
 | t | **Tidy screen** on/off: every action starts on a clean screen |
-| ? | **Keys & shortcuts** (also `h` or `help`) · `clear` / `cls` clears the screen |
+| ? | **All screens & keys** (also `h` or `help`): every screen, grouped, then every key; type a key on that page to go there · `clear` / `cls` clears the screen |
 
 Above the menu, a dashboard shows hours, labs, stages, texts, concepts, exercises, **mastered concepts** and **cards due for review**, plus mastery-weighted campus progress, a 14-day activity sparkline, and a study streak (logged hours, focus sessions and review days all count). If you have set weekly goals, a **This week** line tracks them. Below it, a **➜ Next** line names your best next step; press `n` to start it.
 

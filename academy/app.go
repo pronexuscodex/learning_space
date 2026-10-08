@@ -232,23 +232,41 @@ func (a *App) printDashboard() {
 	}
 }
 
-// printMenu draws the dashboard and the menu. Wide terminals get two
-// columns; narrow ones get a single column, and hints are dropped first.
-func (a *App) printMenu() {
-	a.printDashboard()
-	w := a.cols()
-	a.mu.Lock()
-	dueNow := len(a.reg.dueCards(time.Now()))
-	classic := a.reg.ClassicMode
-	tidy := a.reg.TidyScreen
-	a.mu.Unlock()
+// menuEntry is one menu item: extra is shown only when it fits, short is
+// the label for narrow screens.
+type menuEntry struct{ text, extra, short string }
 
-	item := func(key, label string) string { return sty.Cyan("["+key+"]") + " " + label }
-	hint := func(s string) string { return sty.Gray(" · " + s) }
-	review := sty.Bold(sty.Green("Daily Review"))
-	if dueNow > 0 {
-		review += " " + sty.Bold(sty.Yellow(fmt.Sprintf("(%d due)", dueNow)))
+// menuGroup is a titled block of menu items ("" for no title).
+type menuGroup struct {
+	title   string
+	color   func(string) string
+	entries []menuEntry
+}
+
+func menuItem(key, label string) string { return sty.Cyan("["+key+"]") + " " + label }
+func menuHint(s string) string          { return sty.Gray(" · " + s) }
+
+// reviewLabel is the Daily Review entry, with the number due.
+func (a *App) reviewLabel(short bool) string {
+	a.mu.Lock()
+	due := len(a.reg.dueCards(time.Now()))
+	a.mu.Unlock()
+	label := sty.Bold(sty.Green("Daily Review"))
+	if short {
+		label = sty.Bold(sty.Green("Review"))
 	}
+	if due > 0 {
+		label += " " + sty.Bold(sty.Yellow(fmt.Sprintf("(%d due)", due)))
+	}
+	return label
+}
+
+// allScreens lists every screen, grouped: the detailed menu, and the
+// "All screens & keys" page of the simple home.
+func (a *App) allScreens() []menuGroup {
+	a.mu.Lock()
+	classic, tidy := a.reg.ClassicMode, a.reg.TidyScreen
+	a.mu.Unlock()
 	mode := sty.Gray("off")
 	if classic {
 		mode = sty.Bold(sty.Yellow("ON"))
@@ -257,23 +275,19 @@ func (a *App) printMenu() {
 	if tidy {
 		tidyMode = sty.Bold(sty.Green("on"))
 	}
-	type entry struct{ text, extra, short string } // extra is shown only when it fits; short is for narrow screens
-	groups := []struct {
-		title   string
-		color   func(string) string
-		entries []entry
-	}{
-		{"LEARN", sty.Green, []entry{
+	item, hint := menuItem, menuHint
+	return []menuGroup{
+		{"LEARN", sty.Green, []menuEntry{
 			{item("0", sty.Bold(sty.Green("Start Here"))), hint("begin here"), "Start Here"},
 			{item("j", sty.Bold(sty.Green("Today's workout"))), hint("guided daily session"), "Workout"},
 			{item("6", sty.Bold("Study Hall")), hint("learn & practise"), "Study Hall"},
-			{item("9", review), "", "Review"},
+			{item("9", a.reviewLabel(false)), "", "Review"},
 			{item("n", sty.Bold(sty.Green("What's next"))), hint("best next step"), "What's next"},
 			{item("m", "Roadmap"), hint(fmt.Sprintf("all %d stages", len(curriculum))), "Roadmap"},
 			{item("d", sty.Bold("Dictionary")), hint("every word explained"), "Dictionary"},
 			{item("/", "Search"), hint("find any topic"), "Search"},
 		}},
-		{"PRACTISE & TRACK", sty.Cyan, []entry{
+		{"PRACTISE & TRACK", sty.Cyan, []menuEntry{
 			{item("f", "Focus timer"), hint("Pomodoro"), "Focus timer"},
 			{item("2", "Start a lab project"), "", "Start lab"},
 			{item("3", "Log study hours"), "", "Log hours"},
@@ -284,27 +298,131 @@ func (a *App) printMenu() {
 			{item("a", "Achievements"), "", "Achievements"},
 			{item("k", "Share card"), hint("post your progress"), "Share card"},
 		}},
-		{"RESOURCES", sty.Magenta, []entry{
+		{"RESOURCES", sty.Magenta, []menuEntry{
 			{item("l", sty.Bold("Library")), hint("download PDFs"), "Library"},
 			{item("+", "My resources"), hint("your finds"), "My resources"},
 			{item("w", sty.Bold("Tech watch")), hint("keep up with trends"), "Tech watch"},
 			{item("x", "Export notes"), hint("to Markdown"), "Export"},
 		}},
-		{"SETTINGS & EXIT", sty.Yellow, []entry{
-			{item("o", "Settings"), hint("theme, symbols, modes"), "Settings"},
-			{item("?", "Keys & shortcuts"), hint("Ctrl+L clears"), "Keys"},
+		{"SETTINGS & EXIT", sty.Yellow, []menuEntry{
+			{item("o", "Settings"), hint("theme, symbols, home screen"), "Settings"},
+			{item("?", "All screens & keys"), "", "All & keys"},
 			{item("c", "Classic Mode "+mode), "", "Classic " + stripANSI(mode)},
 			{item("t", "Tidy screen "+tidyMode), "", "Tidy " + stripANSI(tidyMode)},
 			{item("5", "Exit"), hint("progress saves itself"), "Exit"},
 			{item("8", sty.Gray("Undo this session")), "", "Undo session"},
 		}},
 	}
+}
+
+// simpleMenu is the short menu of the simple home screen: the things a
+// learner does most days. Every other key still works; ? shows them all.
+func (a *App) simpleMenu() []menuGroup {
+	item, hint := menuItem, menuHint
+	a.mu.Lock()
+	cs := a.reg.stats(time.Now(), 1)
+	a.mu.Unlock()
+	learn := []menuEntry{
+		{item("j", sty.Bold(sty.Green("Today's workout"))), hint("guided daily session"), "Workout"},
+		{item("6", sty.Bold("Study Hall")), hint("any stage"), "Study Hall"},
+		{item("9", a.reviewLabel(true)), "", "Review"},
+		{item("n", "What's next"), "", "What's next"},
+		{item("d", "Dictionary"), "", "Dictionary"},
+		{item("/", "Search"), "", "Search"},
+		{item("l", "Library"), hint("free PDFs"), "Library"},
+		{item("p", "Progress"), "", "Progress"},
+	}
+	if cs.conceptsStudied < 3 { // new learners: the guide stays in sight
+		learn = append([]menuEntry{{item("0", sty.Bold(sty.Green("Start Here"))), hint("how it works"), "Start Here"}}, learn...)
+	}
+	return []menuGroup{
+		{"", sty.Green, learn},
+		{"", sty.Gray, []menuEntry{
+			{item("?", "All screens & keys"), "", "All & keys"},
+			{item("o", "Settings"), "", "Settings"},
+			{item("5", "Exit"), "", "Exit"},
+		}},
+	}
+}
+
+// printMenu draws the home screen: simple by default, detailed when the
+// learner chose it in Settings.
+func (a *App) printMenu() {
+	a.mu.Lock()
+	detailed := a.reg.Settings.DetailedHome
+	a.mu.Unlock()
+	if detailed {
+		a.printDashboard()
+		a.renderMenu("MAIN MENU", a.allScreens())
+		return
+	}
+	a.printHome()
+	a.renderMenu("MENU", a.simpleMenu())
+}
+
+// printHome is the simple dashboard: three numbers, where you are, and
+// the one thing to do next.
+func (a *App) printHome() {
+	now := time.Now()
+	a.mu.Lock()
+	cs := a.reg.stats(now, 60)
+	today := a.reg.dailyMinutes(now, 1)[0]
+	cur := a.reg.currentStage()
+	var studied, total int
+	if cur != nil {
+		studied, total = conceptProgress(cur)
+	}
+	classic := a.reg.ClassicMode
+	day := a.reg.todayWorkout(now)
+	a.mu.Unlock()
+	w := a.cols()
+
+	streak := sty.Gray("No streak yet")
+	if cs.streak > 0 {
+		streak = sty.Bold(sty.Yellow(fmt.Sprintf("🔥 %d-day streak", cs.streak)))
+	}
+	todayText := sty.Gray("Today ") + sty.Bold(fmt.Sprintf("%.0f min", today))
+	due := sty.Gray("Nothing due")
+	if cs.due > 0 {
+		due = sty.Bold(sty.Yellow(count(cs.due, "card"))) + sty.Gray(" due")
+	}
+	a.println("")
+	for _, l := range flow([]string{streak, todayText, due}, sty.Gray("  ·  "), w, "  ") {
+		a.println(l)
+	}
+	if cur != nil {
+		tail := " " + bar(studied, total, 8, sty.Cyan) + " " + sty.Gray(fmt.Sprintf("%d/%d", studied, total))
+		head := sty.Gray("Now ") + fmt.Sprintf("Stage %d · ", cur.ID)
+		room := w - 2 - visibleLen(head) - visibleLen(tail)
+		if room >= 12 {
+			a.println("  " + head + truncate(cur.Title, room) + tail)
+		} else {
+			a.println("  " + head + truncate(cur.Title, w-2-visibleLen(head)))
+		}
+	}
+	if classic {
+		a.println("  " + classicBadge())
+	}
+	if day == nil || !day.complete() {
+		a.println(a.workoutLine())
+	} else if h := a.nextHint(); h != "" {
+		a.println("  " + h)
+	}
+}
+
+// renderMenu draws menu groups in a box. Wide terminals get two or three
+// columns; narrow ones get two compact columns with short labels.
+func (a *App) renderMenu(title string, groups []menuGroup) {
+	w := a.cols()
+	a.mu.Lock()
+	dueNow := len(a.reg.dueCards(time.Now()))
+	a.mu.Unlock()
 
 	edge := sty.Gray
 	inner := w - 4 // room after "  │ "
-	title := "┌─ " + sty.Bold("MAIN MENU") + " "
-	a.println("  " + edge("┌─ ") + sty.Bold("MAIN MENU") + " " + edge(strings.Repeat("─", max(0, w-2-visibleLen(title)))))
-	show := func(e entry, room int) string {
+	head := "┌─ " + sty.Bold(title) + " "
+	a.println("  " + edge("┌─ ") + sty.Bold(title) + " " + edge(strings.Repeat("─", max(0, w-2-visibleLen(head)))))
+	show := func(e menuEntry, room int) string {
 		if visibleLen(e.text+e.extra) <= room {
 			return e.text + e.extra
 		}
@@ -324,12 +442,14 @@ func (a *App) printMenu() {
 		if gi > 0 {
 			a.println("  " + edge("│"))
 		}
-		a.println("  " + edge("│ ") + g.color(sty.Bold(truncate(g.title, inner))))
+		if g.title != "" {
+			a.println("  " + edge("│ ") + g.color(sty.Bold(truncate(g.title, inner))))
+		}
 		if narrow {
 			half := inner / 2
 			for i := 0; i < len(g.entries); i += 2 {
-				key := func(e entry) string { return strings.SplitN(stripANSI(e.text), " ", 2)[0] }
-				cell := func(e entry, room int) string {
+				key := func(e menuEntry) string { return strings.SplitN(stripANSI(e.text), " ", 2)[0] }
+				cell := func(e menuEntry, room int) string {
 					label := e.short
 					if key(e) == "[9]" && dueNow > 0 {
 						label += fmt.Sprintf(" (%d)", dueNow)
@@ -924,7 +1044,12 @@ func (a *App) commitAndExit() {
 
 // showShortcuts lists every key the academy understands.
 func (a *App) showShortcuts() {
-	a.println(heading("KEYS & SHORTCUTS", sty.Cyan, a.cols()))
+	a.println(heading("ALL SCREENS & KEYS", sty.Cyan, a.cols()))
+	a.println("")
+	a.renderMenu("ALL SCREENS", a.allScreens())
+	for _, l := range wrap("Type any key from the box to go straight there, even at the end of this page.", a.cols()-4, "  ") {
+		a.println(sty.Gray(l))
+	}
 	a.println("")
 	row := func(key, what string) {
 		for i, l := range wrap(what, a.cols()-20, "") {
@@ -944,28 +1069,12 @@ func (a *App) showShortcuts() {
 	row("Ctrl+C", "save and exit (closing the window saves too)")
 	row("q  or  :q", "cancel the current prompt (q for numbers, :q for text)")
 	a.println("")
-	a.printf("  %s\n", sty.Bold("Main menu"))
-	row("0 – 9", "the menu options")
+	a.printf("  %s\n", sty.Bold("Also understood at the menu"))
 	row("r", "Daily Review (same as 9)")
-	row("n", "What's next: your best next steps, one key to start")
-	row("/  or  s", "search concepts, glossary, resources and classics")
-	row("f", "focus timer: a timed study session that is logged")
-	row("p", "progress report: activity calendar, weekly trend, weak cards")
-	row("x", "export all your notes and progress to a Markdown file")
-	row("d", "programmer's dictionary: jargon explained with analogies and code")
-	row("w", "tech watch: the method, live headlines, a watch log and your tech radar")
-	row("+", "my resources: add, edit, import and export your own finds")
-	row("l", "library: download free books and papers as PDFs and open them")
-	row("m", "roadmap: every stage's state and what it builds on; open any Study Hall")
-	row("g", "weekly goals: minutes, days and review cards, tracked on the dashboard")
-	row("a", "achievements")
-	row("o", "settings: colour theme, plain symbols, confidence ratings, modes")
-	row("j", "today's workout: review, recall, learn, mixed practice, reflect")
-	row("k", "share card: your progress, ready to screenshot and post")
-	row("c", "Classic Mode on/off")
-	row("t", "tidy screen on/off: start every action on a clean screen")
+	row("s", "search (same as /)")
+	row("7  or  save", "save now (the academy also saves after every action)")
 	row("clear / cls", "clear the screen now")
-	row("? / h", "this list")
+	row("h  or  help", "this page (same as ?)")
 	a.println("")
 	a.printf("  %s\n", sty.Bold("Long screens"))
 	row("Enter", "next page")

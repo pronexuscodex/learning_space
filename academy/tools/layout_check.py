@@ -41,7 +41,8 @@ KEYS = [
   "1\r", "2\r", "2\r", "2\r", "y\r", "3\r",  # practice: climb all three rungs, done, "with the hint"
   "1\r", "Choosing between bits and bytes\r", "n\r",  # reflect
   "p\r", "\r"*4,          # progress report, now with "Thinking for yourself"
-  "o\r", "1\r", "3\r", "2\r", "6\r",  # settings: colour-blind theme, plain symbols (the rest of the run checks them)
+  "?\r", "\r"*4,            # all screens & keys
+  "o\r", "1\r", "3\r", "2\r", "6\r", "7\r",  # settings: colour-blind theme, plain symbols, detailed home (the rest of the run checks them)
   "l\r", "1\r", "q\r",  # library → try downloading the first PDF → back
   "d\r", "type casting\r", "1\r", "\r", "c\r", "4\r", "1\r", "\r", "a\r", "q\r", "q\r", "q\r",  # dictionary: word → related → categories → A–Z
   "+\r", "a\r", "Modern C, a free book on writing C well\r", "https://example.org/modern-c.pdf\r", "1\r", "5\r", "A long note that should wrap neatly at every terminal width\r", "q\r",  # my resources

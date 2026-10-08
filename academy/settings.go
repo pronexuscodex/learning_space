@@ -98,6 +98,10 @@ func (a *App) settingsScreen() error {
 				themeName = t.Name
 			}
 		}
+		homeName := "simple"
+		if st.DetailedHome {
+			homeName = "detailed"
+		}
 		symbols := "emoji 💡"
 		if st.PlainSymbols {
 			symbols = "plain characters"
@@ -109,9 +113,10 @@ func (a *App) settingsScreen() error {
 			"Ask how sure I am before review answers: " + onOff(!st.NoConfidence),
 			"Classic Mode: " + onOff(classic) + sty.Gray(" · struggle clock, notebook, type-ins"),
 			"Tidy screen: " + onOff(tidy) + sty.Gray(" · each action on a clean screen"),
+			"Home screen: " + sty.Bold(homeName) + sty.Gray(" · simple, or every number and menu item"),
 			"Back",
 		})
-		if err != nil || choice == 5 {
+		if err != nil || choice == 6 {
 			if err == errCancel {
 				return nil
 			}
@@ -136,6 +141,9 @@ func (a *App) settingsScreen() error {
 		case 4:
 			a.mutate(func(r *Registry) { r.TidyScreen = !r.TidyScreen })
 			a.con.ok("Saved.")
+		case 5:
+			a.mutate(func(r *Registry) { r.Settings.DetailedHome = !r.Settings.DetailedHome })
+			a.con.ok("Home screen changed. Every key works either way; ? lists them all.")
 		}
 	}
 }

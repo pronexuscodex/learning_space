@@ -435,6 +435,25 @@ func (a *App) progressReport() {
 
 	a.println(heading("PROGRESS REPORT", sty.Green, w))
 
+	// At a glance: every number, which the simple home screen leaves out.
+	cs := a.reg.stats(now, 60)
+	stat := func(label, value string) string { return sty.Gray(label) + " " + sty.Bold(value) }
+	a.printf("\n  %s\n", sty.Bold("At a glance"))
+	for _, l := range flow([]string{
+		stat("Study", fmt.Sprintf("%.1f h", cs.hours)),
+		stat("Concepts", fmt.Sprintf("%d/%d", cs.conceptsStudied, cs.concepts)),
+		stat("Exercises", fmt.Sprintf("%d/%d", cs.exercisesDone, cs.exercises)),
+		stat("Mastered", fmt.Sprintf("%d/%d", cs.mastered, cs.concepts)),
+		stat("Stages", fmt.Sprintf("%d/%d", cs.stagesGrad, cs.stages)),
+		stat("Books & papers read", fmt.Sprintf("%d/%d", cs.textsRead, cs.texts)),
+		stat("Labs", fmt.Sprintf("%d, %d graduated", cs.labs, cs.labsGrad)),
+	}, sty.Gray("  │  "), w, "    ") {
+		a.println(l)
+	}
+	done := cs.masteryPoints + cs.textsRead + cs.stagesGrad
+	total := cs.masteryMax + cs.texts + cs.stages
+	a.printf("    %s %s %s\n", sty.Gray("Overall"), bar(done, total, max(10, min(24, w-24)), sty.Cyan), sty.Bold(pct(done, total)))
+
 	// Activity calendar: one column per week (Monday first), newest right.
 	weeks := max(4, min(26, (w-8)/2))
 	weekday := (int(now.Weekday()) + 6) % 7 // Monday = 0
