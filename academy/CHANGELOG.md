@@ -4,7 +4,7 @@ All notable changes to the Systems & AI Academy are listed here. The
 format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 versions follow [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [1.6.0] - 2026-10-08
 
 ### Fixed
 - Stage 15's classic reading, the LeNet paper, pointed at yann.lecun.com, which has refused connections for weeks. It now links to the paper's permanent DOI record, and the reading notes where the authors' free copy lives.
