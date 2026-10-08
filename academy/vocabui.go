@@ -60,6 +60,17 @@ func (a *App) renderWord(w Word, inDeck bool) {
 		}
 	}
 	section("⚠ Watch out", sty.Red, w.Watch)
+	if more := deeper[w.Word]; more != "" {
+		a.printf("  %s\n  %s %s\n", edge, edge, sty.Bold(sty.Magenta("Go deeper")))
+		for i, para := range strings.Split(more, "\n\n") {
+			if i > 0 {
+				a.printf("  %s\n", edge)
+			}
+			for _, l := range wrap(para, width-6, "") {
+				a.printf("  %s %s\n", edge, l)
+			}
+		}
+	}
 	if len(w.See) > 0 {
 		a.printf("  %s\n", edge)
 		var items []string

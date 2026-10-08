@@ -36,7 +36,7 @@ var vocabCats = []string{
 var vocab = func() []Word {
 	var all []Word
 	for _, part := range [][]Word{vocabBasics, vocabTypes, vocabFunctions, vocabMemory, vocabTools,
-		vocabSystems, vocabNetworks, vocabData, vocabAlgorithms, vocabSecurity, vocabAI, vocabCulture} {
+		vocabSystems, vocabNetworks, vocabData, vocabAlgorithms, vocabSecurity, vocabAI, vocabCulture, vocabDeep} {
 		all = append(all, part...)
 	}
 	sort.SliceStable(all, func(i, j int) bool { return strings.ToLower(all[i].Word) < strings.ToLower(all[j].Word) })

@@ -6,6 +6,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -30,6 +31,8 @@ type linkResult struct {
 	Status int
 	Err    error
 	PDF    bool // a Library download: the file itself must be a PDF
+
+	Archived bool // the original failed, but the Internet Archive's copy is a PDF
 }
 
 // ok reports whether the link resolved to a successful page.
@@ -167,6 +170,18 @@ func runLinkCheck(out io.Writer) int {
 		}
 	}
 
+	// A broken Library PDF: does the Internet Archive's copy work? Learners
+	// are then still served, though the link should be fixed.
+	for i := range links {
+		if l := &links[i]; l.PDF && !l.ok() && !l.guarded() {
+			if alt, err := archivedCopy(context.Background(), client, l.URL); err == nil {
+				if _, err := checkPDF(client, alt); err == nil {
+					l.Archived = true
+				}
+			}
+		}
+	}
+
 	failed, guarded, unreachable := 0, 0, 0
 	for _, l := range links {
 		mark := sty.Green("✓")
@@ -186,6 +201,9 @@ func runLinkCheck(out io.Writer) int {
 				detail = sty.Red(l.Err.Error())
 			} else {
 				detail = sty.Red(fmt.Sprintf("HTTP %d", l.Status))
+			}
+			if l.Archived {
+				detail += sty.Yellow(" · learners still get it: the Internet Archive's copy works")
 			}
 		}
 		fmt.Fprintf(out, "  %s %s %s %s\n", mark, sty.Gray(fmt.Sprintf("stage %2d", l.Stage)), truncate(l.Title, 48), detail)

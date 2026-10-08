@@ -42,3 +42,16 @@ jobs:
             if [ "$code" = 1 ]; then echo "  ✓ $doi"; else echo "  ✗ $doi ($code)"; fail=1; fi
           done
           exit $fail
+      # The Library falls back to the Internet Archive when a PDF's link
+      # breaks: check, for real, that the archive still answers the way
+      # the academy expects (a snapshot timestamp, then the raw PDF bytes).
+      - name: Internet Archive fallback still works
+        if: always()
+        working-directory: .
+        run: |
+          pdf=https://jeffe.cs.illinois.edu/teaching/algorithms/book/Algorithms-JeffE.pdf
+          ts=$(curl -fsS --retry 3 "https://archive.org/wayback/available?url=$pdf" | python3 -c 'import json,sys; c=json.load(sys.stdin)["archived_snapshots"].get("closest",{}); print(c.get("timestamp","") if c.get("available") else "")')
+          echo "snapshot: $ts"
+          test -n "$ts"
+          curl -fsSL --retry 3 "https://web.archive.org/web/${ts}id_/$pdf" | head -c 5 | grep -q '%PDF-'
+          echo "  ✓ the archived copy is a PDF"
