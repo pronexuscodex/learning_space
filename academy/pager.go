@@ -66,7 +66,13 @@ func (a *App) paged(finalPause bool, render func()) {
 			prompt = sty.Gray("  ── ") + sty.Bold(sty.Cyan("Enter")) + sty.Gray(" more · ") + sty.Bold(sty.Cyan("q")) + sty.Gray(" stop ──")
 		}
 		s, err := a.con.readLine(prompt + " ")
-		if err != nil || isCancel(s) {
+		if err != nil {
+			return
+		}
+		// Like man and less: the prompt disappears once answered, so it
+		// never sits in the middle of the text.
+		a.con.eraseLastLine()
+		if isCancel(s) {
 			return
 		}
 		// Anything else typed here is the answer to what comes next (a

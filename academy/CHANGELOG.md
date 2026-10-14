@@ -4,6 +4,11 @@ All notable changes to the Systems & AI Academy are listed here. The
 format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 versions follow [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Fixed
+- **Paging works like `man` and `less`.** Pressing Enter at "Enter for more" used to leave that prompt in the middle of the text, splitting a sentence across two pages with the prompt between them. The prompt is now erased once answered, so the next page continues the text seamlessly. Output sent to a file or pipe is unchanged.
+
 ## [1.6.0] - 2026-10-08
 
 ### Added

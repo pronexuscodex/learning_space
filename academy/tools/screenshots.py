@@ -68,14 +68,14 @@ XTERM_256 = {"208": "#ff8700", "39": "#00afff", "220": "#ffd700", "33": "#0087ff
 CSI = re.compile(r"\x1b\[([0-9;?]*)([A-Za-z])")
 
 
-def run_session(cols, keys, registry, from_key=-1):
+def run_session(cols, keys, registry, from_key=-1, rows=200):
     pid, fd = pty.fork()
     if pid == 0:
         os.environ["TERM"] = "xterm-256color"
         os.environ.pop("NO_COLOR", None)
         os.environ["ACADEMY_LIBRARY"] = tempfile.mkdtemp(prefix="academy-library-")  # never the real Documents
         os.execv(BIN, ["academy", "-registry", registry])
-    fcntl.ioctl(fd, termios.TIOCSWINSZ, struct.pack("HHHH", 200, cols, 0, 0))
+    fcntl.ioctl(fd, termios.TIOCSWINSZ, struct.pack("HHHH", rows, cols, 0, 0))
     out = bytearray()
 
     def pump(t):
@@ -119,7 +119,11 @@ def terminal_lines(text):
                 elif cmd == "J":
                     lines, cur = [], ""
                 elif cmd == "K":
-                    pass
+                    if params == "2":
+                        cur = ""
+                elif cmd == "A":  # cursor up: back onto earlier lines
+                    for _ in range(int(params or "1")):
+                        cur = lines.pop() if lines else ""
                 i = m.end()
                 continue
             i += 1
