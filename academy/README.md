@@ -371,7 +371,7 @@ Keys never change, whatever the layout: wide terminals show two or three columns
 
 Above the menu, a dashboard shows hours, labs, stages, texts, concepts, exercises, **mastered concepts** and **cards due for review**, plus mastery-weighted campus progress, a 14-day activity sparkline, and a study streak (logged hours, focus sessions and review days all count). If you have set weekly goals, a **This week** line tracks them. Below it, a **➜ Next** line names your best next step; press `n` to start it.
 
-Long screens (the ledger, Start Here, glossaries, resources, concept cards, the notebook) are shown one terminal page at a time: press **Enter** for the next page or **q** to return to the menu. Paging switches on only when you are typing at a real terminal (it uses `$LINES` if set, else 24 rows); piped or scripted input is unaffected.
+Long screens (the ledger, Start Here, glossaries, resources, concept cards, the dictionary, the notebook) are shown one terminal page at a time, like `man` and `less`. The status line shows how far through you are; press **Enter** for the next page, **b** to go back, **<** or **>** for the start or the end, **/word** to find a word (every match is highlighted and the status line counts them; **/** again goes to the next one) and **q** to stop. Typing a number or a menu key answers whatever comes next, so you never have to page to the end of a list to pick from it. Once you answer it, the prompt is erased, so it never sits in the middle of the text. Paging switches on only when you are typing at a real terminal (it uses the terminal's height); piped or scripted input is unaffected.
 
 To cancel a prompt, type `q` at number prompts or `:q` at text prompts. Ctrl-D, Ctrl-C and closing the window (SIGTERM, SIGHUP) save before exiting.
 
@@ -538,8 +538,11 @@ Press **`c`** on the main menu. Classic Mode brings back the habits that made st
 | Ctrl+U / Ctrl+W | any prompt | erases the whole line / the previous word |
 | Ctrl+D | empty prompt | ends input: saves and exits |
 | Ctrl+C | anywhere | saves and exits |
-| Enter / q | long screens | next page / stop paging |
-| a number or key | long screens | answers the next prompt straight away: on a long list, type the item's number at "Enter for more" without paging to the end |
+| Enter / b | long screens | next page / previous page |
+| < / > | long screens | the start / the end |
+| /word, then / | long screens | find a word (highlighted), then the next match |
+| q | long screens | stop paging |
+| a number or key | long screens | answers the next prompt straight away: on a long list, type the item's number at the pager prompt without paging to the end |
 
 On Linux, macOS and the BSDs, the academy reads keys one at a time (a small built-in line editor using termios from Go's standard library), so Ctrl+L works instantly and arrow keys are ignored instead of printing `^[[A`. The terminal is always restored on exit, including after Ctrl+C. Elsewhere (for example Windows), input stays line-based: press **Ctrl+L then Enter**, or type `clear`.
 

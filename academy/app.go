@@ -1078,7 +1078,11 @@ func (a *App) showShortcuts() {
 	a.println("")
 	a.printf("  %s\n", sty.Bold("Long screens"))
 	row("Enter", "next page")
+	row("b", "previous page")
+	row("<  or  >", "the start or the end")
+	row("/word", "find a word (highlighted); / again for the next one")
 	row("q", "stop paging and continue")
+	row("number or key", "answers what comes next, without paging to the end")
 	a.println("")
 	a.printf("  %s\n", sty.Gray(truncate(versionLine(), a.cols()-4)))
 	if !a.con.raw {

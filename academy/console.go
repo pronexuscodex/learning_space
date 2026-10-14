@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -317,6 +318,23 @@ func (c *console) confirm(label string) (bool, error) {
 			return false, nil
 		}
 		c.warn("Please answer y or n.")
+	}
+}
+
+// eraseLastLine removes the line just answered (the cursor is at the
+// start of the line below it), as man and less do with their prompt, so
+// the next output takes its place. Only on a real terminal.
+func (c *console) eraseLastLine() {
+	if c.screen && os.Getenv("TERM") != "dumb" {
+		fmt.Fprint(c.out, "\x1b[1A\r\x1b[2K")
+	}
+}
+
+// clearForRedraw clears a terminal before a screen is drawn again from
+// its start (the pager going back or jumping to a match).
+func (c *console) clearForRedraw() {
+	if c.screen && os.Getenv("TERM") != "dumb" {
+		fmt.Fprint(c.out, clearSeq)
 	}
 }
 

@@ -50,7 +50,7 @@ SHOTS = {
     "roadmap": (80, ["m"], r"ROADMAP", r"more sense later", 40),
     "progress": (80, ["p"], r"PROGRESS REPORT", r"Achievements", 45),
     "library": (80, ["l"], r"LIBRARY", r"Stage 2 ·", 30),
-    "techwatch": (80, ["w", "4"], r"MY TECH RADAR", r"press Enter", 30),
+    "techwatch": (80, ["w", "4"], r"MY TECH RADAR", r"end · Enter", 30),
     "workout": (80, ["j"], r"TODAY'S WORKOUT", r"Ready\?", 30),
     "hint-ladder": (80, ["6", "0", "2", "3", "3", "2", "2"], r"Stuck\?", r"this exercise\.", 40, -3),
     "settings": (80, ["o", "1"], r"SETTINGS", r"Monochrome", 30, -2),
@@ -68,14 +68,14 @@ XTERM_256 = {"208": "#ff8700", "39": "#00afff", "220": "#ffd700", "33": "#0087ff
 CSI = re.compile(r"\x1b\[([0-9;?]*)([A-Za-z])")
 
 
-def run_session(cols, keys, registry, from_key=-1):
+def run_session(cols, keys, registry, from_key=-1, rows=200):
     pid, fd = pty.fork()
     if pid == 0:
         os.environ["TERM"] = "xterm-256color"
         os.environ.pop("NO_COLOR", None)
         os.environ["ACADEMY_LIBRARY"] = tempfile.mkdtemp(prefix="academy-library-")  # never the real Documents
         os.execv(BIN, ["academy", "-registry", registry])
-    fcntl.ioctl(fd, termios.TIOCSWINSZ, struct.pack("HHHH", 200, cols, 0, 0))
+    fcntl.ioctl(fd, termios.TIOCSWINSZ, struct.pack("HHHH", rows, cols, 0, 0))
     out = bytearray()
 
     def pump(t):
@@ -119,7 +119,11 @@ def terminal_lines(text):
                 elif cmd == "J":
                     lines, cur = [], ""
                 elif cmd == "K":
-                    pass
+                    if params == "2":
+                        cur = ""
+                elif cmd == "A":  # cursor up: back onto earlier lines
+                    for _ in range(int(params or "1")):
+                        cur = lines.pop() if lines else ""
                 i = m.end()
                 continue
             i += 1
@@ -223,7 +227,7 @@ def shoot(name, chrome, demo):
             if re.search(last, plain(lines[i])):
                 end = min(i + 1, start + limit)
                 break
-    chosen = [l for l in lines[start:end] if not re.search(r"press Enter to continue|Enter for more|Enter more · q stop", plain(l))]
+    chosen = [l for l in lines[start:end] if not re.search(r"── (“[^”]*” \d+/\d+ · )?(\d+%|end) · Enter[^─]*──|── Enter · q ──", plain(l))]
     while chosen and not plain(chosen[-1]).strip():
         chosen.pop()
     body = "\n".join(to_html(l) for l in chosen)
