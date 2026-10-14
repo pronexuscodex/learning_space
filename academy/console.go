@@ -330,5 +330,13 @@ func (c *console) eraseLastLine() {
 	}
 }
 
+// clearForRedraw clears a terminal before a screen is drawn again from
+// its start (the pager going back or jumping to a match).
+func (c *console) clearForRedraw() {
+	if c.screen && os.Getenv("TERM") != "dumb" {
+		fmt.Fprint(c.out, clearSeq)
+	}
+}
+
 // typeAhead makes s the answer to the next prompt.
 func (c *console) typeAhead(s string) { c.pending = &s }

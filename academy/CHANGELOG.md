@@ -6,6 +6,14 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- **A better pager for long screens**, closer to `less`:
+  - **b** goes back a page, and **<** and **>** jump to the start and the end;
+  - **/word** finds a word in the screen you are reading (a concept card, Start Here, the ledger, a dictionary entry…), highlights every match and jumps to it; **/** again goes to the next match, and the search wraps to the first match at the end;
+  - the status line shows how far through you are (`31%`, `end`) and, while searching, which match you are on (`“stack” 2/7`);
+  - it fits narrow terminals with shorter forms;
+  - the shortcuts page (`?`) lists the new keys.
+
 ### Fixed
 - **Paging works like `man` and `less`.** Pressing Enter at "Enter for more" used to leave that prompt in the middle of the text, splitting a sentence across two pages with the prompt between them. The prompt is now erased once answered, so the next page continues the text seamlessly. Output sent to a file or pipe is unchanged.
 
