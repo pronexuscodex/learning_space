@@ -16,6 +16,10 @@ def width(s):
     return w
 
 # Enroll a lab with a long name, then visit every major screen.
+# WAIT in KEYS: wait (up to 90 s) until the app asks for input again, for
+# steps that take real time, such as a download.
+WAIT = "\0wait"
+
 KEYS = [
   "2\r", "A\r", "5\r", "A really quite long lab name for testing\r", "Architecture notes that are long enough to need truncation on narrow screens\r", "3\r",
   "1\r", "\r"*3,            # ledger (paged)
@@ -43,7 +47,7 @@ KEYS = [
   "p\r", "\r"*4,          # progress report, now with "Thinking for yourself"
   "?\r", "\r"*4,            # all screens & keys
   "o\r", "1\r", "3\r", "2\r", "6\r", "7\r",  # settings: colour-blind theme, plain symbols, detailed home (the rest of the run checks them)
-  "l\r", "1\r", "q\r",  # library → try downloading the first PDF → back
+  "l\r", "1\r", WAIT, "q\r",  # library → try downloading the first PDF (wait for it: keys typed during a download are echoed onto its progress line) → back
   "d\r", "type casting\r", "1\r", "\r", "c\r", "4\r", "1\r", "\r", "a\r", "q\r", "q\r", "q\r",  # dictionary: word → related → categories → A–Z
   "+\r", "a\r", "Modern C, a free book on writing C well\r", "https://example.org/modern-c.pdf\r", "1\r", "5\r", "A long note that should wrap neatly at every terminal width\r", "q\r",  # my resources
   "w\r", "1\r", "q\r", "4\r", "q\r", "5\r", "q\r", "7\r",  # tech watch: method, radar, sources
@@ -74,6 +78,13 @@ def run(cols, rows=60):
     read(1.0)
     pause = re.compile(r"(── (“[^”]*” \d+/\d+ · )?\d+% · Enter[^─]*──|── Enter · q ──)\s*$")
     for k in KEYS:
+        if k == WAIT:
+            for _ in range(360):
+                tail = ANSI.sub("", out[-200:].decode("utf-8", "replace")).split("\r")[-1]
+                if tail.rstrip().endswith("›"):
+                    break
+                read(0.25)
+            continue
         # A long screen may pause ("Enter for more"). If the script is not
         # about to press Enter anyway, press it first, as a person would,
         # so the keys stay in step with the screens.

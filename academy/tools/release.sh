@@ -19,6 +19,13 @@ v[0-9]*.[0-9]*.[0-9]*) ;;
 esac
 
 cd "$(dirname "$0")/.."
+# Every release has its notes, and the notes prove the release is built
+# from the commit that holds its changes: a tag on an older commit (made
+# before the changes were merged) has no section for its version.
+if ! grep -q "^## \[${VERSION#v}\]" CHANGELOG.md; then
+	echo "CHANGELOG.md has no '## [${VERSION#v}]' section: is $VERSION tagged on the right commit (the latest main)?" >&2
+	exit 1
+fi
 EPOCH=${SOURCE_DATE_EPOCH:-$(git log -1 --format=%ct 2>/dev/null || date +%s)}
 STAMP=$(date -u -d "@$EPOCH" +%Y%m%d%H%M.%S 2>/dev/null || date -u -r "$EPOCH" +%Y%m%d%H%M.%S)
 export TZ=UTC # touch -t and zip store local times
