@@ -4,7 +4,9 @@ All notable changes to the Systems & AI Academy are listed here. The
 format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 versions follow [Semantic Versioning](https://semver.org/).
 
-## [1.6.1] - 2026-10-14
+## [1.6.2] - 2026-10-15
+
+1.6.1 was published from the commit just before its changes were merged, so its programs are 1.6.0 with a new version number. 1.6.2 is the release with them.
 
 ### Added
 - **A better pager for long screens**, closer to `less`:
@@ -16,6 +18,12 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 - **Paging works like `man` and `less`.** Pressing Enter at "Enter for more" used to leave that prompt in the middle of the text, splitting a sentence across two pages with the prompt between them. The prompt is now erased once answered, so the next page continues the text seamlessly. Output sent to a file or pipe is unchanged.
+- **Windows:** the classic console (outside Windows Terminal) now processes escape sequences, so colours, clearing the screen and erasing the pager's prompt work there too.
+- A release can no longer be built from the wrong commit: the release script refuses a version with no section in this changelog.
+
+## [1.6.1] - 2026-10-14
+
+Published from the wrong commit: the same programs as 1.6.0. Its intended changes are in 1.6.2.
 
 ## [1.6.0] - 2026-10-08
 

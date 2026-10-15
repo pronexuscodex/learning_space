@@ -980,6 +980,7 @@ func roundHours(h float64) float64 { return math.Round(h*100) / 100 }
 // ---------------------------------------------------------------------------
 
 func main() {
+	enableVirtualTerminal()
 	pathFlag := flag.String("registry", "", "path to the JSON registry (default: in $ACADEMY_HOME if set; in your user data folder when the app is installed; otherwise beside the binary)")
 	noColor := flag.Bool("no-color", false, "disable ANSI colours (also honours NO_COLOR)")
 	checkLinks := flag.Bool("check-links", false, "verify every resource URL over the network, then exit")
