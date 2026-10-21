@@ -108,3 +108,29 @@ func TestStageOverviewShownOnce(t *testing.T) {
 		t.Error("q goes back; no Back item")
 	}
 }
+
+func TestPolish(t *testing.T) {
+	for in, want := range map[float64]string{0: "0 h", 4.75: "4.75 h", 8.5: "8.5 h", 1.0 / 3: "0.33 h"} {
+		if got := hoursText(in); got != want {
+			t.Errorf("hoursText(%v) = %q, want %q", in, got, want)
+		}
+	}
+	for v, pseudo := range map[string]bool{"v1.6.3-0.20261021172350-6dd173726dfa": true, "v0.0.0-20260924110238-77876a787eed": true, "v1.7.0": false} {
+		if pseudoVersion.MatchString(v) != pseudo {
+			t.Errorf("%s: pseudo-version = %v", v, !pseudo)
+		}
+	}
+	if got := pageTitle([]string{"", sty.Green("═══"), "  START HERE · how to learn"}); got != "START HERE · how to learn" {
+		t.Errorf("pageTitle = %q", got)
+	}
+	if got := pageTitle([]string{"  ┏━ Concept 1/8 · Bits"}); got != "Concept 1/8 · Bits" {
+		t.Errorf("pageTitle of a card = %q", got)
+	}
+	labels := map[string]bool{}
+	for _, h := range search("rate limiter") {
+		labels[h.Kind] = true
+	}
+	if !labels[HitDesign] {
+		t.Error("search must find the rate limiter design question")
+	}
+}

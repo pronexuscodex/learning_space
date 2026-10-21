@@ -16,6 +16,12 @@ After a walk through the app as a new learner, at 40, 80 and 160 columns:
 - **The stage page shows its long overview once.** Coming back to it after the glossary or a quiz shows the title, mastery and the concept list.
 - **Fewer keystrokes:** "Study a concept" asks for a number from the list already on screen, and the two-digit "Back" items are gone from the stage menu and the career center (`q` goes back).
 - **Tidy screen is on by default for new learners:** every action starts on a clean screen, so the scrollback stays readable.
+- **Polish:**
+  - The pager's status line names the page, as man does (`START HERE · lines 1–29 of 266`).
+  - Search lists every match through the pager (up to 60) instead of only the best 15, and labels career results "career".
+  - The Study Hall stage list uses a compact `concepts · exercises` column, so full stage titles fit at 80 columns.
+  - Plainer wording: "in progress" instead of "ACTIVE RESEARCH", hours shown as "8.5 h" instead of "8.50h", real plurals instead of "lab(s)" and "match(es)", and the banner reads "Systems & AI Academy".
+  - Development builds show a short `dev-<commit>` instead of a long Go pseudo-version.
 
 ### Added
 - **Get hired: the career center** (`e`). It turns learning into the three things companies hire on: foundations, finished projects and interview skill.

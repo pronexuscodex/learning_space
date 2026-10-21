@@ -1,6 +1,6 @@
 <p align="center"><img src="assets/icon.svg" width="128" alt="Systems & AI Academy icon: a CPU chip with a terminal prompt"></p>
 
-# Systems & AI Academy: Campus Registry
+# Systems & AI Academy
 
 A terminal-based study companion for **self-learners**. It covers the core of a computer science degree plus modern AI and defensive security in **21 stages**, starting with how computers work, and it assumes no prior knowledge. Every concept is explained from scratch and comes with **real-world exercises**.
 
