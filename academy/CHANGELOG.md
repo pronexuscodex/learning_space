@@ -50,6 +50,9 @@ After a walk through the app as a new learner, at 40, 80 and 160 columns:
   - Resizing the window redraws the page at once, re-wrapped to the new width.
   - On Windows, or with `ACADEMY_PAGER=inline`, the line pager is used as before.
 
+### Fixed
+- The link check (`-check-links` and the weekly Links workflow) failed whenever a site's own server was failing, such as Complexity Zoo answering 503 for hours. A server error (5xx) that persists after the retry is now a warning, like a site that does not answer; a 404, a moved page or a fake PDF still fails.
+
 ## [1.6.2] - 2026-10-15
 
 1.6.1 was published from the commit just before its changes were merged, so its programs are 1.6.0 with a new version number. 1.6.2 is the release with them.

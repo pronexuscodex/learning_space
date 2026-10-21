@@ -45,6 +45,13 @@ func (l linkResult) guarded() bool {
 	return l.Err == nil && (l.Status == 401 || l.Status == 403 || l.Status == 418 || l.Status == 429)
 }
 
+// serverDown reports a server error (500–599) that persisted after the
+// retry: the site itself is failing, as with no answer at all. A link
+// that needs fixing gets a 404, a redirect away or a non-PDF instead.
+func (l linkResult) serverDown() bool {
+	return l.Err == nil && l.Status >= 500 && l.Status < 600
+}
+
 // unreachable reports a link that got no HTTP answer at all, even after a
 // retry: the site is down, slow or blocked from here. Nothing says the
 // link is wrong, so it is a warning; a red check must mean something to
@@ -192,6 +199,10 @@ func runLinkCheck(out io.Writer) int {
 			unreachable++
 			mark = sty.Yellow("⚠")
 			detail = sty.Yellow("no answer, twice (site down, slow or blocked): " + l.Err.Error())
+		} else if l.serverDown() {
+			unreachable++
+			mark = sty.Yellow("⚠")
+			detail = sty.Yellow(fmt.Sprintf("HTTP %d, twice: the site's server is failing (try again later)", l.Status))
 		} else if !l.ok() {
 			failed++
 			mark = sty.Red("✗")

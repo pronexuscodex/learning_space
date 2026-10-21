@@ -22,6 +22,8 @@ func TestLinkCheckClassifiesAnswers(t *testing.T) {
 			w.Write([]byte("%PDF-1.7 ..."))
 		case "/fake.pdf":
 			w.Write([]byte("<html>Sorry, moved</html>"))
+		case "/overloaded":
+			w.WriteHeader(http.StatusServiceUnavailable)
 		case "/head-404":
 			if r.Method == http.MethodHead {
 				http.NotFound(w, r)
@@ -53,6 +55,16 @@ func TestLinkCheckClassifiesAnswers(t *testing.T) {
 	fake.Status, fake.Err = checkPDF(srv.Client(), fake.URL)
 	if fake.unreachable() || fake.ok() {
 		t.Error("a page that is not a PDF must fail, not warn")
+	}
+	// A server error (here 503) means the site is failing, not that the
+	// link is wrong: a warning, like no answer. A 404 still fails.
+	busy := linkResult{URL: srv.URL + "/overloaded"}
+	busy.Status, busy.Err = checkLink(srv.Client(), busy.URL)
+	if !busy.serverDown() || busy.ok() || busy.guarded() {
+		t.Errorf("a 503 must count as the site being down: %d %v", busy.Status, busy.Err)
+	}
+	if gone := (linkResult{Status: 404}); gone.serverDown() {
+		t.Error("a 404 needs fixing: it is not a server failure")
 	}
 	if teapot := (linkResult{Status: 418}); !teapot.guarded() {
 		t.Error("418, a common anti-bot answer, is guarded")
