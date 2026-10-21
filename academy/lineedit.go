@@ -67,9 +67,10 @@ func (c *console) clearScreen() {
 
 // readLineRaw reads one line key by key with the shortcuts above.
 func (c *console) readLineRaw(prompt string) (string, error) {
-	restore, err := enableRawInput(int(os.Stdin.Fd()))
+	restore, err := c.rawMode()
 	if err != nil {
 		c.raw = false // fall back to line mode for the rest of the session
+		c.prefill = nil
 		return c.readLineCooked(prompt)
 	}
 	termMu.Lock()
@@ -85,9 +86,10 @@ func (c *console) readLineRaw(prompt string) (string, error) {
 // them.
 func (c *console) editLine(prompt string) (string, error) {
 	c.mu.Lock()
-	c.editing, c.curPrompt, c.curBuf = true, prompt, nil
-	fmt.Fprint(c.out, prompt)
-	c.shown = visibleLen(lastLine(prompt)) // columns used by the input line as drawn
+	c.editing, c.curPrompt, c.curBuf = true, prompt, c.prefill
+	c.prefill = nil
+	fmt.Fprint(c.out, prompt+string(c.curBuf))
+	c.shown = visibleLen(lastLine(prompt) + string(c.curBuf)) // columns used by the input line as drawn
 	c.mu.Unlock()
 	defer func() {
 		c.mu.Lock()

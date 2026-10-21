@@ -100,14 +100,14 @@ def session(rng, keys, reg):
                     break
             else:
                 pass  # some prompts legitimately echo nothing new; timers and fetches are slow
-    # End the session the way a person would: Ctrl+U clears any half-typed
-    # line (Ctrl+D only ends input on an empty line, as in a shell), then
-    # Ctrl+D commits and exits.
+    # End the session the way a person would: q leaves a full-screen page
+    # (like man), Ctrl+U clears any half-typed line (Ctrl+D only ends input
+    # on an empty line, as in a shell), then Ctrl+D commits and exits.
     for _ in range(3):
         if exited is not None:
             break
         try:
-            os.write(fd, b"\x15\x04")
+            os.write(fd, b"q\x15\x04")
         except OSError:
             break
         pump(3)

@@ -43,6 +43,14 @@ type console struct {
 	// readLine returns it instead of waiting for input.
 	pending *string
 
+	// prefill is a key typed in the full-screen pager to answer what
+	// comes next: the next raw prompt starts with it, ready to go on.
+	prefill []rune
+
+	// enterRaw switches to single keys (tests replace it); nil means the
+	// real terminal.
+	enterRaw func() (func(), error)
+
 	// closed is set once input has ended (Ctrl+D or end of a pipe). It is
 	// sticky, so every later prompt also sees the end of input and the
 	// app always reaches its commit-and-exit path.

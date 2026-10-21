@@ -64,6 +64,7 @@ def run(cols, rows=60):
     pid, fd = pty.fork()
     if pid == 0:
         os.environ["ACADEMY_LIBRARY"] = tempfile.mkdtemp(prefix="academy-library-")  # never the real Documents
+        os.environ["ACADEMY_PAGER"] = "inline"  # every line of a long screen is printed, so all of it is measured
         os.execv(os.environ.get("ACADEMY_BIN", os.path.join(D, "..", "academy")), ["academy", "-registry", reg])
     fcntl.ioctl(fd, termios.TIOCSWINSZ, struct.pack("HHHH", rows, cols, 0, 0))
     out = b""

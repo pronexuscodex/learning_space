@@ -68,6 +68,10 @@ XTERM_256 = {"208": "#ff8700", "39": "#00afff", "220": "#ffd700", "33": "#0087ff
 CSI = re.compile(r"\x1b\[([0-9;?]*)([A-Za-z])")
 
 
+class Raw(str):
+    """A key sent as it is, without Enter (for screens that read single keys)."""
+
+
 def run_session(cols, keys, registry, from_key=-1, rows=200):
     pid, fd = pty.fork()
     if pid == 0:
@@ -92,7 +96,7 @@ def run_session(cols, keys, registry, from_key=-1, rows=200):
     marks = []
     for k in keys:
         marks.append(len(out))
-        os.write(fd, (k + "\r").encode())
+        os.write(fd, (k if isinstance(k, Raw) else k + "\r").encode())
         pump(0.5)
     mark = marks[from_key] if marks else 0  # no keys: the start-up screen itself
     pump(0.6)
@@ -107,6 +111,7 @@ def run_session(cols, keys, registry, from_key=-1, rows=200):
 def terminal_lines(text):
     """Apply the few control sequences the app uses; keep SGR colours."""
     lines, cur = [], ""
+    saved = ([], "")
     i = 0
     while i < len(text):
         ch = text[i]
@@ -118,6 +123,12 @@ def terminal_lines(text):
                     cur += m.group(0)
                 elif cmd == "J":
                     lines, cur = [], ""
+                elif cmd == "H":  # cursor home: the app redraws the whole screen
+                    lines, cur = [], ""
+                elif cmd == "h" and "1049" in params:  # alternate screen on
+                    saved, lines, cur = (lines, cur), [], ""
+                elif cmd == "l" and "1049" in params:  # alternate screen off
+                    lines, cur = saved
                 elif cmd == "K":
                     if params == "2":
                         cur = ""

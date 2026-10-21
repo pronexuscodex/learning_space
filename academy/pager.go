@@ -57,6 +57,11 @@ func (a *App) paged(finalPause bool, render func()) {
 	a.con.out = out
 
 	lines := strings.Split(strings.TrimRight(buf.String(), "\n"), "\n")
+	// Like man: a long text (or one to read before going back to the
+	// menu) gets the whole screen, when keys can be read one at a time.
+	if a.fullScreenOK() && (finalPause || len(lines) > termHeight()-2) && a.pageFullScreen(lines, finalPause, render) {
+		return
+	}
 	pageSize := max(5, termHeight()-2)
 	top := 0
 	var find pagerSearch
@@ -164,6 +169,26 @@ func (f *pagerSearch) next(from int) (int, string) {
 	}
 	f.current = 0
 	return f.matches[0], "Back to the first match."
+}
+
+// prev moves to the match before the current one (or before line from),
+// wrapping to the last.
+func (f *pagerSearch) prev(from int) (int, string) {
+	if len(f.matches) == 0 {
+		return -1, fmt.Sprintf("“%s” is not on this screen", f.query)
+	}
+	before := from
+	if f.current >= 0 {
+		before = f.matches[f.current]
+	}
+	for i := len(f.matches) - 1; i >= 0; i-- {
+		if f.matches[i] < before {
+			f.current = i
+			return f.matches[i], ""
+		}
+	}
+	f.current = len(f.matches) - 1
+	return f.matches[f.current], "Back to the last match."
 }
 
 // pagerPrompt is the status line: where you are, and the keys. It has a
