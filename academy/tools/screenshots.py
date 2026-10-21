@@ -52,6 +52,7 @@ SHOTS = {
     "library": (80, ["l"], r"LIBRARY", r"Stage 2 ·", 30),
     "techwatch": (80, ["w", "4"], r"MY TECH RADAR", r"end · Enter", 30),
     "workout": (80, ["j"], r"TODAY'S WORKOUT", r"Ready\?", 30),
+    "career": (80, ["e", "1", "1", "y"], r"GET HIRED", r"Back to the main menu", 32, -1),
     "hint-ladder": (80, ["6", "0", "2", "3", "3", "2", "2"], r"Stuck\?", r"this exercise\.", 40, -3),
     "settings": (80, ["o", "1"], r"SETTINGS", r"Monochrome", 30, -2),
     "share-card": (80, ["k"], r"╭", r"learning_space", 25),
@@ -78,6 +79,7 @@ def run_session(cols, keys, registry, from_key=-1, rows=200):
         os.environ["TERM"] = "xterm-256color"
         os.environ.pop("NO_COLOR", None)
         os.environ["ACADEMY_LIBRARY"] = tempfile.mkdtemp(prefix="academy-library-")  # never the real Documents
+        os.environ["ACADEMY_PAGER"] = "inline"  # long screens in the scrollback, so a shot can show all of one
         os.execv(BIN, ["academy", "-registry", registry])
     fcntl.ioctl(fd, termios.TIOCSWINSZ, struct.pack("HHHH", rows, cols, 0, 0))
     out = bytearray()

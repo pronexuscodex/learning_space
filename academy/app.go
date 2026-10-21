@@ -298,6 +298,9 @@ func (a *App) allScreens() []menuGroup {
 			{item("a", "Achievements"), "", "Achievements"},
 			{item("k", "Share card"), hint("post your progress"), "Share card"},
 		}},
+		{"CAREER", sty.Green, []menuEntry{
+			{item("e", sty.Bold(sty.Green("Get hired"))), hint("roles, portfolio, interviews, job search"), "Get hired"},
+		}},
 		{"RESOURCES", sty.Magenta, []menuEntry{
 			{item("l", sty.Bold("Library")), hint("download PDFs"), "Library"},
 			{item("+", "My resources"), hint("your finds"), "My resources"},
@@ -331,6 +334,7 @@ func (a *App) simpleMenu() []menuGroup {
 		{item("/", "Search"), "", "Search"},
 		{item("l", "Library"), hint("free PDFs"), "Library"},
 		{item("p", "Progress"), "", "Progress"},
+		{item("e", sty.Green("Get hired")), hint("career center"), "Get hired"},
 	}
 	if cs.conceptsStudied < 3 { // new learners: the guide stays in sight
 		learn = append([]menuEntry{{item("0", sty.Bold(sty.Green("Start Here"))), hint("how it works"), "Start Here"}}, learn...)
@@ -1077,12 +1081,14 @@ func (a *App) showShortcuts() {
 	row("h  or  help", "this page (same as ?)")
 	a.println("")
 	a.printf("  %s\n", sty.Bold("Long screens"))
-	row("Enter", "next page")
+	row("Space", "next page (full screen, like man: keys act at once)")
+	row("Enter  ↓  ↑", "one line down or up")
 	row("b", "previous page")
-	row("<  or  >", "the start or the end")
-	row("/word", "find a word (highlighted); / again for the next one")
-	row("q", "stop paging and continue")
-	row("number or key", "answers what comes next, without paging to the end")
+	row("g  G", "the start or the end (also < and >)")
+	row("/word", "find a word (highlighted); n and N for the next and previous match")
+	row("h", "every key of the pager")
+	row("q", "leave and continue")
+	row("number or key", "leave, and use it as your answer to what comes next")
 	a.println("")
 	a.printf("  %s\n", sty.Gray(truncate(versionLine(), a.cols()-4)))
 	if !a.con.raw {
@@ -1157,6 +1163,8 @@ func (a *App) run() {
 			actionErr = a.dictionary()
 		case "w":
 			actionErr = a.techWatch()
+		case "e":
+			actionErr = a.careerCenter()
 		case "+", "my":
 			actionErr = a.myResources()
 		case "l":

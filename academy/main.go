@@ -273,6 +273,9 @@ type Registry struct {
 	Calibration Calibration    `json:"calibration"`        // confidence before reveal vs. recall
 	Workouts    []WorkoutDay   `json:"workouts,omitempty"` // the Daily Workout, one entry per day
 	Settings    Settings       `json:"settings"`           // display and practice preferences
+
+	// The career center (see careers.go).
+	Career Career `json:"career"`
 }
 
 // findStage returns the stage with the given global ID and its track.
@@ -490,6 +493,7 @@ func (r *Registry) validate() error {
 		r.ExerciseOpened = map[string]time.Time{}
 	}
 	r.normalizeThinking()
+	r.normalizeCareer()
 	if r.NextLabID <= maxLab {
 		r.NextLabID = maxLab + 1
 	}

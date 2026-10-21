@@ -20,6 +20,7 @@ New here? Build it (below), run it, and press **`0`** for the *Start Here* guide
 - [Exercises](#exercises)
 - [Built to be remembered, not just read](#built-to-be-remembered-not-just-read)
 - [Think first: learning without leaning on AI](#think-first-learning-without-leaning-on-ai)
+- [Get hired: the career center](#get-hired-the-career-center)
 - [Menu](#menu)
 - [Study Hall](#study-hall)
 - [Programmer's dictionary](#programmers-dictionary)
@@ -312,6 +313,36 @@ The **Progress report** (`p`) has a *Thinking for yourself* section: how many ex
 
 ![Today's workout](docs/workout.png)
 
+## Get hired: the career center
+
+Press **`e`**. Companies hire engineers who can show three things: solid foundations, projects they built and finished, and that they can solve problems out loud in an interview. The career center turns your learning into all three, and tells you honestly how close you are. No app can promise a job; this one measures what interviews and hiring managers check.
+
+- **Target roles:** Backend Software Engineer, Systems / Infrastructure Engineer, Site Reliability / Platform Engineer, Security Engineer, and Machine Learning / AI Engineer. Each explains:
+  - the work, day to day, and who hires for it;
+  - the job titles to search for, and a typical interview process;
+  - what the interviews test;
+  - the academy stages that prepare you (with your progress in each);
+  - the portfolio projects employers value, and the skills to put on your resume;
+  - role-specific advice.
+- **Readiness report:** a score made of four parts, the weakest first, with concrete next steps:
+  - *foundations* (40%): concepts understood in the role's stages;
+  - *portfolio* (25%): projects shipped with tests passing, three to aim for;
+  - *interview practice* (20%): coding mocks, system design mocks and stories;
+  - *job-search kit* (15%).
+- **Portfolio projects:** each role's projects are lab blueprints from the curriculum. Start one with a keystroke, then log hours and mark its tests passing as usual. A checklist covers what makes a project count with employers: README, one-command run, tests in CI, design notes, results, and what you learned.
+- **Coding interview patterns:** an eight-step method to use on every problem (understand, examples, brute force, optimise, plan, code, test, analyse). Then 16 patterns, among them hash maps, two pointers, sliding window, prefix sums, binary search on the answer, intervals, monotonic stacks, BFS/DFS, topological order, union-find, heaps, backtracking, dynamic programming and tries. Each has the signals that point to it, the idea, the pitfalls and two practice problems written for the academy. In the think-first spirit there are no model answers: three hints, a question first, then a direction, then the key idea. After each problem you score yourself against a rubric.
+- **System design:** a seven-step framework with timings, the building blocks (caches, queues, sharding, replication, consistent hashing…) and numbers every engineer should know. Then 9 classic questions (URL shortener, rate limiter, chat, news feed, distributed key-value store, file sync, notifications, web crawler, metrics pipeline), each with the questions to ask, what a strong design covers, the likely deep dives and the usual mistake.
+- **Behavioral interviews:** the STAR method and the 12 questions every loop asks, with what interviewers look for. You write your own stories into a story bank, which shows which questions you can already answer.
+- **Mock interviews:** timed coding (pattern hidden), system design (45 minutes) and behavioral rounds, each scored against a short rubric and kept in your history.
+- **Resume builder:** the rules that get interviews, weak and strong example bullets, and a bullet written for each of your labs using the formula *what you built + how + the result*.
+- **Job search:**
+  - a seven-item kit (resume, GitHub profile, professional profile, a 60-second introduction, target companies, a technical write-up, references);
+  - an applications tracker with stages and a response rate;
+  - tips on referrals, follow-ups, rejection and offers.
+- **Export:** `academy_career.md` next to your registry holds your role, readiness, next steps, projects with bullets, stories and applications.
+
+![The career center](docs/career.png)
+
 ## Menu
 
 **The home screen is simple by default.** It shows three numbers (your streak, today's study minutes, and the cards due), the stage you are working on, one call to action (today's workout, then your best next step) and a short menu of the things you do most days:
@@ -334,6 +365,7 @@ Keys never change, whatever the layout: wide terminals show two or three columns
 | m | **Roadmap**: all 21 stages by track, each marked locked · ready · in progress · understood · mastered, with concept progress, "you are here", and which stages a locked one still needs; open any stage's Study Hall from it |
 | d | **Programmer's dictionary**: 320+ jargon words explained plainly (see below) |
 | / | **Search** (also `s`): every concept, glossary term, resource, blueprint and classic; all words must match, titles rank first; open a hit directly |
+| e | **Get hired**: the career center (target roles, readiness, portfolio, coding and system design interviews, story bank, mock interviews, resume, job search; see above) |
 
 **Practise & track**
 
@@ -371,7 +403,9 @@ Keys never change, whatever the layout: wide terminals show two or three columns
 
 Above the menu, a dashboard shows hours, labs, stages, texts, concepts, exercises, **mastered concepts** and **cards due for review**, plus mastery-weighted campus progress, a 14-day activity sparkline, and a study streak (logged hours, focus sessions and review days all count). If you have set weekly goals, a **This week** line tracks them. Below it, a **➜ Next** line names your best next step; press `n` to start it.
 
-Long screens (the ledger, Start Here, glossaries, resources, concept cards, the dictionary, the notebook) are shown one terminal page at a time, like `man` and `less`. The status line shows how far through you are; press **Enter** for the next page, **b** to go back, **<** or **>** for the start or the end, **/word** to find a word (every match is highlighted and the status line counts them; **/** again goes to the next one) and **q** to stop. Typing a number or a menu key answers whatever comes next, so you never have to page to the end of a list to pick from it. Once you answer it, the prompt is erased, so it never sits in the middle of the text. Paging switches on only when you are typing at a real terminal (it uses the terminal's height); piped or scripted input is unaffected.
+Long screens (the ledger, Start Here, glossaries, resources, concept cards, the dictionary, the notebook) open full screen, like `man`. The text fills the terminal and only a status line sits at the bottom: where you are (`lines 24–46 of 129 35%`, `(END)`) and the keys. Keys act at once, without Enter. **Space** next page, **Enter** or **↓** one line, **b** back a page, **g** / **G** the start / the end, **/word** find a word (every match is highlighted; **n** and **N** go to the next and previous match), **h** every key, **q** leave. When you leave, the normal screen comes back, with the part you were reading in view for the question that follows. Typing a number or a menu key leaves and answers whatever comes next, so you never have to page to the end of a list to pick from it.
+
+Full-screen paging needs a terminal that delivers single keys: Linux, macOS and the BSDs. On Windows, and with `ACADEMY_PAGER=inline`, long screens are paged in the normal scrollback: a prompt under each page takes the same keys followed by Enter, and is erased once answered. Paging switches on only when you are typing at a real terminal; piped or scripted input is unaffected.
 
 To cancel a prompt, type `q` at number prompts or `:q` at text prompts. Ctrl-D, Ctrl-C and closing the window (SIGTERM, SIGHUP) save before exiting.
 
@@ -538,11 +572,12 @@ Press **`c`** on the main menu. Classic Mode brings back the habits that made st
 | Ctrl+U / Ctrl+W | any prompt | erases the whole line / the previous word |
 | Ctrl+D | empty prompt | ends input: saves and exits |
 | Ctrl+C | anywhere | saves and exits |
-| Enter / b | long screens | next page / previous page |
-| < / > | long screens | the start / the end |
-| /word, then / | long screens | find a word (highlighted), then the next match |
-| q | long screens | stop paging |
-| a number or key | long screens | answers the next prompt straight away: on a long list, type the item's number at the pager prompt without paging to the end |
+| Space / b | long screens | next page / previous page |
+| Enter, ↓ / ↑ | long screens | one line down / up |
+| g / G | long screens | the start / the end (also `<` / `>`, Home / End) |
+| /word, n / N | long screens | find a word (highlighted), then the next / previous match |
+| h / q | long screens | every pager key / leave |
+| a number or key | long screens | leaves and answers the next prompt straight away: on a long list, type the item's number without paging to the end |
 
 On Linux, macOS and the BSDs, the academy reads keys one at a time (a small built-in line editor using termios from Go's standard library), so Ctrl+L works instantly and arrow keys are ignored instead of printing `^[[A`. The terminal is always restored on exit, including after Ctrl+C. Elsewhere (for example Windows), input stays line-based: press **Ctrl+L then Enter**, or type `clear`.
 
@@ -665,7 +700,11 @@ One package, one build target:
 | `linkcheck.go` | `-check-links` resource verifier |
 | `lineedit.go` | key-by-key line editor: Ctrl+L, Backspace, Ctrl+U/W, ignores escape sequences |
 | `term_*.go` | raw terminal mode via termios (Linux, macOS, BSD) and a line-mode fallback |
-| `pager.go` | pages long screens on interactive terminals |
+| `pagerfull.go` | the full-screen pager, like man and less (single keys, status line, search) |
+| `pager.go` | the line pager used where single keys are unavailable, and pager search |
+| `careers.go` | the career center: target roles, readiness, the job-search kit, the career export |
+| `careers_coding.go`, `careers_design.go` | coding interview patterns and problems; system design, behavioral, resume and job-search content |
+| `careerui.go` | career center screens: roles, readiness, portfolio, practice, mocks, story bank, resume, job search |
 | `termsize_*.go`, `sigwinch_*.go` | live terminal size (ioctl / Windows console API) and resize notifications |
 | `tools/layout_check.py` | overflow checker: renders every screen at chosen widths in a pseudo-terminal |
 | `classic.go` | Classic Mode: classic corners, struggle clock, notebook |
