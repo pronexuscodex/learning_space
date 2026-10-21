@@ -9,12 +9,18 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"regexp"
 	"runtime"
 	"runtime/debug"
 	"strings"
 )
 
 var version = "" // set at release build time
+
+// pseudoVersion matches the versions Go gives untagged commits, such as
+// v0.0.0-20260924…-77876a787eed or v1.6.3-0.20261021172350-6dd173726dfa:
+// they are shown as dev-<commit> instead.
+var pseudoVersion = regexp.MustCompile(`\d{14}-[0-9a-f]{12}`)
 
 // appVersion is the version shown to users.
 func appVersion() string {
@@ -27,7 +33,7 @@ func appVersion() string {
 	}
 	// A real tagged module version, but not a local pseudo-version such
 	// as v0.0.0-20260924…-77876a787eed+dirty.
-	if v := bi.Main.Version; v != "" && v != "(devel)" && !strings.HasPrefix(v, "v0.0.0-") && !strings.Contains(v, "+dirty") {
+	if v := bi.Main.Version; v != "" && v != "(devel)" && !pseudoVersion.MatchString(v) && !strings.Contains(v, "+dirty") {
 		return v
 	}
 	rev, dirty := "", false

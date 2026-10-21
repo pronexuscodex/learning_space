@@ -107,8 +107,9 @@ type fullPager struct {
 	find   pagerSearch
 	msg    string // shown in the status line until the next key
 
-	home     bool // opened from the main menu: menu keys go there
-	typedNow bool // the key that ended paging is a complete answer
+	home     bool   // opened from the main menu: menu keys go there
+	title    string // the page's own heading, for the status line
+	typedNow bool   // the key that ended paging is a complete answer
 }
 
 // homeKeys are the main menu's one-key choices. On a page opened from the
@@ -139,6 +140,7 @@ func (a *App) pageFullScreen(lines []string, o pageOpts, render func()) (pageRes
 	p := &fullPager{a: a, render: render, lines: lines, width: a.cols(), home: o.home}
 	p.find.current = -1
 	p.top = min(max(0, o.start), p.maxTop())
+	p.title = pageTitle(lines)
 	typed := p.run()
 	restoreTerminal()
 
@@ -309,24 +311,43 @@ func (p *fullPager) status() string {
 	keys := []string{
 		"Space next page · ↑↓ scroll · b back · / find · h help · q quit",
 		"Space next · b back · / find · h help · q quit",
-		"Space next · q quit",
+		"Space next · h help · q quit",
 		"q quit",
 	}
 	if p.home {
 		keys = []string{
 			"Space next page · ↑↓ scroll · / find · q quit · or press a menu key",
 			"Space next · b back · q quit · or a menu key",
-			"Space next · q quit",
+			"Space next · q quit · or a menu key",
 			"q quit",
 		}
 	}
 	if p.find.query != "" && len(p.find.matches) > 0 {
 		keys[0] = "Space next page · n/N next/previous match · h help · q quit"
 		keys[1] = "n next · N previous · h help · q quit"
-		keys[2] = "n next · q quit"
+		keys[2] = "n next · h help · q quit"
 	}
 	text := " " + where
+	// Like man, name the page when there is room for it with at least the
+	// short keys; otherwise the keys come first.
+	titled := false
+	if p.title != "" && p.msg == "" {
+		for _, k := range keys[:3] {
+			tail := " · " + where + " · " + k + " "
+			if room := cols - 1 - visibleLen(tail); room >= 12 {
+				t := truncate(p.title, min(28, room))
+				if head, _, ok := strings.Cut(p.title, " · "); ok && visibleLen(t) <= visibleLen(head)+4 {
+					t = truncate(head, room) // "START HERE", not "START HERE · …"
+				}
+				text, titled = " "+t+tail, true
+				break
+			}
+		}
+	}
 	for _, k := range keys {
+		if titled {
+			break
+		}
 		if t := " " + where + " · " + k + " "; visibleLen(t) <= cols {
 			text = t
 			break
@@ -423,4 +444,16 @@ func renderLines(a *App, render func()) []string {
 	render()
 	a.con.out = out
 	return strings.Split(strings.TrimRight(buf.String(), "\n"), "\n")
+}
+
+// pageTitle is a page's heading: its first line of text, without frames,
+// shortened for the status line ("START HERE · how to learn wi…").
+func pageTitle(lines []string) string {
+	for _, l := range lines {
+		t := strings.Trim(stripANSI(l), " ┏┃━╭│─═")
+		if t != "" {
+			return truncate(t, 28)
+		}
+	}
+	return ""
 }

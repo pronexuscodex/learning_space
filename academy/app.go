@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"math"
 	"os"
 	"strconv"
 	"strings"
@@ -146,11 +147,16 @@ func (a *App) println(s string)                  { fmt.Fprintln(a.con.out, s) }
 // Badges
 // ---------------------------------------------------------------------------
 
+// hoursText shows hours plainly: "4.75 h", "8.5 h", "0 h".
+func hoursText(h float64) string {
+	return strconv.FormatFloat(math.Round(h*100)/100, 'f', -1, 64) + " h"
+}
+
 func statusPill(s Status) string {
 	if s == StatusGraduated {
 		return sty.Bold(sty.Green("★ GRADUATED"))
 	}
-	return sty.Bold(sty.Yellow("◐ ACTIVE RESEARCH"))
+	return sty.Bold(sty.Yellow("◐ IN PROGRESS"))
 }
 
 func statusMark(s Status) string {
@@ -533,7 +539,7 @@ func (a *App) viewLedger() {
 		for _, l := range flow([]string{
 			color(sty.Bold("Track "+t.ID)) + " " + bar(grad, len(t.Stages), min(16, max(6, w-30)), color),
 			fmt.Sprintf("%d/%d stages graduated", grad, len(t.Stages)),
-			sty.Bold(fmt.Sprintf("%.2fh", roundHours(trackHours))),
+			sty.Bold(hoursText(roundHours(trackHours))),
 		}, sty.Gray(" · "), w, "  ") {
 			a.println(l)
 		}
@@ -543,7 +549,7 @@ func (a *App) viewLedger() {
 	cs := a.reg.stats(time.Now(), 60)
 	a.println("\n" + sty.Gray(strings.Repeat("─", w)))
 	for _, l := range flow([]string{
-		sty.Gray("Campus total") + " " + sty.Bold(fmt.Sprintf("%.2fh", roundHours(grand))) + fmt.Sprintf(" across %d lab(s)", a.reg.labCount()),
+		sty.Gray("Campus total") + " " + sty.Bold(hoursText(roundHours(grand))) + " across " + count(a.reg.labCount(), "lab"),
 		sty.Gray("Last 14d") + " " + sparkline(cs.activity[len(cs.activity)-14:]),
 		sty.Gray("last saved") + " " + formatTime(a.reg.LastCommit),
 	}, "   ", w, "  ") {
@@ -572,7 +578,7 @@ func (a *App) renderStageCard(s *Stage, color func(string) string) {
 	a.println("")
 	a.printf("  %s %s %s %s\n", color("╭─"), color(sty.Bold(fmt.Sprintf("Stage %d", s.ID))),
 		sty.Gray("·"), sty.Bold(truncate(s.Title, w-16)))
-	flowed("   ", statusPill(s.Status), sty.Gray(fmt.Sprintf("%.2fh logged · %d lab(s)", stageHours(s), len(s.Labs))))
+	flowed("   ", statusPill(s.Status), sty.Gray(hoursText(stageHours(s))+" logged · "+count(len(s.Labs), "lab")))
 	line(padRight(sty.Gray("Reading"), 10) + bar(read, total, barW, sty.Green) + " " + fmt.Sprintf("%d/%d", read, total))
 	line(padRight(sty.Gray("Concepts"), 10) + bar(studied, concepts, barW, sty.Blue) + " " + fmt.Sprintf("%d/%d", studied, concepts))
 	line(padRight(sty.Gray("Exercises"), 10) + bar(exDone, exTotal, barW, sty.Magenta) + " " + fmt.Sprintf("%d/%d", exDone, exTotal))
@@ -616,7 +622,7 @@ func (a *App) renderStageCard(s *Stage, color func(string) string) {
 	}
 	for _, l := range s.Labs {
 		id := sty.Gray(padRight(fmt.Sprintf("#%d", l.ID), 4))
-		hours := sty.Bold(fmt.Sprintf("%.2fh", l.HoursLogged))
+		hours := sty.Bold(hoursText(l.HoursLogged))
 		if inner >= 72 { // one row: name, hours, build, status
 			nameW := min(28, inner-46)
 			line(fmt.Sprintf("  %s %s %s %s  %s  %s", color("▸"), id,
@@ -651,6 +657,10 @@ func (a *App) listStages(track *Track) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	w := a.cols()
+	const countsW = 13 // "10/10 · 30/30", right-aligned so the numbers line up
+	if w-14-countsW-1 >= 24 {
+		a.printf("%s\n", sty.Gray(fmt.Sprintf("%*s", w-1, "concepts · exercises")))
+	}
 	for _, t := range a.reg.Tracks {
 		if track != nil && t.ID != track.ID {
 			continue
@@ -663,8 +673,7 @@ func (a *App) listStages(track *Track) {
 			exDone, exTotal := exerciseProgress(s)
 			state := a.reg.stageState(s)
 			mark := stateStyle(state)(stageStateGlyphs[state])
-			// Right-aligned in a fixed column, so two-digit counts line up.
-			counts := fmt.Sprintf("%25s", fmt.Sprintf("concepts %d/%d · ex %d/%d", studied, concepts, exDone, exTotal))
+			counts := fmt.Sprintf("%*s", countsW, fmt.Sprintf("%d/%d · %d/%d", studied, concepts, exDone, exTotal))
 			titleW := w - 14 - visibleLen(counts) - 1
 			if titleW < 24 { // too narrow for the counts: give the title the room
 				titleW, counts = w-14, ""
@@ -691,7 +700,7 @@ func (a *App) listLabs() bool {
 				nameW := max(12, min(32, w-36))
 				for i, row := range flow([]string{
 					color(padRight(fmt.Sprintf("#%d", l.ID), 4)) + " " + padRight(truncate(l.Name, nameW), nameW),
-					sty.Gray(fmt.Sprintf("stage %d", s.ID)) + " " + sty.Bold(fmt.Sprintf("%.2fh", l.HoursLogged)),
+					sty.Gray(fmt.Sprintf("stage %d", s.ID)) + " " + sty.Bold(hoursText(l.HoursLogged)),
 					statusMark(l.Status),
 				}, "  ", w-4, "") {
 					if i > 0 {
@@ -883,7 +892,7 @@ func (a *App) logHours() error {
 		l.Log = append(l.Log, HourEntry{At: time.Now().UTC().Truncate(time.Second), Hours: hours, Note: note})
 		total, name = l.HoursLogged, l.Name
 	})
-	a.con.ok("+%.2fh on %s — cumulative %s.", hours, sty.Bold(name), sty.Bold(fmt.Sprintf("%.2fh", total)))
+	a.con.ok("+%s on %s: %s in total.", hoursText(hours), sty.Bold(name), sty.Bold(hoursText(total)))
 	return nil
 }
 
@@ -936,8 +945,9 @@ func (a *App) toggleStage() error {
 	a.mu.Unlock()
 
 	if next == StatusGraduated && (read < total || studied < concepts || exDone < exTotal || activeLabs > 0 || !checkPassed) {
-		a.con.warn("Stage %d still has %d unread text(s), %d unstudied concept(s), %d open exercise(s) and %d active lab(s).",
-			id, total-read, concepts-studied, exTotal-exDone, activeLabs)
+		a.con.warn("Stage %d still has %s, %s, %s and %s.", id,
+			count(total-read, "unread text"), count(concepts-studied, "unstudied concept"),
+			count(exTotal-exDone, "open exercise"), count(activeLabs, "lab in progress", "labs in progress"))
 		if !checkPassed {
 			a.con.warn("Its mastery check has not been passed yet (Study Hall → Mastery check).")
 		}

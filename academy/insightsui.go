@@ -110,23 +110,32 @@ func (a *App) searchScreen() error {
 		return nil
 	}
 	shown := hits
-	if len(shown) > 15 {
-		shown = shown[:15]
+	if len(shown) > 60 { // enough to scan; more words narrow it down
+		shown = shown[:60]
 	}
-	a.printf("\n  %s\n", sty.Gray(fmt.Sprintf("%d match(es)%s", len(hits), map[bool]string{true: ", showing the best 15", false: ""}[len(hits) > 15])))
-	for i, h := range shown {
-		kind := map[string]func(string) string{HitConcept: sty.Blue, HitGlossary: sty.Cyan, HitResource: sty.Magenta, HitClassic: sty.Yellow, HitBlueprint: sty.Green, HitWord: sty.Cyan, HitMine: sty.Yellow,
-			HitPattern: sty.Green, HitDesign: sty.Blue, HitRole: sty.Green}[h.Kind]
-		where := fmt.Sprintf("Stage %-2d", h.Stage)
-		if h.Stage < 0 {
-			where = "general "
+	a.paged(false, func() {
+		note := count(len(hits), "match", "matches")
+		if len(hits) > len(shown) {
+			note += fmt.Sprintf(", showing the best %d: add a word to narrow it down", len(shown))
 		}
-		head := fmt.Sprintf("%s %s %s", kind(padRight(h.Kind, 9)), sty.Gray(where), sty.Bold(h.Title))
-		a.printf("  %s %s\n", sty.Cyan(fmt.Sprintf("%2d.", i+1)), truncate(stripANSI(head), a.cols()-7))
-		if h.Snippet != "" {
-			a.printf("      %s\n", sty.Gray(truncate(h.Snippet, a.cols()-8)))
+		a.printf("\n  %s\n", sty.Gray(note))
+		for i, h := range shown {
+			kind := map[string]func(string) string{HitConcept: sty.Blue, HitGlossary: sty.Cyan, HitResource: sty.Magenta, HitClassic: sty.Yellow, HitBlueprint: sty.Green, HitWord: sty.Cyan, HitMine: sty.Yellow,
+				HitPattern: sty.Green, HitDesign: sty.Blue, HitRole: sty.Green}[h.Kind]
+			where := fmt.Sprintf("Stage %-2d", h.Stage)
+			switch {
+			case h.Kind == HitPattern || h.Kind == HitDesign || h.Kind == HitRole:
+				where = "career  "
+			case h.Stage < 0:
+				where = "general "
+			}
+			head := fmt.Sprintf("%s %s %s", kind(padRight(h.Kind, 9)), sty.Gray(where), sty.Bold(h.Title))
+			a.printf("  %s %s\n", sty.Cyan(fmt.Sprintf("%2d.", i+1)), truncate(stripANSI(head), a.cols()-7))
+			if h.Snippet != "" {
+				a.printf("      %s\n", sty.Gray(truncate(h.Snippet, a.cols()-8)))
+			}
 		}
-	}
+	})
 	a.println("")
 	n, err := a.con.promptInt("Open which one?", func(n int) error {
 		if n < 1 || n > len(shown) {
