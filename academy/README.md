@@ -438,7 +438,7 @@ For every stage:
 - **Builds on:** the stages this one depends on, with a nudge if they are still thin.
 - **What you'll be able to do:** concrete outcomes, shown before you begin.
 - **Mastery overview:** a glyph per concept on the mastery ladder, and your mastery-check result.
-- **Concepts:** the six-part cards described above. Mark each one as understood once you could explain it to a friend.
+- **Concepts:** the six-part cards described above. Each card starts with what it **builds on**: the earlier concepts it needs, ticked when you have marked them as understood. Mark each one as understood once you could explain it to a friend.
 - **Exercise gym:** warm-up → practice → real-world, with hints and check-off.
 - **Glossary:** 8–15 words explained simply.
 - **Resource library:** free courses, books, papers, videos and tools with links, such as CS50, MIT OCW courses, OSTEP, CMU 15-445, PortSwigger Academy, ISL, and Karpathy's *Zero to Hero*.
@@ -686,7 +686,7 @@ The tests check:
 - **The v1 → v2 migration and stage merging.**
 - **Retention:** the scheduler's intervals grow and reset on a lapse; deck unlocking and due cards; each step of the mastery ladder.
 - **Classic Mode:** every stage has a complete classic corner with HTTPS links; the struggle clock's thresholds and early unlock; notebook and type-in progress survive a save round trip.
-- **Connections:** globally unique concept names; every concept has valid cross-links and a go-deeper pointer; prerequisites only point backwards; every resource uses HTTPS.
+- **Connections:** globally unique concept names; every concept has valid cross-links and a go-deeper pointer; stage and concept prerequisites only point backwards (so they cannot form a cycle), name real concepts, and agree with each other; every resource uses HTTPS.
 - **Layout:** display widths (emoji, CJK and combining marks), wrap and flow never exceed the width, and long prompts wrap.
 - **Guidance:** What's next ordering and its four-step limit, prerequisites, search AND semantics and ranking, snippets, daily minutes and the weekly comparison, focus sessions in stats, and the Markdown export.
 - **Goals, roadmap and achievements:** the calendar week's minutes, days and cards; the on-track rule; each stage state and its missing prerequisites; achievements awarded exactly once; backups deduplicated, rotated to 10, restored, and bad backups refused without touching the registry.
@@ -711,6 +711,7 @@ One package, one build target:
 | `retention.go` | review cards, SM-2 style scheduler, mastery ladder |
 | `review.go` | Daily Review and Mastery Check screens |
 | `connections.go` | concept cross-links, go-deeper pointers, stage prerequisites |
+| `prereqs.go` | concept prerequisites, and the next concept to learn with them first |
 | `linkcheck.go` | `-check-links` resource verifier |
 | `lineedit.go` | key-by-key line editor: Ctrl+L, Backspace, Ctrl+U/W, ignores escape sequences |
 | `term_*.go` | raw terminal mode via termios (Linux, macOS, BSD) and a line-mode fallback |

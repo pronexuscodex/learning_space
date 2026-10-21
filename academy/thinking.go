@@ -438,23 +438,11 @@ func percent(f float64) string { return strconv.Itoa(int(f*100+0.5)) + "%" }
 // Choosing what to learn and practise
 // ---------------------------------------------------------------------------
 
-// nextConcept is the next concept to learn: the first one not yet
-// understood in the current stage.
+// nextConcept is the next concept to learn (see nextToLearn): its
+// prerequisites come first.
 func (r *Registry) nextConcept() (stage, concept int, ok bool) {
-	s := r.currentStage()
-	if s == nil {
-		return 0, 0, false
-	}
-	g, found := guideFor(s.ID)
-	if !found {
-		return 0, 0, false
-	}
-	for i, c := range g.Concepts {
-		if !s.hasStudied(c.Name) {
-			return s.ID, i, true
-		}
-	}
-	return 0, 0, false
+	stage, concept, _, ok = r.nextToLearn()
+	return stage, concept, ok
 }
 
 // Practice is an exercise chosen for practice.
