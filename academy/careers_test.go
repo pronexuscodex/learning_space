@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 // Every role points at real stages and real lab blueprints, so the
@@ -269,5 +270,107 @@ func TestCareerScreensFit(t *testing.T) {
 				t.Errorf("%d columns: line is %d wide: %q", cols, w, stripANSI(line))
 			}
 		}
+	}
+}
+
+// A problem solved with hints comes back after redoAfter; solving it
+// alone clears it. Practised patterns join the review deck.
+func TestInterviewRedosAndPatternCards(t *testing.T) {
+	r := seedRegistry()
+	now := time.Date(2026, 10, 21, 12, 0, 0, 0, time.UTC)
+	p := codingPatterns[2]
+	topic := p.Name + ": " + p.Drills[0].Title
+	r.Career.Mocks = []MockRecord{{Kind: MockCoding, Topic: topic, At: now, Score: 4, Of: 4, Hints: 2}}
+	if len(r.interviewRedos(now.Add(24*time.Hour))) != 0 {
+		t.Error("a redo must not be due after one day")
+	}
+	due := r.interviewRedos(now.Add(redoAfter))
+	if len(due) != 1 || due[0].Drill.Title != p.Drills[0].Title {
+		t.Fatalf("the redo must be due after %v: %+v", redoAfter, due)
+	}
+	if sg, ok := r.interviewSuggestion(now.Add(redoAfter)); !ok || sg.Kind != SuggestInterview || !strings.Contains(sg.Title, p.Drills[0].Title) {
+		t.Errorf("What's next must offer the redo: %+v", sg)
+	}
+	found := false
+	for _, s := range r.nextSteps(now.Add(redoAfter)) {
+		found = found || s.Kind == SuggestInterview
+	}
+	if !found {
+		t.Error("the redo must appear in What's next")
+	}
+	r.Career.Mocks = append(r.Career.Mocks, MockRecord{Kind: MockCoding, Topic: topic, At: now.Add(4 * 24 * time.Hour), Score: 4, Of: 4})
+	if len(r.interviewRedos(now.Add(30*24*time.Hour))) != 0 {
+		t.Error("solving it alone clears the redo")
+	}
+
+	cards := 0
+	for _, c := range r.unlockedCards() {
+		if c.Kind == CardPattern {
+			cards++
+			if c.Concept != p.Name || c.StageID != NoStage || c.Q == "" || c.A == "" {
+				t.Errorf("bad pattern card %+v", c)
+			}
+		}
+	}
+	if cards != 2 {
+		t.Errorf("a practised pattern adds 2 review cards, got %d", cards)
+	}
+}
+
+func TestCareerIsFoundEverywhere(t *testing.T) {
+	kinds := map[string]bool{}
+	for _, q := range []string{"sliding window", "rate limiter", "security engineer"} {
+		for _, h := range search(q) {
+			kinds[h.Kind] = true
+		}
+	}
+	for _, k := range []string{HitPattern, HitDesign, HitRole} {
+		if !kinds[k] {
+			t.Errorf("search must find %s hits", k)
+		}
+	}
+
+	r := seedRegistry()
+	r.Career.Role = "ml"
+	now := time.Now()
+	fresh := r.awardAchievements(now)
+	got := map[string]bool{}
+	for _, a := range fresh {
+		got[a.ID] = true
+	}
+	if !got["target-role"] || got["first-mock"] {
+		t.Errorf("choosing a role earns Eyes on the Prize, and nothing more: %v", got)
+	}
+	card := stripANSI(strings.Join(r.shareCard(now, 80), "\n"))
+	if !strings.Contains(card, "Goal: Machine Learning") {
+		t.Errorf("the share card shows the goal:\n%s", card)
+	}
+	var out bytes.Buffer
+	a := &App{reg: r, width: 80, con: &console{out: &out}}
+	a.printHome()
+	if !strings.Contains(stripANSI(out.String()), "Goal Machine Learning / AI Engineer") {
+		t.Errorf("the home screen shows the goal:\n%s", out.String())
+	}
+	out.Reset()
+	r.Career.Mocks = []MockRecord{{Kind: MockCoding, Topic: "x: y", Score: 3, Of: 4, At: now}}
+	a.progressReport()
+	if !strings.Contains(stripANSI(out.String()), "Getting hired") || !strings.Contains(stripANSI(out.String()), "coding 1 (avg 75%)") {
+		t.Errorf("the progress report has a Getting hired section")
+	}
+}
+
+// With a target role, the workout's practice step can be an interview
+// problem.
+func TestWorkoutOffersInterviewPractice(t *testing.T) {
+	r := seedRegistry()
+	r.Career.Role = "backend"
+	input := "2\n" + "d\n" + "y\ny\ny\ny\n"
+	var out bytes.Buffer
+	a := &App{reg: r, width: 80, con: &console{in: bufio.NewReader(strings.NewReader(input)), out: &out}}
+	if _, err := a.runWorkoutStep(StepPractice, -1); err != nil {
+		t.Fatalf("%v\n%s", err, out.String())
+	}
+	if len(r.Career.Mocks) != 1 || r.Career.Mocks[0].Kind != MockCoding || r.Career.Mocks[0].Score != 4 {
+		t.Errorf("the interview problem must be recorded: %+v", r.Career.Mocks)
 	}
 }

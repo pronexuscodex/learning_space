@@ -185,6 +185,10 @@ func (c *console) redrawLine(buf []rune) {
 func (c *console) redrawForResize() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	if c.onResize != nil { // a full-screen view redraws itself
+		c.onResize()
+		return
+	}
 	if !c.editing || c.onClear == nil {
 		return
 	}

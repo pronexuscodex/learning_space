@@ -378,6 +378,11 @@ func (a *App) printHome() {
 	}
 	classic := a.reg.ClassicMode
 	day := a.reg.todayWorkout(now)
+	role, hasRole := roleByID(a.reg.Career.Role)
+	var ready float64
+	if hasRole {
+		ready = a.reg.readiness(role).Total
+	}
 	a.mu.Unlock()
 	w := a.cols()
 
@@ -402,6 +407,15 @@ func (a *App) printHome() {
 			a.println("  " + head + truncate(cur.Title, room) + tail)
 		} else {
 			a.println("  " + head + truncate(cur.Title, w-2-visibleLen(head)))
+		}
+	}
+	if hasRole {
+		tail := " " + bar(int(ready*100), 100, 8, sty.Green) + " " + sty.Gray(percent(ready)+" ready") + sty.Gray("  (e)")
+		head := sty.Gray("Goal ")
+		if room := w - 2 - visibleLen(head) - visibleLen(tail); room >= 12 {
+			a.println("  " + head + truncate(role.Name, room) + tail)
+		} else {
+			a.println("  " + head + truncate(role.Name, w-2-visibleLen(head)))
 		}
 	}
 	if classic {

@@ -18,10 +18,19 @@ versions follow [Semantic Versioning](https://semver.org/).
   - **A resume builder** that writes a bullet for each of your projects.
   - **A job search section:** a seven-item kit, an applications tracker with a response rate, and tips.
   - **An export,** `academy_career.md`.
+  - **Woven into the rest of the academy:**
+    - Practised interview patterns add two cards each to the Daily Review.
+    - Problems solved with hints come back after three days to redo alone.
+    - Today's workout can practise an interview problem.
+    - What's next suggests interview practice.
+    - Search finds patterns, design questions and roles.
+    - The home screen, share card and progress report show your goal and readiness.
+    - Eight career achievements are added.
 - **A full-screen pager, like `man` and `less`.** Long screens fill the terminal with only a status line at the bottom (`lines 24–46 of 129 35%`, `(END)`).
   - Keys act at once, without Enter: Space (next page), Enter or ↓ (one line), b (back a page), g / G (start / end), /word (search, with every match highlighted), n / N (next / previous match), h (every key) and q (leave).
   - The normal screen comes back afterwards, with what you were reading in view.
   - Typing a number or menu key leaves and answers what comes next.
+  - Resizing the window redraws the page at once, re-wrapped to the new width.
   - On Windows, or with `ACADEMY_PAGER=inline`, the line pager is used as before.
 
 ## [1.6.2] - 2026-10-15

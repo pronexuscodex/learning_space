@@ -110,8 +110,11 @@ func (a *App) reviewCard(card Card, n, total int) (int, error) {
 	if card.Concept != "" {
 		source += " · " + card.Concept
 	}
-	if card.Kind == CardWord {
+	switch card.Kind {
+	case CardWord:
 		source = "Programmer's dictionary"
+	case CardPattern:
+		source = "Interview patterns · " + card.Concept
 	}
 	head := fmt.Sprintf("  %s %s %s", sty.Green("┏━"), sty.Gray(fmt.Sprintf("%d/%d ·", n, total)),
 		sty.Bold(sty.Green(strings.ToUpper(card.Kind))))

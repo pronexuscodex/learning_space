@@ -26,13 +26,14 @@ type StudySession struct {
 
 // Suggestion kinds.
 const (
-	SuggestReview   = "review"
-	SuggestConcept  = "concept"
-	SuggestExercise = "exercise"
-	SuggestMastery  = "mastery"
-	SuggestTypeIn   = "type-in"
-	SuggestFocus    = "focus"
-	SuggestWatch    = "watch"
+	SuggestReview    = "review"
+	SuggestConcept   = "concept"
+	SuggestExercise  = "exercise"
+	SuggestMastery   = "mastery"
+	SuggestTypeIn    = "type-in"
+	SuggestFocus     = "focus"
+	SuggestWatch     = "watch"
+	SuggestInterview = "interview"
 )
 
 // Suggestion is one recommended next step.
@@ -141,6 +142,10 @@ exercises:
 		}
 	}
 
+	if sg, ok := r.interviewSuggestion(now); ok {
+		out = append(out, sg)
+	}
+
 	for _, s := range r.stageOrder() {
 		studied, total := conceptProgress(s)
 		if total > 0 && studied == total && (s.MasteryCheck == nil || !s.MasteryCheck.Passed) {
@@ -195,6 +200,9 @@ const (
 	HitBlueprint = "blueprint"
 	HitWord      = "word"
 	HitMine      = "yours"
+	HitPattern   = "pattern"
+	HitDesign    = "design"
+	HitRole      = "career"
 )
 
 // Hit is one search result.
@@ -293,6 +301,26 @@ func search(query string) []Hit {
 	for _, w := range vocab {
 		if matches(w.Word, strings.Join(w.Also, " "), w.Means) {
 			hits = append(hits, Hit{Kind: HitWord, Stage: w.Stage, Title: w.Word, Snippet: w.Means, score: 3 + titleScore(w.Word)})
+		}
+	}
+	// The career center: interview patterns, design questions and roles.
+	for i, p := range codingPatterns {
+		var drills []string
+		for _, d := range p.Drills {
+			drills = append(drills, d.Title, d.Task)
+		}
+		if matches(p.Name, p.Signal, p.Idea, strings.Join(drills, " ")) {
+			hits = append(hits, Hit{Kind: HitPattern, Stage: NoStage, Concept: i, Title: p.Name, Snippet: p.Signal, score: 2 + titleScore(p.Name)})
+		}
+	}
+	for i, p := range designPrompts {
+		if matches(p.Name, p.Prompt, strings.Join(p.Core, " ")) {
+			hits = append(hits, Hit{Kind: HitDesign, Stage: NoStage, Concept: i, Title: "Design: " + p.Name, Snippet: p.Prompt, score: 2 + titleScore(p.Name)})
+		}
+	}
+	for i, ro := range roles {
+		if matches(ro.Name, ro.Does, strings.Join(ro.Titles, " "), strings.Join(ro.Keywords, " ")) {
+			hits = append(hits, Hit{Kind: HitRole, Stage: NoStage, Concept: i, Title: ro.Name, Snippet: ro.Does, score: 2 + titleScore(ro.Name)})
 		}
 	}
 	sort.SliceStable(hits, func(i, j int) bool { return hits[i].score > hits[j].score })

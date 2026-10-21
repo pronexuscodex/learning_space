@@ -121,3 +121,40 @@ func TestReadKeyParsesSpecialKeys(t *testing.T) {
 		t.Errorf("a plain key after an escape sequence: got %q %q", r, name)
 	}
 }
+
+// resizeReader asks for a resize redraw before handing over its keys, as
+// a window resize would while the pager waits for a key.
+type resizeReader struct {
+	con  *console
+	keys string
+	done bool
+}
+
+func (r *resizeReader) Read(b []byte) (int, error) {
+	if !r.done {
+		r.done = true
+		r.con.redrawForResize()
+	}
+	return strings.NewReader(r.keys).Read(b)
+}
+
+func TestFullScreenRedrawsOnResize(t *testing.T) {
+	t.Setenv("LINES", "12")
+	t.Setenv("COLUMNS", "100")
+	t.Setenv("TERM", "xterm-256color")
+	var out bytes.Buffer
+	c := &console{out: &out, raw: true, screen: true, enterRaw: func() (func(), error) { return func() {}, nil }}
+	c.in = bufio.NewReader(&resizeReader{con: c, keys: "q"})
+	a := &App{reg: seedRegistry(), width: 100, pager: true, con: c}
+	a.paged(true, func() {
+		for i := 1; i <= 40; i++ {
+			a.println(fmt.Sprintf("line %d", i))
+		}
+	})
+	if n := strings.Count(out.String(), "lines 1–11 of 40"); n != 2 {
+		t.Errorf("a resize must redraw the page at once: %d draws", n)
+	}
+	if c.onResize != nil {
+		t.Error("the resize hook must be removed when the pager closes")
+	}
+}

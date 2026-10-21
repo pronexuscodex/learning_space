@@ -51,9 +51,14 @@ type MockRecord struct {
 	Topic   string    `json:"topic"`
 	At      time.Time `json:"at"`
 	Minutes int       `json:"minutes"`
-	Score   int       `json:"score"` // rubric points met
-	Of      int       `json:"of"`    // rubric points possible
+	Score   int       `json:"score"`           // rubric points met
+	Of      int       `json:"of"`              // rubric points possible
+	Hints   int       `json:"hints,omitempty"` // hints taken (coding problems)
 }
+
+// helped reports whether a coding problem was not yet solved alone: hints
+// were taken, or the rubric was not fully met.
+func (m MockRecord) helped() bool { return m.Hints > 0 || m.Score < m.Of }
 
 // Mock interview kinds.
 const (
@@ -514,4 +519,175 @@ func (r *Registry) careerMarkdown(now time.Time) string {
 // mdCell makes text safe inside a Markdown table cell.
 func mdCell(s string) string {
 	return strings.NewReplacer("|", "\\|", "\n", " ").Replace(s)
+}
+
+// drillByTopic finds the coding problem a mock record is about.
+func drillByTopic(topic string) (Pattern, Drill, bool) {
+	for _, p := range codingPatterns {
+		for _, d := range p.Drills {
+			if p.Name+": "+d.Title == topic {
+				return p, d, true
+			}
+		}
+	}
+	return Pattern{}, Drill{}, false
+}
+
+// InterviewRedo is a coding problem to do again, alone.
+type InterviewRedo struct {
+	Pattern Pattern
+	Drill   Drill
+	Last    MockRecord
+}
+
+// interviewRedos are the coding problems last solved with hints (or not
+// fully), at least redoAfter ago: the same think-first redo as for
+// curriculum exercises. A clean solve alone clears one.
+func (r *Registry) interviewRedos(now time.Time) []InterviewRedo {
+	latest := map[string]MockRecord{}
+	var order []string
+	for _, m := range r.Career.Mocks {
+		if m.Kind != MockCoding {
+			continue
+		}
+		if _, seen := latest[m.Topic]; !seen {
+			order = append(order, m.Topic)
+		}
+		if prev, ok := latest[m.Topic]; !ok || !m.At.Before(prev.At) {
+			latest[m.Topic] = m
+		}
+	}
+	var due []InterviewRedo
+	for _, topic := range order {
+		m := latest[topic]
+		if !m.helped() || now.Sub(m.At) < redoAfter {
+			continue
+		}
+		if p, d, ok := drillByTopic(topic); ok {
+			due = append(due, InterviewRedo{p, d, m})
+		}
+	}
+	sort.SliceStable(due, func(i, j int) bool { return due[i].Last.At.Before(due[j].Last.At) })
+	return due
+}
+
+// practisedPatterns are the coding patterns the learner has worked a
+// problem of, in the order of the pattern list.
+func (r *Registry) practisedPatterns() []Pattern {
+	done := map[string]bool{}
+	for _, m := range r.Career.Mocks {
+		if m.Kind == MockCoding {
+			if name, _, ok := strings.Cut(m.Topic, ": "); ok {
+				done[name] = true
+			}
+		}
+	}
+	var out []Pattern
+	for _, p := range codingPatterns {
+		if done[p.Name] {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
+// CardPattern is the review-card kind for interview patterns.
+const CardPattern = "interview pattern"
+
+// patternCards are the review cards for a practised pattern: spotting it
+// from the signals in a problem, and how it works. Recognising the
+// pattern fast is the skill a coding interview tests most.
+func patternCards(p Pattern) []Card {
+	return []Card{
+		{ID: "pattern :: " + p.Name + " :: spot", StageID: NoStage, Concept: p.Name, Kind: CardPattern,
+			Q: "Coding interview: which pattern do these signals point to, and why? " + p.Signal,
+			A: p.Name + ". " + p.Idea},
+		{ID: "pattern :: " + p.Name + " :: how", StageID: NoStage, Concept: p.Name, Kind: CardPattern,
+			Q: "How do you apply the “" + p.Name + "” pattern, what does it usually cost, and what is the classic mistake?",
+			A: strings.Join(p.Steps, " → ") + "\n\nCost: " + p.Cost + "\n\nWatch out: " + p.Pitfall},
+	}
+}
+
+// careerCards are the review cards from the career center.
+func (r *Registry) careerCards() []Card {
+	var cards []Card
+	for _, p := range r.practisedPatterns() {
+		cards = append(cards, patternCards(p)...)
+	}
+	return cards
+}
+
+// interviewSuggestion is the career step for What's next: a due redo of
+// an interview problem, or a weekly problem once there is a target role
+// and some foundations.
+func (r *Registry) interviewSuggestion(now time.Time) (Suggestion, bool) {
+	if redos := r.interviewRedos(now); len(redos) > 0 {
+		return Suggestion{Kind: SuggestInterview,
+			Title: "Redo an interview problem alone: " + redos[0].Drill.Title,
+			Why:   fmt.Sprintf("On %s you solved it with help. Solving it again from a blank page is what makes the pattern yours.", redos[0].Last.At.Format("2 January"))}, true
+	}
+	role, ok := roleByID(r.Career.Role)
+	if !ok {
+		return Suggestion{}, false
+	}
+	if rd := r.readiness(role); rd.Foundations < 0.2 {
+		return Suggestion{}, false
+	}
+	for _, m := range r.Career.Mocks {
+		if m.Kind == MockCoding && now.Sub(m.At) < 7*24*time.Hour {
+			return Suggestion{}, false
+		}
+	}
+	return Suggestion{Kind: SuggestInterview, Title: "Practise an interview problem (" + role.Name + ")",
+		Why: "One problem a week, worked aloud against the clock, keeps you ready to interview."}, true
+}
+
+// Career achievements.
+func init() {
+	readyFor := func(r *Registry, at float64) bool {
+		role, ok := roleByID(r.Career.Role)
+		return ok && r.readiness(role).Total >= at
+	}
+	achievements = append(achievements,
+		Achievement{"target-role", "Eyes on the Prize", "Chose the job you are aiming for.",
+			func(r *Registry, cs campusStats) bool { return r.Career.Role != "" }},
+		Achievement{"first-mock", "Under the Clock", "Took your first mock interview.",
+			func(r *Registry, cs campusStats) bool { return len(r.Career.Mocks) > 0 }},
+		Achievement{"pattern-spotter", "Pattern Spotter", "Practised a problem from 8 different interview patterns.",
+			func(r *Registry, cs campusStats) bool { return len(r.practisedPatterns()) >= 8 }},
+		Achievement{"storyteller", "Storyteller", "Wrote six STAR stories for behavioral interviews.",
+			func(r *Registry, cs campusStats) bool { return len(r.Career.Stories) >= targetStories }},
+		Achievement{"shipped", "Shipped It", "Finished a portfolio project for your target role, tests passing.",
+			func(r *Registry, cs campusStats) bool {
+				role, ok := roleByID(r.Career.Role)
+				if !ok {
+					return false
+				}
+				for _, p := range role.Projects {
+					for _, t := range r.Tracks {
+						for _, s := range t.Stages {
+							for _, l := range s.Labs {
+								if strings.EqualFold(l.Name, p) && (l.CompilationStatus == CompileTested || l.Status == StatusGraduated) {
+									return true
+								}
+							}
+						}
+					}
+				}
+				return false
+			}},
+		Achievement{"ready-to-apply", "Ready to Apply", "Reached 60% readiness for your target role.",
+			func(r *Registry, cs campusStats) bool { return readyFor(r, 0.6) }},
+		Achievement{"in-the-arena", "In the Arena", "Tracked your first job application.",
+			func(r *Registry, cs campusStats) bool { return len(r.Career.Applications) > 0 }},
+		Achievement{"offer", "Offer in Hand", "Reached the offer stage of an application.",
+			func(r *Registry, cs campusStats) bool {
+				for _, ap := range r.Career.Applications {
+					if ap.Stage == "Offer" {
+						return true
+					}
+				}
+				return false
+			}},
+	)
 }

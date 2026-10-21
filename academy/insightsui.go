@@ -74,6 +74,8 @@ func (a *App) doSuggestion(s Suggestion) error {
 		return a.focusTimer()
 	case SuggestWatch:
 		return a.techWatch()
+	case SuggestInterview:
+		return a.interviewProblem()
 	}
 	return nil
 }
@@ -94,7 +96,7 @@ func (a *App) nextHint() string {
 // ---------------------------------------------------------------------------
 
 func (a *App) searchScreen() error {
-	a.println(heading("SEARCH · concepts, glossary, resources, classics", sty.Blue, a.cols()))
+	a.println(heading("SEARCH · concepts, words, resources, interview prep", sty.Blue, a.cols()))
 	q, err := a.con.promptText("Search for", 80, true)
 	if err != nil {
 		return err
@@ -113,7 +115,8 @@ func (a *App) searchScreen() error {
 	}
 	a.printf("\n  %s\n", sty.Gray(fmt.Sprintf("%d match(es)%s", len(hits), map[bool]string{true: ", showing the best 15", false: ""}[len(hits) > 15])))
 	for i, h := range shown {
-		kind := map[string]func(string) string{HitConcept: sty.Blue, HitGlossary: sty.Cyan, HitResource: sty.Magenta, HitClassic: sty.Yellow, HitBlueprint: sty.Green, HitWord: sty.Cyan, HitMine: sty.Yellow}[h.Kind]
+		kind := map[string]func(string) string{HitConcept: sty.Blue, HitGlossary: sty.Cyan, HitResource: sty.Magenta, HitClassic: sty.Yellow, HitBlueprint: sty.Green, HitWord: sty.Cyan, HitMine: sty.Yellow,
+			HitPattern: sty.Green, HitDesign: sty.Blue, HitRole: sty.Green}[h.Kind]
 		where := fmt.Sprintf("Stage %-2d", h.Stage)
 		if h.Stage < 0 {
 			where = "general "
@@ -185,6 +188,12 @@ func (a *App) openHit(h Hit) error {
 		}
 	case HitBlueprint:
 		return a.showBlueprints(h.Stage, g)
+	case HitPattern:
+		return a.studyPattern(codingPatterns[h.Concept])
+	case HitDesign:
+		a.paged(false, func() { a.renderDesignPrompt(designPrompts[h.Concept], true) })
+	case HitRole:
+		a.paged(false, func() { a.renderRole(roles[h.Concept]) })
 	}
 	return nil
 }
@@ -564,6 +573,7 @@ func (a *App) progressReport() {
 	}
 
 	a.thinkingReport(w, now)
+	a.careerReport(w)
 
 	// Goals and achievements.
 	if g := a.reg.Goals; g != (Goals{}) {

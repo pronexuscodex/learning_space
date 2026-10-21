@@ -194,7 +194,7 @@ func (r *Registry) unlockedCards() []Card {
 			cards = append(cards, wordCard(w))
 		}
 	}
-	return cards
+	return append(cards, r.careerCards()...)
 }
 
 // dueCards returns unlocked cards due at now; cards never reviewed are due.

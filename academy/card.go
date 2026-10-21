@@ -63,6 +63,10 @@ func (r *Registry) shareCard(now time.Time, cols int) []string {
 		add("")
 		add(sty.Gray("Now: ") + truncate(fmt.Sprintf("Stage %d · %s", s.ID, s.Title), inner-5))
 	}
+	if role, ok := roleByID(r.Career.Role); ok {
+		ready := " · " + percent(r.readiness(role).Total) + " ready"
+		add(sty.Gray("Goal: ") + truncate(role.Name, inner-6-len(ready)) + sty.Green(ready))
+	}
 
 	out := []string{"╭" + strings.Repeat("─", inner+2) + "╮"}
 	for _, l := range body {
