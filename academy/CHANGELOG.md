@@ -24,6 +24,9 @@ After a walk through the app as a new learner, at 40, 80 and 160 columns:
   - Development builds show a short `dev-<commit>` instead of a long Go pseudo-version.
 
 ### Added
+- **Concept prerequisites.** Concepts now list the earlier concepts it builds on (167 links across 113 concepts in all 21 stages), shown at the top of its card with a tick for each one you have marked as understood.
+  - **What's next and Today's workout** use them. When the next concept builds on one you have not marked yet, they send you to the first missing step and say which concept it leads to. They do not stop you reading anything.
+  - **Tests check the graph:** every name is a real concept, every prerequisite comes earlier and agrees with the stage prerequisites (so there can be no cycle), and every concept from Stage 1 on lists at least one.
 - **Get hired: the career center** (`e`). It turns learning into the three things companies hire on: foundations, finished projects and interview skill.
   - **Five target roles:** Backend, Systems / Infrastructure, SRE / Platform, Security and ML / AI Engineer. For each: the work, who hires, the job titles to search for, the interview process, what the interviews test, the stages that prepare you, the portfolio projects employers value, resume skills and advice.
   - **A readiness score:** foundations, portfolio, interview practice and job-search kit, with the most useful next steps.

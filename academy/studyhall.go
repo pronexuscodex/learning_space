@@ -216,12 +216,13 @@ func (a *App) studyConceptAt(stageID int, g StageGuide, idx int) error {
 	already := s.hasStudied(c.Name)
 	note := s.Notes[c.Name]
 	level := a.reg.conceptMastery(s, c)
+	builds := a.reg.prereqsOf(c.Name)
 	done := make([]bool, len(c.Exercises))
 	for i := range c.Exercises {
 		done[i] = s.hasDone(c.Name, i)
 	}
 	a.mu.Unlock()
-	render := func() { a.renderConcept(c, idx+1, len(g.Concepts), g.Glossary, done, note, level) }
+	render := func() { a.renderConcept(c, idx+1, len(g.Concepts), g.Glossary, done, note, level, builds) }
 	res := a.pagedWith(pageOpts{recap: true}, render)
 	understood := false // said so after leaving the card early
 	for res.early && !res.typed {
@@ -311,7 +312,7 @@ func (a *App) studyConceptAt(stageID int, g StageGuide, idx int) error {
 
 // renderConcept prints a concept as a heavy-bordered reading card, going
 // from intuition (analogy, real life) to precision (details, diagram).
-func (a *App) renderConcept(c Concept, n, total int, glossary []Term, done []bool, note string, level int) {
+func (a *App) renderConcept(c Concept, n, total int, glossary []Term, done []bool, note string, level int, builds []Prereq) {
 	w := a.cols()
 	edge := sty.Blue("┃")
 	blank := func() { a.printf("  %s\n", edge) }
@@ -339,6 +340,30 @@ func (a *App) renderConcept(c Concept, n, total int, glossary []Term, done []boo
 		a.printf("  %s %s\n", lead, l)
 	}
 	paragraph(c.Summary, sty.Italic)
+
+	if len(builds) > 0 {
+		section("🧱 Builds on", sty.Blue)
+		unmet := 0
+		for _, p := range builds {
+			mark, tag := sty.Green("✓"), fmt.Sprintf(" (Stage %d)", p.Stage)
+			if !p.Met {
+				mark, tag, unmet = sty.Yellow("○"), fmt.Sprintf(" (Stage %d, not yet)", p.Stage), unmet+1
+			}
+			if visibleLen(p.Name+tag) <= w-10 {
+				a.printf("  %s   %s %s\n", edge, mark, p.Name+sty.Gray(tag))
+				continue
+			}
+			for i, l := range wrap(p.Name+tag, w-10, "") { // narrow screens: wrap, never cut
+				if i > 0 {
+					mark = " "
+				}
+				a.printf("  %s   %s %s\n", edge, mark, l)
+			}
+		}
+		if unmet > 0 {
+			paragraph("Not marked as understood yet. Read it first, or carry on if you already know it.", sty.Gray)
+		}
+	}
 
 	if c.Analogy != "" {
 		section("💬 In plain words", sty.Magenta)

@@ -106,19 +106,22 @@ func (r *Registry) nextSteps(now time.Time) []Suggestion {
 			Why:   "Reviews protect what you have already learned, so they come first. Most sessions take 5–15 minutes."})
 	}
 
-	if s := r.currentStage(); s != nil {
-		g, _ := guideFor(s.ID)
-		for i, c := range g.Concepts {
-			if !s.hasStudied(c.Name) {
-				why := "The next concept in your current stage."
-				if studied, _ := conceptProgress(s); studied == 0 {
-					why = "A good place to start: the stages this one builds on are covered."
-				}
-				out = append(out, Suggestion{Kind: SuggestConcept, Stage: s.ID, Concept: i,
-					Title: fmt.Sprintf("Study “%s” (Stage %d)", c.Name, s.ID), Why: why})
-				break
+	if id, i, unblocks, ok := r.nextToLearn(); ok {
+		_, s := r.findStage(id)
+		c := curriculum[id].Concepts[i]
+		why := "The next concept in your current stage."
+		switch {
+		case unblocks != "":
+			why = fmt.Sprintf("The first missing step before “%s” (Stage %d): it is not marked as understood yet.", unblocks, stageOfConcept(unblocks))
+		case s != nil && len(conceptPrereqs[c.Name]) > 0:
+			why = "The next concept in your current stage; everything it builds on is understood."
+		case s != nil:
+			if studied, _ := conceptProgress(s); studied == 0 {
+				why = "A good place to start: the stages this one builds on are covered."
 			}
 		}
+		out = append(out, Suggestion{Kind: SuggestConcept, Stage: id, Concept: i,
+			Title: fmt.Sprintf("Study “%s” (Stage %d)", c.Name, id), Why: why})
 	}
 
 	// The lowest open exercise of the earliest understood concept: warm-ups

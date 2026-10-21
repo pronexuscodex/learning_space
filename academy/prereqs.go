@@ -1,0 +1,255 @@
+package main
+
+// Concept prerequisites: which concepts each concept builds on. They make
+// "what should I learn next, and why?" answerable concept by concept. The
+// next-concept suggestion sends the learner to an unmet prerequisite first
+// and says which concept it unblocks, and every concept card lists what it
+// builds on.
+//
+// Rules, checked by TestConceptPrereqs:
+//   - every name is a concept in the curriculum;
+//   - a prerequisite comes earlier in the default order: an earlier
+//     concept of the same stage, or a concept in a stage that this stage
+//     builds on (stagePrereqs, followed transitively). Following the stages
+//     in order therefore never meets a missing prerequisite, and the graph
+//     cannot contain a cycle.
+//
+// Only edges that matter are listed. Within a stage the concepts are
+// already in teaching order, so most edges cross stages.
+
+// conceptPrereqs is keyed by Concept.Name, like conceptLinks.
+var conceptPrereqs = map[string][]string{
+	// ---- Stage 0
+	"From Source Code to Running Program":         {"The CPU at Work: Fetch, Decode, Execute", "Memory & Storage: Where Data Lives"},
+	"The Operating System: The Machine's Manager": {"From Source Code to Running Program"},
+	"Input & Output: Keys, Screens & Interrupts":  {"The Operating System: The Machine's Manager"},
+	"Booting: From Power Button to Login":         {"The Operating System: The Machine's Manager"},
+
+	// ---- Stage 1
+	"Your First C Program: Source, Compiler, Executable": {"From Source Code to Running Program"},
+	"Values, Types & Variables":                          {"Bits & Bytes: Everything Is a Number", "Your First C Program: Source, Compiler, Executable"},
+	"Control Flow: Decisions & Loops":                    {"Values, Types & Variables"},
+	"Functions & Decomposition":                          {"Control Flow: Decisions & Loops"},
+	"Memory, Addresses & Pointers":                       {"Memory & Storage: Where Data Lives", "Functions & Decomposition"},
+	"Collections: Lists, Dictionaries & Strings":         {"Memory, Addresses & Pointers"},
+	"Safe Input & Undefined Behavior":                    {"Collections: Lists, Dictionaries & Strings"},
+	"Debugging & Reading Errors":                         {"Functions & Decomposition"},
+
+	// ---- Stage 2
+	"Big-O: Measuring Growth":               {"Control Flow: Decisions & Loops"},
+	"Arrays, Linked Lists, Stacks & Queues": {"Big-O: Measuring Growth", "Memory, Addresses & Pointers", "Collections: Lists, Dictionaries & Strings"},
+	"Hash Tables":                           {"Arrays, Linked Lists, Stacks & Queues"},
+	"Trees, Heaps & Sorting":                {"Arrays, Linked Lists, Stacks & Queues", "Functions & Decomposition"},
+	"Graphs, BFS/DFS & Shortest Paths":      {"Arrays, Linked Lists, Stacks & Queues", "Trees, Heaps & Sorting"},
+
+	// ---- Stage 3
+	"Logic & Boolean Algebra":     {"Control Flow: Decisions & Loops"},
+	"Sets, Functions & Relations": {"Logic & Boolean Algebra"},
+	"Proof & Induction":           {"Logic & Boolean Algebra", "Control Flow: Decisions & Loops"},
+	"Counting & Combinatorics":    {"Sets, Functions & Relations"},
+	"Probability for Programmers": {"Counting & Combinatorics"},
+
+	// ---- Stage 4
+	"Binary & Number Representation":              {"Bits & Bytes: Everything Is a Number"},
+	"Logic Gates & Circuits":                      {"Logic & Boolean Algebra", "Binary & Number Representation"},
+	"Memory: Latches, Registers & RAM":            {"Logic Gates & Circuits"},
+	"The CPU: Datapath & Instruction Cycle":       {"Memory: Latches, Registers & RAM", "The CPU at Work: Fetch, Decode, Execute"},
+	"Pipelining, Branch Prediction & Parallelism": {"The CPU: Datapath & Instruction Cycle"},
+
+	// ---- Stage 5
+	"The Compilation Pipeline":                   {"Your First C Program: Source, Compiler, Executable", "From Source Code to Running Program"},
+	"Registers, the Stack & Calling Conventions": {"Functions & Decomposition", "The CPU: Datapath & Instruction Cycle"},
+	"Integers & Floating Point in Bits":          {"Binary & Number Representation", "Values, Types & Variables"},
+	"The Memory Hierarchy & Locality":            {"Memory & Storage: Where Data Lives", "Memory: Latches, Registers & RAM"},
+	"Parsing: Recursive Descent & Pratt":         {"The Compilation Pipeline", "Trees, Heaps & Sorting"},
+
+	// ---- Stage 6
+	"Processes & the Address Space":     {"The Operating System: The Machine's Manager", "The Compilation Pipeline"},
+	"Virtual Memory & Paging":           {"Processes & the Address Space", "Memory, Addresses & Pointers", "The Memory Hierarchy & Locality"},
+	"System Calls & Privilege":          {"The Operating System: The Machine's Manager", "Registers, the Stack & Calling Conventions"},
+	"Scheduling & Context Switches":     {"Processes & the Address Space", "Input & Output: Keys, Screens & Interrupts"},
+	"Synchronisation & Memory Ordering": {"Scheduling & Context Switches"},
+
+	// ---- Stage 7
+	"Durability: Page Cache, fsync & Atomic Rename": {"System Calls & Privilege", "Memory & Storage: Where Data Lives"},
+	"B-Trees":                        {"Trees, Heaps & Sorting", "The Memory Hierarchy & Locality"},
+	"LSM-Trees":                      {"B-Trees", "Durability: Page Cache, fsync & Atomic Rename"},
+	"Write-Ahead Logging & Recovery": {"Durability: Page Cache, fsync & Atomic Rename"},
+	"Transactions, Isolation & MVCC": {"Write-Ahead Logging & Recovery", "Synchronisation & Memory Ordering"},
+	"SQL & the Relational Model":     {"Sets, Functions & Relations", "B-Trees"},
+
+	// ---- Stage 8
+	"The Layered Stack & Encapsulation":         {"Networks: How Computers Talk"},
+	"TCP: Handshake, Flow & Congestion Control": {"The Layered Stack & Encapsulation"},
+	"Sockets & I/O Multiplexing":                {"TCP: Handshake, Flow & Congestion Control", "System Calls & Privilege"},
+	"Time, Clocks & Ordering":                   {"The Layered Stack & Encapsulation"},
+	"Consensus & Replication (Raft)":            {"Time, Clocks & Ordering"},
+	"HTTP, DNS & How the Web Works":             {"TCP: Handshake, Flow & Congestion Control"},
+
+	// ---- Stage 9
+	"The Command Line & Your Environment": {"The Operating System: The Machine's Manager"},
+	"Version Control with Git":            {"The Command Line & Your Environment"},
+	"Testing & Reliability":               {"Functions & Decomposition"},
+	"Software Design & Abstraction":       {"Functions & Decomposition", "Testing & Reliability"},
+	"From Code to Production":             {"Version Control with Git", "Testing & Reliability"},
+
+	// ---- Stage 10
+	"Web Vulnerabilities: Injection & XSS":           {"Thinking Like an Attacker: Threat Modelling", "HTTP, DNS & How the Web Works"},
+	"Hashing & Password Storage":                     {"Hash Tables"},
+	"Encryption: Symmetric & Public-Key":             {"Counting & Combinatorics"},
+	"TLS & Authentication on the Web":                {"Encryption: Symmetric & Public-Key", "HTTP, DNS & How the Web Works"},
+	"Memory-Safety Bugs: Overflows & Use-After-Free": {"Safe Input & Undefined Behavior", "Registers, the Stack & Calling Conventions"},
+	"Access Control: Who May Do What":                {"TLS & Authentication on the Web"},
+	"Network Attacks & Defences":                     {"TCP: Handshake, Flow & Congestion Control", "TLS & Authentication on the Web"},
+	"Secrets & the Software Supply Chain":            {"Thinking Like an Attacker: Threat Modelling", "Encryption: Symmetric & Public-Key"},
+	"Detection & Incident Response":                  {"Thinking Like an Attacker: Threat Modelling"},
+
+	// ---- Stage 11
+	"Finite Automata & Regular Expressions":     {"Sets, Functions & Relations"},
+	"Grammars & Pushdown Automata":              {"Finite Automata & Regular Expressions", "Arrays, Linked Lists, Stacks & Queues"},
+	"Turing Machines & Computability":           {"Grammars & Pushdown Automata"},
+	"The Halting Problem & Undecidability":      {"Turing Machines & Computability", "Proof & Induction"},
+	"Complexity Classes: P, NP & Hard Problems": {"Turing Machines & Computability", "Big-O: Measuring Growth"},
+
+	// ---- Stage 12
+	"Paradigms: Imperative, Object-Oriented & Functional": {"Functions & Decomposition"},
+	"Type Systems":                       {"Values, Types & Variables"},
+	"Memory Management":                  {"Memory, Addresses & Pointers", "Safe Input & Undefined Behavior"},
+	"Interpreters, Compilers & Runtimes": {"The Compilation Pipeline"},
+	"Concurrency Models":                 {"Paradigms: Imperative, Object-Oriented & Functional"},
+
+	// ---- Stage 13
+	"Matrices as Linear Maps":                      {"Sets, Functions & Relations"},
+	"Eigenvectors & the SVD":                       {"Matrices as Linear Maps"},
+	"Gradients, Jacobians & the Matrix Chain Rule": {"Matrices as Linear Maps"},
+	"Probability, Softmax & Cross-Entropy":         {"Probability for Programmers"},
+	"Optimisation: From Gradient Descent to Adam":  {"Gradients, Jacobians & the Matrix Chain Rule"},
+
+	// ---- Stage 14
+	"Descriptive Statistics & Distributions": {"Probability for Programmers"},
+	"Statistical Inference & Experiments":    {"Descriptive Statistics & Distributions"},
+	"Linear & Logistic Regression":           {"Descriptive Statistics & Distributions", "Optimisation: From Gradient Descent to Adam", "Probability, Softmax & Cross-Entropy"},
+	"Trees, Ensembles & Clustering":          {"Linear & Logistic Regression"},
+	"Evaluating Models Honestly":             {"Linear & Logistic Regression"},
+
+	// ---- Stage 15
+	"Computational Graphs & Reverse-Mode Autodiff": {"Gradients, Jacobians & the Matrix Chain Rule"},
+	"MLPs, Activations & Initialisation":           {"Computational Graphs & Reverse-Mode Autodiff", "Matrices as Linear Maps"},
+	"Residual Connections & Normalisation":         {"MLPs, Activations & Initialisation"},
+	"Attention & the Transformer":                  {"Residual Connections & Normalisation", "Probability, Softmax & Cross-Entropy"},
+	"The Training Loop & Generalisation":           {"MLPs, Activations & Initialisation", "Evaluating Models Honestly", "Optimisation: From Gradient Descent to Adam"},
+
+	// ---- Stage 16
+	"The GPU Execution Model":                      {"Pipelining, Branch Prediction & Parallelism", "Scheduling & Context Switches"},
+	"GPU Memory Hierarchy & Coalescing":            {"The GPU Execution Model", "The Memory Hierarchy & Locality"},
+	"The Roofline Model: Compute- vs Memory-Bound": {"GPU Memory Hierarchy & Coalescing"},
+	"Kernel Fusion & FlashAttention":               {"The Roofline Model: Compute- vs Memory-Bound", "Attention & the Transformer"},
+	"KV Cache, Batching & PagedAttention":          {"Attention & the Transformer", "Virtual Memory & Paging"},
+
+	// ---- Stage 17
+	"Secure Design Principles":   {"Thinking Like an Attacker: Threat Modelling", "Access Control: Who May Do What"},
+	"Handling Untrusted Input":   {"Web Vulnerabilities: Injection & XSS"},
+	"Writing Memory-Safe Code":   {"Memory-Safety Bugs: Overflows & Use-After-Free"},
+	"Security Code Review":       {"Handling Untrusted Input", "Writing Memory-Safe Code"},
+	"Automated Security Testing": {"Writing Memory-Safe Code"},
+
+	// ---- Stage 18
+	"Strong Authentication: MFA & Passkeys":                     {"TLS & Authentication on the Web", "Encryption: Symmetric & Public-Key"},
+	"Sessions, Tokens & Single Sign-On":                         {"Strong Authentication: MFA & Passkeys", "HTTP, DNS & How the Web Works"},
+	"Authorization Design: Roles, Attributes & Least Privilege": {"Access Control: Who May Do What"},
+	"Cloud Security & Shared Responsibility":                    {"Authorization Design: Roles, Attributes & Least Privilege"},
+	"Zero Trust: Never Trust the Network Alone":                 {"Strong Authentication: MFA & Passkeys", "Network Attacks & Defences"},
+
+	// ---- Stage 19
+	"Firewalls & Network Segmentation":            {"Network Attacks & Defences"},
+	"Logging & Telemetry":                         {"Detection & Incident Response"},
+	"Intrusion Detection: Signatures & Anomalies": {"Logging & Telemetry", "Probability for Programmers"},
+	"Detection Engineering with MITRE ATT&CK":     {"Intrusion Detection: Signatures & Anomalies"},
+	"Security Monitoring & Alert Triage":          {"Intrusion Detection: Signatures & Anomalies"},
+
+	// ---- Stage 20
+	"Incident Response Planning":          {"Detection & Incident Response"},
+	"Containment, Eradication & Recovery": {"Incident Response Planning"},
+	"Digital Forensics Basics":            {"Incident Response Planning", "Logging & Telemetry"},
+	"Blameless Post-Mortems":              {"Incident Response Planning"},
+	"Privacy & Data Protection":           {"Thinking Like an Attacker: Threat Modelling"},
+}
+
+// conceptAt locates a concept by name: its stage and its index there.
+func conceptAt(name string) (stageID, idx int, ok bool) {
+	for id, g := range curriculum {
+		for i, c := range g.Concepts {
+			if c.Name == name {
+				return id, i, true
+			}
+		}
+	}
+	return 0, 0, false
+}
+
+// Prereq is one prerequisite of a concept and whether it is met.
+type Prereq struct {
+	Name  string
+	Stage int
+	Met   bool // marked as understood
+}
+
+// prereqsOf lists a concept's prerequisites with their state.
+func (r *Registry) prereqsOf(name string) []Prereq {
+	var out []Prereq
+	for _, p := range conceptPrereqs[name] {
+		id, _, ok := conceptAt(p)
+		if !ok {
+			continue
+		}
+		met := true // a stage missing from the registry cannot block anything
+		if _, s := r.findStage(id); s != nil {
+			met = s.hasStudied(p)
+		}
+		out = append(out, Prereq{p, id, met})
+	}
+	return out
+}
+
+// firstUnmet returns the concept to learn before name: its earliest unmet
+// prerequisite, followed down to one whose own prerequisites are all met.
+// It returns "" when every prerequisite of name is met. Prerequisites
+// always come earlier in the curriculum, so the walk ends.
+func (r *Registry) firstUnmet(name string) string {
+	for _, p := range r.prereqsOf(name) {
+		if !p.Met {
+			if deeper := r.firstUnmet(p.Name); deeper != "" {
+				return deeper
+			}
+			return p.Name
+		}
+	}
+	return ""
+}
+
+// nextToLearn is the next concept to learn: the first one not yet
+// understood in the current stage, or, when that one builds on concepts
+// not yet understood, the first of those. unblocks names the concept the
+// detour leads back to ("" when there is no detour).
+func (r *Registry) nextToLearn() (stage, concept int, unblocks string, ok bool) {
+	s := r.currentStage()
+	if s == nil {
+		return 0, 0, "", false
+	}
+	g, found := guideFor(s.ID)
+	if !found {
+		return 0, 0, "", false
+	}
+	for i, c := range g.Concepts {
+		if s.hasStudied(c.Name) {
+			continue
+		}
+		if p := r.firstUnmet(c.Name); p != "" {
+			if id, idx, ok := conceptAt(p); ok {
+				return id, idx, c.Name, true
+			}
+		}
+		return s.ID, i, "", true
+	}
+	return 0, 0, "", false
+}
