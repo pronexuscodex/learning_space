@@ -511,6 +511,7 @@ func seedRegistry() *Registry {
 
 	return &Registry{
 		SchemaVersion:  schemaVersion,
+		TidyScreen:     true, // each action starts on a clean screen, so the scrollback stays readable
 		NextLabID:      1,
 		Reviews:        map[string]ReviewCard{},
 		ReviewHistory:  map[string]int{},

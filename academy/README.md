@@ -405,15 +405,19 @@ Keys never change, whatever the layout: wide terminals show two or three columns
 | Key | Action |
 |---|--------|
 | o | **Settings**: colour theme (default, high contrast, colour-blind friendly, monochrome), plain symbols instead of emoji, confidence ratings, Classic Mode, tidy screen, simple or detailed home screen |
-| 5 | **Exit**. Your progress is saved automatically after every action, so closing the window is fine too |
+| q | **Exit** (also `5`, `quit` or `exit`). Your progress is saved automatically after every action, so closing the window is fine too |
 | 8 | **Undo this session**: puts your progress back exactly as it was when you opened the academy, then exits (asks first) |
 | c | **Classic Mode** on/off: struggle clock, lab notebook, classic corners and type-ins |
-| t | **Tidy screen** on/off: every action starts on a clean screen |
+| t | **Tidy screen** on/off: every action starts on a clean screen, so the scrollback stays readable (on by default for new learners) |
 | ? | **All screens & keys** (also `h` or `help`): every screen, grouped, then every key; type a key on that page to go there · `clear` / `cls` clears the screen |
 
 Above the menu, a dashboard shows hours, labs, stages, texts, concepts, exercises, **mastered concepts** and **cards due for review**, plus mastery-weighted campus progress, a 14-day activity sparkline, and a study streak (logged hours, focus sessions and review days all count). If you have set weekly goals, a **This week** line tracks them. Below it, a **➜ Next** line names your best next step; press `n` to start it.
 
 Long screens (the ledger, Start Here, glossaries, resources, concept cards, the dictionary, the notebook) open full screen, like `man`. The text fills the terminal and only a status line sits at the bottom: where you are (`lines 24–46 of 129 35%`, `(END)`) and the keys. Keys act at once, without Enter. **Space** next page, **Enter** or **↓** one line, **b** back a page, **g** / **G** the start / the end, **/word** find a word (every match is highlighted; **n** and **N** go to the next and previous match), **h** every key, **q** leave. When you leave, the normal screen comes back, with the part you were reading in view for the question that follows. Typing a number or a menu key leaves and answers whatever comes next, so you never have to page to the end of a list to pick from it.
+
+Pages you open from the main menu (Start Here, All screens & keys, the ledger, the progress report, achievements) take the menu's keys: press `d` there and the Dictionary opens at once. Read them with Space, the arrows, PgUp/PgDn and `q`.
+
+Leave a concept card before the end and the academy does not ask whether you understand it: it shows the key idea and how far you read, and offers to read the rest from where you stopped, to mark it understood, or to come back later.
 
 Full-screen paging needs a terminal that delivers single keys: Linux, macOS and the BSDs. On Windows, and with `ACADEMY_PAGER=inline`, long screens are paged in the normal scrollback: a prompt under each page takes the same keys followed by Enter, and is erased once answered. Paging switches on only when you are typing at a real terminal; piped or scripted input is unaffected.
 

@@ -106,17 +106,25 @@ type fullPager struct {
 	top    int
 	find   pagerSearch
 	msg    string // shown in the status line until the next key
+
+	home     bool // opened from the main menu: menu keys go there
+	typedNow bool // the key that ended paging is a complete answer
 }
+
+// homeKeys are the main menu's one-key choices. On a page opened from the
+// main menu they leave the page and go there at once, as the page says;
+// paging there uses Space, the arrows, PgUp/PgDn, Home/End, b and q.
+const homeKeys = "0123456789jnmdfgpakwlxoctesr+?"
 
 // pageFullScreen shows lines in the full-screen pager. It returns false,
 // having shown nothing, when the terminal cannot switch to single keys.
 // After it, with finalPause off, the part of the text last on screen is
 // printed again, so the question that follows has it in view.
-func (a *App) pageFullScreen(lines []string, finalPause bool, render func()) bool {
+func (a *App) pageFullScreen(lines []string, o pageOpts, render func()) (pageResult, bool) {
 	c := a.con
 	restore, err := c.rawMode()
 	if err != nil {
-		return false
+		return pageResult{}, false
 	}
 	leave := func() {
 		fmt.Fprint(c.out, altScreenOff)
@@ -128,19 +136,26 @@ func (a *App) pageFullScreen(lines []string, finalPause bool, render func()) boo
 	termMu.Unlock()
 
 	fmt.Fprint(c.out, altScreenOn)
-	p := &fullPager{a: a, render: render, lines: lines, width: a.cols()}
+	p := &fullPager{a: a, render: render, lines: lines, width: a.cols(), home: o.home}
 	p.find.current = -1
-	prefill := p.run()
+	p.top = min(max(0, o.start), p.maxTop())
+	typed := p.run()
 	restoreTerminal()
 
-	if !finalPause {
-		top, end := p.top, min(p.top+p.bodyRows(), len(p.lines))
-		a.println(strings.Join(p.lines[top:end], "\n"))
+	end := min(p.top+p.bodyRows(), len(p.lines))
+	res := pageResult{early: end < len(p.lines), top: p.top, end: end, read: end * 100 / max(1, len(p.lines)), typed: typed != ""}
+	// Without finalPause a question follows: keep what was on screen in
+	// view for it, unless the caller sums up an early exit itself.
+	if !o.finalPause && !(o.recap && res.early && !res.typed) {
+		a.println(strings.Join(p.lines[p.top:end], "\n"))
 	}
-	if prefill != "" {
-		c.prefill = []rune(prefill)
+	switch {
+	case typed != "" && p.typedNow:
+		c.typeAhead(typed) // a menu key: go there at once
+	case typed != "":
+		c.prefill = []rune(typed) // the start of an answer: go on typing
 	}
-	return true
+	return res, true
 }
 
 // bodyRows is how many text rows fit above the status line.
@@ -197,6 +212,10 @@ func (p *fullPager) run() string {
 // to pass on when it was typed to answer what comes next.
 func (p *fullPager) key(r rune, name string) (bool, string) {
 	body := p.bodyRows()
+	if p.home && name == "" && strings.ContainsRune(homeKeys, r) && !(r == 'n' && p.find.query != "") {
+		p.typedNow = true
+		return true, string(r)
+	}
 	switch {
 	case r == 'q' || r == 'Q' || name == keyEsc:
 		return true, ""
@@ -293,6 +312,14 @@ func (p *fullPager) status() string {
 		"Space next · q quit",
 		"q quit",
 	}
+	if p.home {
+		keys = []string{
+			"Space next page · ↑↓ scroll · / find · q quit · or press a menu key",
+			"Space next · b back · q quit · or a menu key",
+			"Space next · q quit",
+			"q quit",
+		}
+	}
 	if p.find.query != "" && len(p.find.matches) > 0 {
 		keys[0] = "Space next page · n/N next/previous match · h help · q quit"
 		keys[1] = "n next · N previous · h help · q quit"
@@ -354,13 +381,17 @@ var pagerHelp = []string{
 	"  b  PgUp             previous page",
 	"  Enter  j  ↓         one line down",
 	"  k  ↑                one line up",
-	"  d  /  u             half a page down / up",
+	"  d · u               half a page down · up",
 	"  g  <  Home          the start",
 	"  G  >  End           the end",
 	"  /word               find a word (every match is highlighted)",
 	"  n  /  N             next / previous match",
 	"  q  Esc              quit and continue",
 	"  a number or key     quit, and use it as your answer to what comes next",
+	"",
+	"On pages opened from the main menu (Start Here, All screens & keys,",
+	"the ledger, the progress report…), the menu's keys go straight to",
+	"their screen: use Space, the arrows and q there to read.",
 	"",
 	"These are the keys of man and less, so they work there too.",
 	"",

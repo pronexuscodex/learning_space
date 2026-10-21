@@ -31,34 +31,34 @@ KEYS = [
   "4\r", "\r"*2,            # resources
   "5\r", "n\r",             # blueprints
   "8\r", "1\r", "\r", "n\r", "3\r",  # classic corner → type-in lab listing → skip prediction → not run → back
-  "10\r",                   # back to main
+  "q\r",                    # back to main
   "n\r", "q\r",             # what's next, then cancel
   "/\r", "memory cache\r", "1\r", "\r"*3, "n\r",  # search → open first hit (a concept) → don't mark
   "f\r", "\r", "1\r", "a goal that is rather long for a narrow terminal\r", "p", "p", "s", # focus timer, stop at once
   "p\r", "\r"*3,            # progress report (paged)
   "x\r",                    # export notes
   "g\r", "\r", "\r", "\r",   # weekly goals: accept the suggestions
-  "m\r", "\r"*3, "2\r", "10\r",  # roadmap → open stage 2's Study Hall → back
+  "m\r", "\r"*3, "2\r", "q\r",  # roadmap → open stage 2's Study Hall → back
   "a\r", "\r"*3,            # achievements
   "k\r",                    # share card
-  "j\r", "2\r", "1\r", "1\r", "y\r", "Everything in a computer is a number made of bits\r",  # workout: skip review, nothing to recall yet, learn the first concept
+  "j\r", "1\r", "y\r", "Everything in a computer is a number made of bits\r",  # workout: review and recall pass by themselves (nothing yet), learn the first concept
   "1\r", "2\r", "2\r", "2\r", "y\r", "3\r",  # practice: climb all three rungs, done, "with the hint"
   "1\r", "Choosing between bits and bytes\r", "n\r",  # reflect
   "p\r", "\r"*4,          # progress report, now with "Thinking for yourself"
   "?\r", "\r"*4,            # all screens & keys
   "o\r", "1\r", "3\r", "2\r", "6\r", "7\r",  # settings: colour-blind theme, plain symbols, detailed home (the rest of the run checks them)
   "l\r", "1\r", WAIT, "q\r",  # library → try downloading the first PDF (wait for it: keys typed during a download are echoed onto its progress line) → back
-  "d\r", "type casting\r", "1\r", "\r", "c\r", "4\r", "1\r", "\r", "a\r", "q\r", "q\r", "q\r",  # dictionary: word → related → categories → A–Z
+  "d\r", "type casting\r", "1\r", "\r", "c\r", "4\r", "1\r", "\r", "a\r", "q\r", "q\r",  # dictionary: word → related → categories → A–Z
   "+\r", "a\r", "Modern C, a free book on writing C well\r", "https://example.org/modern-c.pdf\r", "1\r", "5\r", "A long note that should wrap neatly at every terminal width\r", "q\r",  # my resources
   "w\r", "1\r", "q\r", "4\r", "q\r", "5\r", "q\r", "7\r",  # tech watch: method, radar, sources
   "e\r", "1\r", "4\r", "y\r", "2\r", "\r"*3,  # career center: security role → target → readiness
   "3\r", "q\r",            # portfolio projects
   "4\r", "1\r", "1\r", "\r", "d\r", "y\r", "y\r", "n\r", "y\r", "q\r",  # a coding problem with one hint, scored
   "5\r", "2\r", "n\r", "q\r",  # system design: the rate limiter
-  "6\r", "q\r", "8\r", "9\r", "a\r", "Acme Security\r", "Associate Security Engineer\r", "\r", "k1\r", "q\r",  # stories, resume, job search
-  "11\r",                  # back to the main menu
+  "6\r", "q\r", "8\r", "q\r", "9\r", "a\r", "Acme Security\r", "Associate Security Engineer\r", "\r", "k1\r", "q\r",  # stories, resume, job search
+  "q\r",                   # back to the main menu
   "9\r", "q\r",             # daily review intro, then stop
-  "c\r", "y\r", "6\r", "1\r", "2\r", "5\r", "2\r", "y\r", "n\r", "n\r", "q\r", "10\r", "c\r", "y\r",  # Classic Mode: struggle clock message, then off again
+  "c\r", "y\r", "6\r", "1\r", "2\r", "5\r", "2\r", "y\r", "n\r", "n\r", "q\r", "q\r", "c\r", "y\r",  # Classic Mode: struggle clock message, then off again
   "5\r",                    # commit & exit
 ]
 
@@ -84,7 +84,10 @@ def run(cols, rows=60):
                 except OSError: return
     read(1.0)
     pause = re.compile(r"(── (“[^”]*” \d+/\d+ · )?\d+% · Enter[^─]*──|── Enter · q ──)\s*$")
-    for k in KEYS:
+    before_last = 0
+    for i, k in enumerate(KEYS):
+        if i == len(KEYS) - 1:
+            before_last = len(out)
         if k == WAIT:
             for _ in range(360):
                 tail = ANSI.sub("", out[-200:].decode("utf-8", "replace")).split("\r")[-1]
@@ -108,6 +111,11 @@ def run(cols, rows=60):
     if os.environ.get("LAYOUT_DUMP"):
         with open(os.environ["LAYOUT_DUMP"] + f".{cols}.txt", "w") as f: f.write(text)
     bad = []
+    # The script must reach its last key: an early exit (a q that landed on
+    # the main menu after the keys fell out of step) would skip screens
+    # silently and still look clean.
+    if b"See you next time" in out[:before_last]:
+        bad.append((999, "the app exited before the end of the key script: the keys are out of step with the screens"))
     for line in text.split("\n"):
         if "http" in line:   # long URLs are left for the terminal to wrap
             continue

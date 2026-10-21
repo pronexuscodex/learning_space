@@ -61,10 +61,21 @@ func (a *App) dailyWorkout() error {
 		if done {
 			continue
 		}
+		info := workoutInfo[step]
+		if empty := a.emptyStep(step); empty != "" {
+			// Nothing to do in this step today: say so and move on,
+			// rather than asking "Ready?" first.
+			a.mutate(func(r *Registry) {
+				if day := r.workoutFor(time.Now()); !day.has(step) {
+					day.Done = append(day.Done, step)
+				}
+			})
+			a.con.say(sty.Gray("✓"), fmt.Sprintf("%s · %s: %s", fmt.Sprintf("Step %d", n+1), info.Title, empty), sty.Gray)
+			continue
+		}
 		a.println("")
 		a.println(a.workoutChecklist())
-		info := workoutInfo[step]
-		a.printf("\n  %s %s\n", sty.Bold(sty.Green(fmt.Sprintf("Step %d of %d", n+1, len(workoutSteps)))), sty.Bold(info.Title))
+		a.printf("\n  %s %s %s\n", sty.Bold(sty.Green(fmt.Sprintf("Step %d of %d", n+1, len(workoutSteps)))), sty.Gray("·"), sty.Bold(info.Title))
 		for _, l := range wrap(info.Why, w-6, "    ") {
 			a.println(sty.Gray(l))
 		}
@@ -224,4 +235,33 @@ func (a *App) reflect() error {
 		a.con.ok("You did the thinking yourself. That is how understanding is built.")
 	}
 	return nil
+}
+
+// emptyStep says why a workout step has nothing to do today, or "" when
+// it has.
+func (a *App) emptyStep(step string) string {
+	now := time.Now()
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	switch step {
+	case StepReview:
+		if len(a.reg.dueCards(now)) == 0 {
+			return "nothing is due, your memory is up to date"
+		}
+	case StepRecall:
+		if len(a.reg.recallCandidates(now)) == 0 {
+			return "nothing to recall yet; once you understand a concept, it comes back here"
+		}
+	case StepLearn:
+		if _, _, ok := a.reg.nextConcept(); !ok {
+			return "every available concept is understood; use the time for a mastery check or a lab"
+		}
+	case StepPractice:
+		if _, ok := a.reg.practicePick(now, -1, func(int) int { return 0 }); !ok {
+			if _, hasRole := roleByID(a.reg.Career.Role); !hasRole {
+				return "no open exercises yet; understand a concept first and its exercises appear here"
+			}
+		}
+	}
+	return ""
 }

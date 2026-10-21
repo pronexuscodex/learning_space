@@ -20,7 +20,7 @@ func renderHome(t *testing.T, r *Registry, cols int) string {
 // detailed dashboard and every menu item.
 func TestHomeScreens(t *testing.T) {
 	newbie := renderHome(t, seedRegistry(), 80)
-	for _, want := range []string{"No streak yet", "Today 0 min", "Nothing due", "[j] Today's workout", "[0] Start Here", "[?] All screens & keys", "[5] Exit"} {
+	for _, want := range []string{"No streak yet", "Today 0 min", "Nothing due", "[j] Today's workout", "[0] Start Here", "[?] All screens & keys", "[q] Exit"} {
 		if !strings.Contains(newbie, want) {
 			t.Errorf("simple home for a new learner lacks %q:\n%s", want, newbie)
 		}

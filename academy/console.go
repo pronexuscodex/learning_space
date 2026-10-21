@@ -114,29 +114,45 @@ func (c *console) note(format string, args ...any) {
 // (set by main; 80 when unset).
 var layoutWidth = func() int { return 80 }
 
-// promptLabel renders "  Label (hint) › ". The hint is dropped when the
-// prompt would take more than about half of a narrow terminal's width.
+// promptLabel renders "  Label (hint) › ". Long labels wrap to the
+// screen's width, keeping room on the last line to type; a label that is
+// a list of choices ("a add · e edit · q back") breaks only between
+// choices. A hint that does not fit goes on its own line above.
 func promptLabel(label, hint string) string {
 	w := layoutWidth()
-	lines := wrap(label, w*2/3, "")
+	room := max(24, w-12) // the input shares the last line
+	lines := breakChoices(label, room)
 	for i := range lines {
 		lines[i] = "  " + sty.Bold(lines[i])
 	}
 	s := strings.Join(lines, "\n") // long questions wrap; the input stays on the last line
 	if hint != "" {
-		if visibleLen(lines[len(lines)-1])+visibleLen(hint)+6 <= w*2/3 {
+		if visibleLen(lines[len(lines)-1])+visibleLen(hint)+6 <= w-6 { // still room to type
 			s += " " + sty.Gray("("+hint+")")
 		} else {
 			// Too long to share the line: the hint goes on its own line
 			// above the question, never dropped (it often says what to type).
 			var above []string
-			for _, l := range wrap(hint, w-4, "  ") {
-				above = append(above, sty.Gray(l))
+			for _, l := range breakChoices(hint, w-4) {
+				above = append(above, sty.Gray("  "+l))
 			}
 			s = strings.Join(above, "\n") + "\n" + s
 		}
 	}
 	return s + sty.Cyan(" › ")
+}
+
+// breakChoices wraps text to width; when it is a list of choices joined
+// by " · ", it breaks only between choices.
+func breakChoices(text string, width int) []string {
+	if !strings.Contains(text, " · ") {
+		return wrap(text, width, "")
+	}
+	var lines []string
+	for _, l := range flow(strings.Split(text, " · "), " · ", width, "") {
+		lines = append(lines, wrap(l, width, "")...) // a single choice wider than the line still wraps
+	}
+	return lines
 }
 
 // sanitize strips control characters (tabs become spaces), invalid UTF-8

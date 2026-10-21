@@ -46,9 +46,31 @@ func termHeight() int {
 // paged to the end. With finalPause, it also waits after the last page,
 // so the screen stays visible until the learner is ready to go on.
 func (a *App) paged(finalPause bool, render func()) {
+	a.pagedWith(pageOpts{finalPause: finalPause}, render)
+}
+
+// pageOpts adjust how pagedWith shows a screen.
+type pageOpts struct {
+	finalPause bool // wait after the last page
+	home       bool // opened from the main menu: its keys leave the page and go there at once
+	recap      bool // the caller sums up when the reader leaves early: do not reprint the view
+	start      int  // the line to open at
+}
+
+// pageResult says how the reader left a paged screen.
+type pageResult struct {
+	early bool // left before reaching the end
+	top   int  // the first line on screen when they left
+	end   int  // the line after the last one on screen
+	read  int  // how far they got, in percent
+	typed bool // left by typing an answer to what comes next
+}
+
+// pagedWith is paged with options, reporting how the reader left.
+func (a *App) pagedWith(o pageOpts, render func()) pageResult {
 	if !a.pager {
 		render()
-		return
+		return pageResult{read: 100}
 	}
 	var buf bytes.Buffer
 	out := a.con.out
@@ -59,11 +81,17 @@ func (a *App) paged(finalPause bool, render func()) {
 	lines := strings.Split(strings.TrimRight(buf.String(), "\n"), "\n")
 	// Like man: a long text (or one to read before going back to the
 	// menu) gets the whole screen, when keys can be read one at a time.
-	if a.fullScreenOK() && (finalPause || len(lines) > termHeight()-2) && a.pageFullScreen(lines, finalPause, render) {
-		return
+	if a.fullScreenOK() && (o.finalPause || len(lines) > termHeight()-2) {
+		if res, ok := a.pageFullScreen(lines, o, render); ok {
+			return res
+		}
 	}
+	finalPause := o.finalPause
 	pageSize := max(5, termHeight()-2)
-	top := 0
+	top := min(max(0, o.start), max(0, len(lines)-pageSize))
+	result := func(end int, typed bool) pageResult {
+		return pageResult{early: end < len(lines), top: top, end: end, read: end * 100 / max(1, len(lines)), typed: typed}
+	}
 	var find pagerSearch
 	draw, clear := true, false
 	after := "" // a note shown under the page, once
@@ -88,22 +116,22 @@ func (a *App) paged(finalPause bool, render func()) {
 		draw, clear, after = true, false, ""
 		last := end == len(lines)
 		if last && !finalPause && find.query == "" {
-			return
+			return result(end, false)
 		}
 
 		s, err := a.con.readLine(a.pagerPrompt(top, end, len(lines), &find) + " ")
 		if err != nil {
-			return
+			return result(end, false)
 		}
 		// Like man and less: the prompt disappears once answered, so it
 		// never sits in the middle of the text.
 		a.con.eraseLastLine()
 		switch {
 		case isCancel(s):
-			return
+			return result(end, false)
 		case s == "":
 			if last {
-				return
+				return result(end, false)
 			}
 			top = end
 		case (s == "b" || s == "B") && top > 0:
@@ -127,7 +155,7 @@ func (a *App) paged(finalPause bool, render func()) {
 			// Anything else is the answer to what comes next: no need to
 			// page to the end first.
 			a.con.typeAhead(s)
-			return
+			return result(end, true)
 		}
 	}
 }

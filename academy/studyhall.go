@@ -29,8 +29,10 @@ func (a *App) studyHallFor(stageID int) error {
 		return nil
 	}
 
+	full := true // the whole overview the first time; afterwards a short header
 	for {
-		a.renderStageSyllabus(stageID, guide)
+		a.renderStageSyllabus(stageID, guide, full)
+		full = false
 		a.mu.Lock()
 		_, st := a.reg.findStage(stageID)
 		exDone, exTotal := exerciseProgress(st)
@@ -45,8 +47,10 @@ func (a *App) studyHallFor(stageID int) error {
 			fmt.Sprintf("%s %s", sty.Bold("Mastery check"), sty.Gray(fmt.Sprintf("(mixed exam, %d%% to pass)", int(masteryPassMark*100)))),
 			fmt.Sprintf("%s %s", sty.Bold("Classic corner"), sty.Gray("(anchor book, classic text, real source, type-in lab)")),
 			fmt.Sprintf("%s %s", sty.Bold("PDF library"), sty.Gray(fmt.Sprintf("(%d free books and papers to download)", len(a.libraryEntries(stageID))))),
-			"Back to main menu",
 		})
+		if errors.Is(err, errCancel) {
+			return nil // q: back to the main menu
+		}
 		if err != nil {
 			return err
 		}
@@ -89,7 +93,8 @@ func (a *App) studyHallFor(stageID int) error {
 }
 
 // renderStageSyllabus prints the stage overview and the concept checklist.
-func (a *App) renderStageSyllabus(stageID int, g StageGuide) {
+// Without full, only the title, mastery and the concept checklist.
+func (a *App) renderStageSyllabus(stageID int, g StageGuide, full bool) {
 	a.mu.Lock()
 	t, s := a.reg.findStage(stageID)
 	color := trackColor(t.ID)
@@ -115,8 +120,12 @@ func (a *App) renderStageSyllabus(stageID int, g StageGuide) {
 	a.mu.Unlock()
 
 	a.printf("\n  %s %s %s\n", color(sty.Bold(fmt.Sprintf("Stage %d", stageID))), sty.Gray("·"), sty.Bold(truncate(title, a.cols()-14)))
-	for _, l := range wrap(g.Overview, a.cols()-4, "  ") {
-		a.println(sty.Italic(l))
+	if !full {
+		prereqs, g.Outcomes = nil, nil
+	} else {
+		for _, l := range wrap(g.Overview, a.cols()-4, "  ") {
+			a.println(sty.Italic(l))
+		}
 	}
 	if len(prereqs) > 0 {
 		a.println("")
@@ -165,8 +174,10 @@ func (a *App) renderStageSyllabus(stageID int, g StageGuide) {
 		legend = append(legend, masteryBadge(i)+" "+sty.Gray(n))
 	}
 	legend = append(legend, sty.Gray("●●● = exercises done"))
-	for _, l := range flow(legend, "  ", w, "  ") {
-		a.println(l)
+	if full {
+		for _, l := range flow(legend, "  ", w, "  ") {
+			a.println(l)
+		}
 	}
 	numWidth := len(fmt.Sprint(len(g.Concepts))) + 1 // "9." or "10.", so the names line up
 	for i, c := range g.Concepts {
@@ -183,15 +194,17 @@ func (a *App) renderStageSyllabus(stageID int, g StageGuide) {
 // (asking the learner to explain it in their own words) or lets them
 // refresh their explanation.
 func (a *App) studyConcept(stageID int, g StageGuide) error {
-	names := make([]string, len(g.Concepts))
-	for i, c := range g.Concepts {
-		names[i] = c.Name
-	}
-	idx, err := a.con.promptChoice("Concept", names)
+	// The concepts are listed, numbered, just above.
+	n, err := a.con.promptInt(fmt.Sprintf("Which concept? (1–%d, from the list above)", len(g.Concepts)), func(n int) error {
+		if n < 1 || n > len(g.Concepts) {
+			return fmt.Errorf("choose a concept from 1 to %d", len(g.Concepts))
+		}
+		return nil
+	})
 	if err != nil {
 		return err
 	}
-	return a.studyConceptAt(stageID, g, idx)
+	return a.studyConceptAt(stageID, g, n-1)
 }
 
 // studyConceptAt opens concept idx of a stage directly (used by the Study
@@ -208,15 +221,45 @@ func (a *App) studyConceptAt(stageID int, g StageGuide, idx int) error {
 		done[i] = s.hasDone(c.Name, i)
 	}
 	a.mu.Unlock()
-	a.paged(false, func() { a.renderConcept(c, idx+1, len(g.Concepts), g.Glossary, done, note, level) })
+	render := func() { a.renderConcept(c, idx+1, len(g.Concepts), g.Glossary, done, note, level) }
+	res := a.pagedWith(pageOpts{recap: true}, render)
+	understood := false // said so after leaving the card early
+	for res.early && !res.typed {
+		// Left before the end: sum up instead of asking straight away
+		// whether a half-read card is understood.
+		a.println("")
+		a.printf("  %s %s\n", sty.Bold(sty.Cyan(truncate(c.Name, a.cols()-22))), sty.Gray(fmt.Sprintf("· you read %d%%", res.read)))
+		for _, l := range wrap("Key idea: "+c.Summary, a.cols()-6, "    ") {
+			a.println(l)
+		}
+		options := []string{"Read the rest (from where you stopped)", "Continue"}
+		if !already {
+			options = []string{"Read the rest (from where you stopped)", "I understand it: mark it and explain it in my own words", "Not yet: back to the Study Hall"}
+		}
+		n, err := a.con.promptChoice("What now?", options)
+		if errors.Is(err, errCancel) || (err == nil && n == 2) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		if n == 0 {
+			res = a.pagedWith(pageOpts{recap: true, start: max(0, res.end-2)}, render) // two lines of context
+			continue
+		}
+		understood = !already
+		break
+	}
 
 	if !already {
-		yes, err := a.con.confirm("Do you understand it well enough to explain it to a friend?")
-		if err != nil || !yes {
-			if err == nil {
-				a.con.note("No rush. Re-read the analogy, try the warm-up exercise, then come back.")
+		if !understood {
+			yes, err := a.con.confirm("Do you understand it well enough to explain it to a friend?")
+			if err != nil || !yes {
+				if err == nil {
+					a.con.note("No rush. Re-read the analogy, try the warm-up exercise, then come back.")
+				}
+				return err
 			}
-			return err
 		}
 		a.con.note("Now explain it in your own words; putting it into your own words is what makes it stick.")
 		text, err := a.con.promptText("Your explanation (Enter to skip)", maxNotesLen, false)
