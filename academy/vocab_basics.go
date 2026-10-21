@@ -418,7 +418,7 @@ letters[-1]    # "c": Python counts backwards from -1`,
 		"An ordered collection that can grow and shrink. Python's list, C++'s vector and Go's slice are dynamic arrays under the hood.",
 		"A shopping list: add items, cross some out, keep the order.",
 		`todo = ["milk"]
-todo.append("eggs")      # ["milk", "eggs"]`,
+todo.append("eggs")      # todo is now ["milk", "eggs"]`,
 		"Inserting at the front of a dynamic array moves every other item. Adding at the end is cheap.",
 		[]string{"Array", "Linked list", "Big-O notation"}},
 	{"Dictionary", []string{"dict", "hash map", "hash table", "map", "associative array", "object (JSON)"}, "Types & data", 2,

@@ -443,7 +443,7 @@ var extras = map[int]stageExtras{
 		Glossary: []Term{
 			{"CPU", "The chip that executes instructions, one tiny step at a time, billions of times per second."},
 			{"Instruction", "One basic command the CPU understands, such as 'add these two numbers' or 'jump to here'."},
-			{"Register", "A tiny, ultra-fast storage slot inside the CPU; the CPU can only do maths on values held in registers."},
+			{"Register", "A tiny, ultra-fast storage slot inside the CPU; most of the CPU's maths works on values held in registers."},
 			{"Assembly", "A human-readable spelling of machine instructions, such as 'add rax, rbx'."},
 			{"Compiler", "A program that translates code you write (C, Go, Rust) into machine instructions."},
 			{"Linker", "The tool that stitches separately compiled pieces into one runnable program."},

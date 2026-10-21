@@ -52,6 +52,10 @@ After a walk through the app as a new learner, at 40, 80 and 160 columns:
 
 ### Fixed
 - The link check (`-check-links` and the weekly Links workflow) failed whenever a site's own server was failing, such as Complexity Zoo answering 503 for hours. A server error (5xx) that persists after the retry is now a warning, like a site that does not answer; a 404, a moved page or a fake PDF still fails.
+- A full correctness pass over the teaching content. Every coding drill was solved, the reference solutions were checked, and every quiz answer, exercise hint, type-in program and number in the lessons was recomputed. Four wordings were fixed:
+  - the dictionary's List example could be read as `append` returning the new list;
+  - Commit and Migration still described saving and schema versions from before 1.6.0;
+  - the Stage 5 glossary said the CPU can do maths only on registers.
 
 ## [1.6.2] - 2026-10-15
 
