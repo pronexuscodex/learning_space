@@ -166,6 +166,23 @@ func (a *App) runWorkoutStep(step string, learnedStage int) (int, error) {
 		return stage, a.studyConceptAt(stage, g, ci)
 	case StepPractice:
 		a.mu.Lock()
+		role, hasRole := roleByID(a.reg.Career.Role)
+		redos := len(a.reg.interviewRedos(now))
+		a.mu.Unlock()
+		if hasRole {
+			interview := "An interview problem for " + role.Name + " (25–45 min, aloud)"
+			if redos > 0 {
+				interview = "An interview problem to redo alone (" + count(redos, "is", "are") + " due)"
+			}
+			n, err := a.con.promptChoice("Practise what?", []string{"An exercise from the curriculum (mixed topics)", interview})
+			if err != nil {
+				return -1, err
+			}
+			if n == 1 {
+				return -1, a.interviewProblem()
+			}
+		}
+		a.mu.Lock()
 		p, ok := a.reg.practicePick(now, learnedStage, rand.Intn)
 		a.mu.Unlock()
 		if !ok {

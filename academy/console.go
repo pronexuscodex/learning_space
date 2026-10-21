@@ -47,6 +47,10 @@ type console struct {
 	// comes next: the next raw prompt starts with it, ready to go on.
 	prefill []rune
 
+	// onResize, when set, redraws a full-screen view after the terminal
+	// is resized (called under mu, before any other redraw).
+	onResize func()
+
 	// enterRaw switches to single keys (tests replace it); nil means the
 	// real terminal.
 	enterRaw func() (func(), error)
@@ -62,6 +66,13 @@ type console struct {
 func (c *console) setOnClear(f func()) {
 	c.mu.Lock()
 	c.onClear = f
+	c.mu.Unlock()
+}
+
+// setOnResize installs (or removes) the full-screen redraw hook.
+func (c *console) setOnResize(f func()) {
+	c.mu.Lock()
+	c.onResize = f
 	c.mu.Unlock()
 }
 

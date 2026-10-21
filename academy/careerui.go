@@ -64,6 +64,7 @@ func (a *App) careerCenter() error {
 		if err != nil && !errors.Is(err, errCancel) {
 			return err
 		}
+		a.announceAchievements()
 	}
 }
 
@@ -116,6 +117,18 @@ func (a *App) renderCareerHome() {
 	}
 	for _, l := range wrap(rd.verdict(), w-4, "  ") {
 		a.println(sty.Green(l))
+	}
+	a.mu.Lock()
+	redos := a.reg.interviewRedos(time.Now())
+	a.mu.Unlock()
+	if len(redos) > 0 {
+		for i, l := range wrap(fmt.Sprintf("%d interview problem%s to redo alone, starting with \"%s\" (Mock interview [7])", len(redos), plural(len(redos)), redos[0].Drill.Title), w-12, "") {
+			lead := "  " + sty.Bold(sty.Cyan("Redo ▸")) + " "
+			if i > 0 {
+				lead = "         "
+			}
+			a.println(lead + l)
+		}
 	}
 	if len(steps) > 0 {
 		for i, l := range wrap(steps[0], w-12, "") {
@@ -398,33 +411,60 @@ func (a *App) portfolio() error {
 func (a *App) codingPractice() error {
 	a.paged(false, a.renderInterviewMethod)
 	for {
+		a.mu.Lock()
+		done := map[string]bool{}
+		for _, p := range a.reg.practisedPatterns() {
+			done[p.Name] = true
+		}
+		a.mu.Unlock()
 		var names []string
 		for _, p := range codingPatterns {
-			names = append(names, p.Name)
+			mark := sty.Gray("○ ")
+			if done[p.Name] {
+				mark = sty.Green("✓ ")
+			}
+			names = append(names, mark+p.Name)
 		}
 		a.println("")
 		n, err := a.con.promptChoice("Which pattern?", names)
 		if err != nil {
 			return err
 		}
-		p := codingPatterns[n]
-		a.paged(false, func() { a.renderPattern(p) })
-		var drills []string
-		for _, d := range p.Drills {
-			drills = append(drills, "Practise: "+d.Title)
-		}
-		a.println("")
-		d, err := a.con.promptChoice("Practise a problem?", drills)
-		if errors.Is(err, errCancel) {
-			continue
-		}
-		if err != nil {
-			return err
-		}
-		if err := a.codingSession(p, p.Drills[d]); err != nil {
+		if err := a.studyPattern(codingPatterns[n]); err != nil && !errors.Is(err, errCancel) {
 			return err
 		}
 	}
+}
+
+// studyPattern shows a pattern and offers one of its problems.
+func (a *App) studyPattern(p Pattern) error {
+	a.paged(false, func() { a.renderPattern(p) })
+	var drills []string
+	for _, d := range p.Drills {
+		drills = append(drills, "Practise: "+d.Title)
+	}
+	a.println("")
+	d, err := a.con.promptChoice("Practise a problem?", drills)
+	if err != nil {
+		return err
+	}
+	return a.codingSession(p, p.Drills[d])
+}
+
+// interviewProblem starts the most useful coding problem now: a due redo,
+// otherwise one not yet practised.
+func (a *App) interviewProblem() error {
+	a.mu.Lock()
+	redos := a.reg.interviewRedos(time.Now())
+	mocks := append([]MockRecord(nil), a.reg.Career.Mocks...)
+	a.mu.Unlock()
+	if len(redos) > 0 {
+		a.con.say(sty.Cyan("↻"), fmt.Sprintf("A redo: on %s you solved this one with help. Now do it alone.", redos[0].Last.At.Format("2 January")), sty.Cyan)
+		return a.codingSession(redos[0].Pattern, redos[0].Drill)
+	}
+	p, d := pickDrill(mocks, rand.IntN)
+	a.con.note("Pattern: %s. Work it aloud, as in an interview.", p.Name)
+	return a.codingSession(p, d)
 }
 
 // renderInterviewMethod prints how to work any coding problem.
@@ -582,11 +622,11 @@ func (a *App) codingSession(p Pattern, d Drill) error {
 		return err
 	}
 	a.mutate(func(r *Registry) {
-		r.Career.Mocks = append(r.Career.Mocks, MockRecord{Kind: MockCoding, Topic: p.Name + ": " + d.Title, At: time.Now(), Minutes: minutes, Score: score, Of: len(codingRubric)})
+		r.Career.Mocks = append(r.Career.Mocks, MockRecord{Kind: MockCoding, Topic: p.Name + ": " + d.Title, At: time.Now(), Minutes: minutes, Score: score, Of: len(codingRubric), Hints: hints})
 	})
-	note := ""
-	if hints > 0 {
-		note = fmt.Sprintf(" You used %d hint%s: try a problem of the same pattern again in a few days without them.", hints, plural(hints))
+	note := " Its two pattern cards are now in your Daily Review [9]."
+	if hints > 0 || score < len(codingRubric) {
+		note = fmt.Sprintf(" It comes back in %d days to redo alone, from a blank page; its pattern cards are in your Daily Review [9].", int(redoAfter.Hours()/24))
 	}
 	a.con.ok("Recorded: %d/%d on the rubric, %d min.%s", score, len(codingRubric), minutes, note)
 	return nil
@@ -893,7 +933,14 @@ func (a *App) mockInterview() error {
 	}
 	switch n {
 	case 0:
+		a.mu.Lock()
+		redos := a.reg.interviewRedos(time.Now())
+		a.mu.Unlock()
 		p, d := pickDrill(mocks, rand.IntN)
+		if len(redos) > 0 {
+			p, d = redos[0].Pattern, redos[0].Drill
+			a.con.say(sty.Cyan("↻"), fmt.Sprintf("A redo: on %s you solved this one with help. Now do it alone.", redos[0].Last.At.Format("2 January")), sty.Cyan)
+		}
 		a.con.note("Pattern hidden: spotting it is part of the test. Timer starts now.")
 		hidden := Pattern{Name: p.Name}
 		return a.codingSession(hidden, d)
@@ -1246,4 +1293,52 @@ func (a *App) exportCareer() error {
 	a.con.ok("Exported your career kit to %s", path)
 	a.con.note("Copy the bullets into your resume, the stories into your interview notes, and keep it with your applications.")
 	return nil
+}
+
+// careerReport is the progress report's "Getting hired" section. Caller
+// holds a.mu (the progress report renders under the lock).
+func (a *App) careerReport(w int) {
+	c := a.reg.Career
+	role, hasRole := roleByID(c.Role)
+	if !hasRole && len(c.Mocks) == 0 && len(c.Stories) == 0 && len(c.Applications) == 0 {
+		return
+	}
+	a.printf("\n  %s\n", sty.Bold("Getting hired"))
+	if hasRole {
+		rd := a.reg.readiness(role)
+		a.printf("    %s %s %s\n", bar(int(rd.Total*100), 100, min(16, w-30), sty.Green), sty.Bold(percent(rd.Total)), sty.Gray("ready"))
+		for _, l := range wrap(role.Name, w-6, "    ") {
+			a.println(l)
+		}
+	}
+	kinds := []struct{ kind, name string }{{MockCoding, "coding"}, {MockDesign, "system design"}, {MockBehavioral, "behavioral"}}
+	var parts []string
+	for _, k := range kinds {
+		n, got, of := 0, 0, 0
+		for _, m := range c.Mocks {
+			if m.Kind == k.kind {
+				n++
+				got += m.Score
+				of += m.Of
+			}
+		}
+		if n > 0 {
+			parts = append(parts, fmt.Sprintf("%s %d (avg %s)", k.name, n, pct(got, of)))
+		}
+	}
+	if len(parts) > 0 {
+		for _, l := range wrap("Mock interviews: "+strings.Join(parts, " · "), w-6, "    ") {
+			a.println(sty.Gray(l))
+		}
+	}
+	line := fmt.Sprintf("Stories %d · applications %d", len(c.Stories), len(c.Applications))
+	if rate, ok := responseRate(c.Applications); ok {
+		line += " · response rate " + percent(rate)
+	}
+	if redos := a.reg.interviewRedos(time.Now()); len(redos) > 0 {
+		line += fmt.Sprintf(" · %d problem%s to redo", len(redos), plural(len(redos)))
+	}
+	for _, l := range wrap(line, w-6, "    ") {
+		a.println(sty.Gray(l))
+	}
 }

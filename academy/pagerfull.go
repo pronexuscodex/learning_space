@@ -167,58 +167,76 @@ func (p *fullPager) relayout() {
 }
 
 // run handles keys until the reader leaves. It returns a key typed to
-// answer whatever comes next, if that is how the reader left.
+// answer whatever comes next, if that is how the reader left. The state
+// changes under the console lock, which the resize handler also takes to
+// redraw at once when the window changes size.
 func (p *fullPager) run() string {
 	c := p.a.con
+	c.setOnResize(func() { p.relayout(); p.draw() })
+	defer c.setOnResize(nil)
 	for {
+		c.mu.Lock()
 		p.relayout()
 		p.draw()
 		p.msg = ""
+		c.mu.Unlock()
 		r, name, err := c.readKey()
 		if err != nil {
 			return ""
 		}
-		body := p.bodyRows()
-		switch {
-		case r == 'q' || r == 'Q' || name == keyEsc:
-			return ""
-		case r == ' ' || r == 'f' || r == 0x06 || r == 0x16 || name == keyPageDown:
-			p.scroll(body)
-		case r == '\n' || r == '\r' || r == 'j' || r == 0x0e || r == 0x05 || name == keyDown:
-			p.scroll(1)
-		case r == 'k' || r == 0x10 || r == 0x19 || name == keyUp:
-			p.scroll(-1)
-		case r == 'b' || r == 0x02 || name == keyPageUp:
-			p.scroll(-body)
-		case r == 'd' || r == 0x04:
-			p.scroll(body / 2)
-		case r == 'u' || r == 0x15:
-			p.scroll(-body / 2)
-		case r == 'g' || r == '<' || name == keyHome:
-			p.top = 0
-		case r == 'G' || r == '>' || name == keyEnd:
-			p.top = p.maxTop()
-		case r == '/':
-			if q, ok := p.ask("/"); ok && q != "" {
-				p.find = newPagerSearch(p.lines, q)
-				p.jump(p.find.next(p.top))
-			}
-		case (r == 'n' || r == 'N') && p.find.query != "":
-			if r == 'n' {
-				p.jump(p.find.next(p.top))
-			} else {
-				p.jump(p.find.prev(p.top))
-			}
-		case r == 'h' || r == 'H' || r == '?':
-			p.help()
-		case r == keyCtrlL || name != "" || r == 0:
-			// redraw / an unused special key
-		case unicode.IsPrint(r):
-			// A number or a menu key: leave, and let it answer what comes
-			// next (the reader goes on typing there).
-			return string(r)
+		c.mu.Lock()
+		leave, typed := p.key(r, name)
+		c.mu.Unlock()
+		if leave {
+			return typed
 		}
 	}
+}
+
+// key applies one key. It reports whether the reader leaves, and the key
+// to pass on when it was typed to answer what comes next.
+func (p *fullPager) key(r rune, name string) (bool, string) {
+	body := p.bodyRows()
+	switch {
+	case r == 'q' || r == 'Q' || name == keyEsc:
+		return true, ""
+	case r == ' ' || r == 'f' || r == 0x06 || r == 0x16 || name == keyPageDown:
+		p.scroll(body)
+	case r == '\n' || r == '\r' || r == 'j' || r == 0x0e || r == 0x05 || name == keyDown:
+		p.scroll(1)
+	case r == 'k' || r == 0x10 || r == 0x19 || name == keyUp:
+		p.scroll(-1)
+	case r == 'b' || r == 0x02 || name == keyPageUp:
+		p.scroll(-body)
+	case r == 'd' || r == 0x04:
+		p.scroll(body / 2)
+	case r == 'u' || r == 0x15:
+		p.scroll(-body / 2)
+	case r == 'g' || r == '<' || name == keyHome:
+		p.top = 0
+	case r == 'G' || r == '>' || name == keyEnd:
+		p.top = p.maxTop()
+	case r == '/':
+		if q, ok := p.ask("/"); ok && q != "" {
+			p.find = newPagerSearch(p.lines, q)
+			p.jump(p.find.next(p.top))
+		}
+	case (r == 'n' || r == 'N') && p.find.query != "":
+		if r == 'n' {
+			p.jump(p.find.next(p.top))
+		} else {
+			p.jump(p.find.prev(p.top))
+		}
+	case r == 'h' || r == 'H' || r == '?':
+		p.help()
+	case r == keyCtrlL || name != "" || r == 0:
+		// redraw / an unused special key
+	case unicode.IsPrint(r):
+		// A number or a menu key: leave, and let it answer what comes
+		// next (the reader goes on typing there).
+		return true, string(r)
+	}
+	return false, ""
 }
 
 // jump moves to a search result, with the match on the second row.
@@ -233,6 +251,7 @@ func (p *fullPager) jump(at int, note string) {
 
 // draw paints the screen: the text, then the status line.
 func (p *fullPager) draw() {
+	p.top = min(p.top, p.maxTop()) // the window may have grown
 	var b strings.Builder
 	b.WriteString("\x1b[H")
 	body := p.bodyRows()

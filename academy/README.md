@@ -341,6 +341,16 @@ Press **`e`**. Companies hire engineers who can show three things: solid foundat
   - tips on referrals, follow-ups, rejection and offers.
 - **Export:** `academy_career.md` next to your registry holds your role, readiness, next steps, projects with bullets, stories and applications.
 
+The career center is woven into the rest of the academy:
+
+- **Spaced review:** every pattern you practise adds two cards to your Daily Review, spotting the pattern from a problem's signals and how it works, because recognising the pattern fast is what a coding interview tests most.
+- **Redos:** a problem solved with hints, or without meeting the whole rubric, comes back three days later to solve alone from a blank page. It is offered first in mock interviews, in What's next and in the career center.
+- **Today's workout:** with a target role, the practice step can be an interview problem instead of a curriculum exercise.
+- **What's next** suggests a redo that is due, or a weekly interview problem once you have some foundations.
+- **Search** finds interview patterns, design questions and roles.
+- **Your progress everywhere:** the home screen shows your goal and readiness; the share card shows them too; the progress report has a *Getting hired* section (readiness, mock interviews with average scores, stories, applications, response rate, redos due).
+- **Achievements:** eight career milestones.
+
 ![The career center](docs/career.png)
 
 ## Menu
@@ -378,7 +388,7 @@ Keys never change, whatever the layout: wide terminals show two or three columns
 | 1 | **Ledger**: a colour card per stage, with reading, concept and exercise progress bars, labs and hours |
 | g | **Weekly goals**: study minutes, study days and review cards per week (Monday to Sunday), tracked on the dashboard: cyan on track, yellow behind, green done |
 | p | **Progress report**: a GitHub-style activity calendar, the last 7 days against the 7 before, time and mastery per track, deck health and your most-forgotten cards |
-| a | **Achievements**: 28 milestones (first concept, 7- and 30-day streaks, 100 and 1,000 reviews, a mastered concept, a passed mastery check, a whole track, graduation…), announced the moment you earn them |
+| a | **Achievements**: 36 milestones (first concept, 7- and 30-day streaks, 100 and 1,000 reviews, a mastered concept, a passed mastery check, a whole track, graduation, and career ones: a first mock interview, six stories, a shipped portfolio project, ready to apply, a first application, an offer…), announced the moment you earn them |
 
 **Resources**
 
