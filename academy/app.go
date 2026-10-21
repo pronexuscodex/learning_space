@@ -124,6 +124,12 @@ func (a *App) mutate(fn func(r *Registry)) {
 	a.dirty = true
 }
 
+// pagedHome pages a screen opened from the main menu: the menu's keys
+// leave it and go straight to their screen.
+func (a *App) pagedHome(render func()) {
+	a.pagedWith(pageOpts{finalPause: true, home: true}, render)
+}
+
 // cols is the layout width. On a terminal it is measured live, so after a
 // resize the next screen (or Ctrl+L) fits the new size.
 func (a *App) cols() int {
@@ -312,7 +318,7 @@ func (a *App) allScreens() []menuGroup {
 			{item("?", "All screens & keys"), "", "All & keys"},
 			{item("c", "Classic Mode "+mode), "", "Classic " + stripANSI(mode)},
 			{item("t", "Tidy screen "+tidyMode), "", "Tidy " + stripANSI(tidyMode)},
-			{item("5", "Exit"), hint("progress saves itself"), "Exit"},
+			{item("q", "Exit"), hint("progress saves itself; 5 works too"), "Exit"},
 			{item("8", sty.Gray("Undo this session")), "", "Undo session"},
 		}},
 	}
@@ -344,7 +350,7 @@ func (a *App) simpleMenu() []menuGroup {
 		{"", sty.Gray, []menuEntry{
 			{item("?", "All screens & keys"), "", "All & keys"},
 			{item("o", "Settings"), "", "Settings"},
-			{item("5", "Exit"), "", "Exit"},
+			{item("q", "Exit"), "", "Exit"},
 		}},
 	}
 }
@@ -1136,7 +1142,7 @@ func (a *App) run() {
 		var actionErr error
 		switch strings.ToLower(choice) {
 		case "0":
-			a.paged(true, a.showStartHere)
+			a.pagedHome(a.showStartHere)
 		case "9", "r":
 			actionErr = a.dailyReview()
 		case "c":
@@ -1156,7 +1162,7 @@ func (a *App) run() {
 				a.con.ok("Tidy screen off: earlier output stays visible above the menu.")
 			}
 		case "?", "h", "help":
-			a.paged(true, a.showShortcuts)
+			a.pagedHome(a.showShortcuts)
 		case "n":
 			actionErr = a.whatsNext()
 		case "j":
@@ -1168,7 +1174,7 @@ func (a *App) run() {
 		case "f":
 			actionErr = a.focusTimer()
 		case "p":
-			a.paged(true, a.progressReport)
+			a.pagedHome(a.progressReport)
 		case "x":
 			actionErr = a.exportNotes()
 		case "m":
@@ -1186,18 +1192,18 @@ func (a *App) run() {
 		case "g":
 			actionErr = a.setGoals()
 		case "a":
-			a.paged(true, a.showAchievements)
+			a.pagedHome(a.showAchievements)
 		case "k":
 			a.showShareCard()
 		case "1":
-			a.paged(true, a.viewLedger)
+			a.pagedHome(a.viewLedger)
 		case "2":
 			actionErr = a.enrollLab()
 		case "3":
 			actionErr = a.logHours()
 		case "4":
 			actionErr = a.advanceStatus()
-		case "5":
+		case "5", "q", "quit", "exit", ":q":
 			a.commitAndExit()
 		case "6":
 			actionErr = a.studyHall()
@@ -1224,7 +1230,7 @@ func (a *App) run() {
 		case "":
 			// Blank line: just redraw the menu.
 		default:
-			a.con.warn("%q is not a menu option. Choose 0-9, a letter from the menu, or ? for help.", choice)
+			a.con.warn("%q is not a menu option. Choose a key from the menu, ? for every screen, or q to quit.", choice)
 		}
 
 		switch {

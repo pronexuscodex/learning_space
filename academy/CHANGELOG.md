@@ -6,6 +6,17 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [1.7.0] - 2026-10-21
 
+### Changed
+After a walk through the app as a new learner, at 40, 80 and 160 columns:
+- **Menu keys work on pages opened from the main menu.** "All screens & keys" promised "type any key to go there", but `d`, `j`, `g`, `k`, `f` and `/` scrolled the page instead. On those pages (also Start Here, the ledger, the progress report and achievements), a menu key now goes straight to its screen; read them with Space, the arrows and `q`.
+- **Leaving a concept card early no longer asks straight away whether you understand it.** You see the key idea and how far you read, then choose: read the rest (from where you stopped), mark it understood and explain it, or come back later.
+- **`q` quits at the main menu** (also `quit` and `exit`; `5` still works), as it means back everywhere else.
+- **Today's workout skips steps with nothing to do,** such as a review with nothing due or a recall with nothing learned yet, with one line each instead of asking "Ready?" first.
+- **Prompts use the screen's width** and break only between choices, never inside one ("t / today's word"); a short hint such as (y/n) stays on the question's line.
+- **The stage page shows its long overview once.** Coming back to it after the glossary or a quiz shows the title, mastery and the concept list.
+- **Fewer keystrokes:** "Study a concept" asks for a number from the list already on screen, and the two-digit "Back" items are gone from the stage menu and the career center (`q` goes back).
+- **Tidy screen is on by default for new learners:** every action starts on a clean screen, so the scrollback stays readable.
+
 ### Added
 - **Get hired: the career center** (`e`). It turns learning into the three things companies hire on: foundations, finished projects and interview skill.
   - **Five target roles:** Backend, Systems / Infrastructure, SRE / Platform, Security and ML / AI Engineer. For each: the work, who hires, the job titles to search for, the interview process, what the interviews test, the stages that prepare you, the portfolio projects employers value, resume skills and advice.

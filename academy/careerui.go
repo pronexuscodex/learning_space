@@ -23,7 +23,6 @@ var careerOptions = []string{
 	"Resume builder (bullets for your projects)",
 	"Job search (kit, applications tracker, tips)",
 	"Export your career kit (Markdown)",
-	"Back to the main menu",
 }
 
 // careerCenter is the career center's main screen.
@@ -1179,13 +1178,20 @@ func (a *App) renderJobSearch() {
 				parts = append(parts, fmt.Sprintf("%s %d", st, counts[st]))
 			}
 		}
-		a.println(sty.Gray("    " + strings.Join(parts, " · ")))
+		for _, l := range flow(parts, " · ", w-4, "    ") {
+			a.println(sty.Gray(l))
+		}
 		if rate, ok := responseRate(apps); ok {
-			a.println(sty.Gray("    Response rate: " + percent(rate) + " of applications reached a screen or further."))
+			a.grayWrap("Response rate: "+percent(rate)+" of applications reached a screen or further.", "    ")
 		}
 		for i, ap := range apps {
-			a.printf("    %s %s %s %s\n", sty.Cyan(fmt.Sprintf("%d.", i+1)), sty.Bold(truncate(ap.Company, 24)),
-				sty.Gray(truncate(ap.Role, max(10, w-50))), sty.Yellow(ap.Stage))
+			num := sty.Cyan(fmt.Sprintf("%d.", i+1))
+			if w >= 70 {
+				a.printf("    %s %s %s %s\n", num, sty.Bold(truncate(ap.Company, 24)), sty.Gray(truncate(ap.Role, w-50)), sty.Yellow(ap.Stage))
+			} else { // narrow: the role on its own line
+				a.printf("    %s %s %s\n", num, sty.Bold(truncate(ap.Company, w-22)), sty.Yellow(ap.Stage))
+				a.printf("       %s\n", sty.Gray(truncate(ap.Role, w-9)))
+			}
 			if ap.Next != "" {
 				for _, l := range wrap("next: "+ap.Next, w-12, "       ") {
 					a.println(sty.Gray(l))

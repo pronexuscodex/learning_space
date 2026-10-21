@@ -198,7 +198,7 @@ func TestCareerCenterScreens(t *testing.T) {
 		"9", "a", "Acme", "Backend Engineer", "", "k1", "1", "3", "", "q", // job search: an application, a kit item, an update
 		"8", "1", "Built a REST API in Go with tests", // resume bullet
 		"10", // export
-		"11", // back
+		"q",  // back
 	}, "\n") + "\n"
 	dir := t.TempDir()
 	var out bytes.Buffer
@@ -256,6 +256,9 @@ func TestCareerScreensFit(t *testing.T) {
 		a.renderDesignBasics()
 		a.renderStoryBank()
 		a.renderJobSearch()
+		a.reg.Career.Applications = []Application{{Company: "A company with a long name", Role: "Associate Security Engineer", Stage: "Applied", Next: "Follow up in a week with a short note"}}
+		a.renderJobSearch()
+		a.reg.Career.Applications = nil
 		for _, role := range roles {
 			a.renderRole(role)
 		}
