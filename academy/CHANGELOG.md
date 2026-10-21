@@ -4,6 +4,26 @@ All notable changes to the Systems & AI Academy are listed here. The
 format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 versions follow [Semantic Versioning](https://semver.org/).
 
+## [1.7.0] - 2026-10-21
+
+### Added
+- **Get hired: the career center** (`e`). It turns learning into the three things companies hire on: foundations, finished projects and interview skill.
+  - **Five target roles:** Backend, Systems / Infrastructure, SRE / Platform, Security and ML / AI Engineer. For each: the work, who hires, the job titles to search for, the interview process, what the interviews test, the stages that prepare you, the portfolio projects employers value, resume skills and advice.
+  - **A readiness score:** foundations, portfolio, interview practice and job-search kit, with the most useful next steps.
+  - **Portfolio projects:** start them as labs with one key, with a checklist of what makes a project count.
+  - **Coding interview patterns:** an eight-step method and 16 patterns with 32 practice problems written for the academy. Each problem has a three-step hint ladder instead of a model answer, and a rubric to score yourself.
+  - **System design:** a seven-step framework, building blocks, numbers to know, and 9 classic questions with what a strong design covers and the usual mistake.
+  - **Behavioral interviews:** STAR and 12 common questions, with a story bank you write.
+  - **Timed mock interviews** (coding, system design, behavioral), scored and kept in a history.
+  - **A resume builder** that writes a bullet for each of your projects.
+  - **A job search section:** a seven-item kit, an applications tracker with a response rate, and tips.
+  - **An export,** `academy_career.md`.
+- **A full-screen pager, like `man` and `less`.** Long screens fill the terminal with only a status line at the bottom (`lines 24–46 of 129 35%`, `(END)`).
+  - Keys act at once, without Enter: Space (next page), Enter or ↓ (one line), b (back a page), g / G (start / end), /word (search, with every match highlighted), n / N (next / previous match), h (every key) and q (leave).
+  - The normal screen comes back afterwards, with what you were reading in view.
+  - Typing a number or menu key leaves and answers what comes next.
+  - On Windows, or with `ACADEMY_PAGER=inline`, the line pager is used as before.
+
 ## [1.6.2] - 2026-10-15
 
 1.6.1 was published from the commit just before its changes were merged, so its programs are 1.6.0 with a new version number. 1.6.2 is the release with them.

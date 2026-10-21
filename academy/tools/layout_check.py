@@ -51,6 +51,12 @@ KEYS = [
   "d\r", "type casting\r", "1\r", "\r", "c\r", "4\r", "1\r", "\r", "a\r", "q\r", "q\r", "q\r",  # dictionary: word → related → categories → A–Z
   "+\r", "a\r", "Modern C, a free book on writing C well\r", "https://example.org/modern-c.pdf\r", "1\r", "5\r", "A long note that should wrap neatly at every terminal width\r", "q\r",  # my resources
   "w\r", "1\r", "q\r", "4\r", "q\r", "5\r", "q\r", "7\r",  # tech watch: method, radar, sources
+  "e\r", "1\r", "4\r", "y\r", "2\r", "\r"*3,  # career center: security role → target → readiness
+  "3\r", "q\r",            # portfolio projects
+  "4\r", "1\r", "1\r", "\r", "d\r", "y\r", "y\r", "n\r", "y\r", "q\r",  # a coding problem with one hint, scored
+  "5\r", "2\r", "n\r", "q\r",  # system design: the rate limiter
+  "6\r", "q\r", "8\r", "9\r", "a\r", "Acme Security\r", "Associate Security Engineer\r", "\r", "k1\r", "q\r",  # stories, resume, job search
+  "11\r",                  # back to the main menu
   "9\r", "q\r",             # daily review intro, then stop
   "c\r", "y\r", "6\r", "1\r", "2\r", "5\r", "2\r", "y\r", "n\r", "n\r", "q\r", "10\r", "c\r", "y\r",  # Classic Mode: struggle clock message, then off again
   "5\r",                    # commit & exit
@@ -64,6 +70,7 @@ def run(cols, rows=60):
     pid, fd = pty.fork()
     if pid == 0:
         os.environ["ACADEMY_LIBRARY"] = tempfile.mkdtemp(prefix="academy-library-")  # never the real Documents
+        os.environ["ACADEMY_PAGER"] = "inline"  # every line of a long screen is printed, so all of it is measured
         os.execv(os.environ.get("ACADEMY_BIN", os.path.join(D, "..", "academy")), ["academy", "-registry", reg])
     fcntl.ioctl(fd, termios.TIOCSWINSZ, struct.pack("HHHH", rows, cols, 0, 0))
     out = b""

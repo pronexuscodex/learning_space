@@ -52,6 +52,7 @@ SHOTS = {
     "library": (80, ["l"], r"LIBRARY", r"Stage 2 ·", 30),
     "techwatch": (80, ["w", "4"], r"MY TECH RADAR", r"end · Enter", 30),
     "workout": (80, ["j"], r"TODAY'S WORKOUT", r"Ready\?", 30),
+    "career": (80, ["e", "1", "1", "y"], r"GET HIRED", r"Back to the main menu", 32, -1),
     "hint-ladder": (80, ["6", "0", "2", "3", "3", "2", "2"], r"Stuck\?", r"this exercise\.", 40, -3),
     "settings": (80, ["o", "1"], r"SETTINGS", r"Monochrome", 30, -2),
     "share-card": (80, ["k"], r"╭", r"learning_space", 25),
@@ -68,12 +69,17 @@ XTERM_256 = {"208": "#ff8700", "39": "#00afff", "220": "#ffd700", "33": "#0087ff
 CSI = re.compile(r"\x1b\[([0-9;?]*)([A-Za-z])")
 
 
+class Raw(str):
+    """A key sent as it is, without Enter (for screens that read single keys)."""
+
+
 def run_session(cols, keys, registry, from_key=-1, rows=200):
     pid, fd = pty.fork()
     if pid == 0:
         os.environ["TERM"] = "xterm-256color"
         os.environ.pop("NO_COLOR", None)
         os.environ["ACADEMY_LIBRARY"] = tempfile.mkdtemp(prefix="academy-library-")  # never the real Documents
+        os.environ["ACADEMY_PAGER"] = "inline"  # long screens in the scrollback, so a shot can show all of one
         os.execv(BIN, ["academy", "-registry", registry])
     fcntl.ioctl(fd, termios.TIOCSWINSZ, struct.pack("HHHH", rows, cols, 0, 0))
     out = bytearray()
@@ -92,7 +98,7 @@ def run_session(cols, keys, registry, from_key=-1, rows=200):
     marks = []
     for k in keys:
         marks.append(len(out))
-        os.write(fd, (k + "\r").encode())
+        os.write(fd, (k if isinstance(k, Raw) else k + "\r").encode())
         pump(0.5)
     mark = marks[from_key] if marks else 0  # no keys: the start-up screen itself
     pump(0.6)
@@ -107,6 +113,7 @@ def run_session(cols, keys, registry, from_key=-1, rows=200):
 def terminal_lines(text):
     """Apply the few control sequences the app uses; keep SGR colours."""
     lines, cur = [], ""
+    saved = ([], "")
     i = 0
     while i < len(text):
         ch = text[i]
@@ -118,6 +125,12 @@ def terminal_lines(text):
                     cur += m.group(0)
                 elif cmd == "J":
                     lines, cur = [], ""
+                elif cmd == "H":  # cursor home: the app redraws the whole screen
+                    lines, cur = [], ""
+                elif cmd == "h" and "1049" in params:  # alternate screen on
+                    saved, lines, cur = (lines, cur), [], ""
+                elif cmd == "l" and "1049" in params:  # alternate screen off
+                    lines, cur = saved
                 elif cmd == "K":
                     if params == "2":
                         cur = ""
