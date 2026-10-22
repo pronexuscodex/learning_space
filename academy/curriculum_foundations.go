@@ -10,6 +10,8 @@ var foundationsGuides = map[int]StageGuide{
 		Overview: `Programming is telling a very fast, very literal machine exactly what to
 do. This stage teaches the building blocks every language shares
 (values, variables, decisions, loops, functions and collections) in C,
+then what real C programs are made of: structs, memory you allocate and
+free yourself, files, and programs split across several files,
 the language that lets you see what is really happening underneath:
 every variable has a size and an address, nothing is hidden, and the
 compiler turns your text into real machine instructions you can run.
@@ -28,6 +30,8 @@ the language itself.`,
 			"Explain what a variable, an array, a string and a pointer are in memory",
 			"Break a problem into functions and read compiler errors and warnings calmly",
 			"Recognise undefined behaviour and use the compiler's warnings and sanitizers to catch it",
+			"Organise data with structs, manage heap memory with malloc and free without leaks, and read and write files safely",
+			"Split a program into modules with headers, and build it with make",
 		},
 		Glossary: []Term{
 			{"Source file", "The text file you write (hello.c) before the compiler turns it into a program."},
@@ -42,6 +46,13 @@ the language itself.`,
 			{"Undefined behaviour", "An operation C gives no meaning to (such as reading past an array); anything may happen."},
 			{"Warning", "A message from the compiler about code that is legal but probably wrong. Treat it as an error."},
 			{"Segfault", "The crash you get when a program touches memory it is not allowed to."},
+			{"Struct", "A type that groups named fields into one value, such as struct point { int x, y; }."},
+			{"Heap", "Memory you request while the program runs (malloc) and must give back yourself (free)."},
+			{"Memory leak", "Memory that was allocated and never freed, so the program keeps growing."},
+			{"Stream", "A FILE * the C library reads or writes through a buffer: a file, or stdin, stdout and stderr."},
+			{"Header file", "A .h file of declarations that other .c files include to use a module."},
+			{"Preprocessor", "The step before compiling that handles #include, #define and #ifndef."},
+			{"Makefile", "The file that tells make how to build a program, and which files each step depends on."},
 		},
 		Concepts: []Concept{
 			{
@@ -428,6 +439,145 @@ use here, with one missing check.`,
 				),
 			},
 			{
+				Name:    "Structs: Grouping Related Data",
+				Summary: "A struct bundles named fields into one value, so a program can talk about a student instead of three loose variables.",
+				Body: `Real data comes in groups: a student has a name, an age and an average.
+A struct gives the group one name and one type:
+
+  struct student {
+      char   name[32];
+      int    age;
+      double average;
+  };
+
+  struct student s = {"Ada", 36, 91.5};
+  s.age = 37;                       // . reaches a field
+
+A struct is a value like any other. Assigning it (s2 = s) copies every
+field, passing it to a function gives the function a copy, and a
+function can return one. When the struct is big, or the function must
+change the caller's struct, pass a pointer instead and reach the fields
+with ->:
+
+  void birthday(struct student *p) { p->age++; }   // p->age means (*p).age
+  birthday(&s);
+
+An array of structs is a table of records (struct student class[30]),
+and typedef gives a type a shorter name (typedef struct student
+Student;). Compare structs field by field: == does not compile for
+structs, and memcmp is unreliable because of the padding bytes the
+compiler may add between fields (see below).`,
+				Diagram: `  struct student s                         sizeof = 48 on x86-64
+  ┌──────────────────────┬────────┬─────────┬──────────────┐
+  │ name[32]  "Ada\0…"   │ age 37 │ padding │ average 91.5 │
+  └──────────────────────┴────────┴─────────┴──────────────┘
+   offset 0               32       36        40`,
+				UnderTheHood: `The compiler turns every field into a fixed offset from the start of
+the struct. With the layout above, p->age is "the 4 bytes at p + 32",
+and int get_age(struct student *p) { return p->age; } compiles with
+gcc -O2 to:
+
+  mov eax, DWORD PTR [rdi+32]   ; load 4 bytes, 32 past the pointer
+  ret
+
+Each field starts at a multiple of its own alignment (4 for an int, 8
+for a double), so the compiler inserts padding: average cannot start at
+36, so it starts at 40. Field order therefore changes the size.
+struct { char a; double b; char c; } takes 24 bytes; reordered as
+{ double b; char a; char c; } it takes 16. offsetof(type, field), from
+stddef.h, tells you where any field sits.`,
+				MentalModel: "A struct is a form with labelled boxes; the compiler knows how far down the form each box sits.",
+				TryIt:       "Define struct student, print sizeof(struct student) and offsetof(struct student, average) with %zu, then reorder the fields and predict the new size before you print it.",
+				Analogy: `A library's index card for each book: title, author, year and shelf on
+one card. You hand someone the whole card, not four scraps of paper,
+and everyone knows where on the card the year is written.`,
+				Example: `Every file on your disk is described by a struct inside the operating
+system: on Linux and macOS, struct stat holds a file's size, owner,
+permissions and timestamps, and it is what ls -l prints. Network packet
+headers, image file headers and the entities in a game are all structs
+laid out field by field.`,
+				Exercises: trio(
+					`What is sizeof(struct { char c; int x; char d; }) on a typical 64-bit machine, and how would you reorder the fields to make it smaller?`,
+					"12: c at 0, x at 4 (it must be aligned to 4), d at 8, then padding up to a multiple of 4. With x first it becomes 8.",
+					`Define struct point { double x, y; } and write double distance(struct point a, struct point b) and struct point midpoint(struct point a, struct point b). Then write void translate(struct point *p, double dx, double dy) and explain why it takes a pointer when the other two do not.`,
+					"distance uses sqrt from math.h (link with -lm on Linux). translate must change the caller's point, so it needs its address: p->x += dx.",
+					`Model a small library: struct book { char title[64]; char author[64]; int year; int on_loan; }. Read up to 100 books from a file of lines title;author;year;on_loan, then print the books on loan and the oldest book. Put the parsing of one line in its own function that returns 0 or -1.`,
+					"fgets each line, strchr to find each ';', copy each field with a length check, and strtol the numbers. An array of 100 structs and a count is all the storage you need.",
+				),
+			},
+			{
+				Name:    "Dynamic Memory: malloc, free & Leaks",
+				Summary: "When the size is only known while the program runs, ask for memory on the heap, and give back every byte you take.",
+				Body: `Local variables live on the stack: fast, automatic, freed when the
+function returns, and fixed in size when you write the program. When
+the size is only known at run time (a file of unknown length, a list
+that keeps growing), you ask for memory on the heap:
+
+  int *a = malloc(n * sizeof *a);     // room for n ints
+  if (a == NULL) { /* out of memory: report it and stop */ }
+  /* … use a[0] … a[n - 1] … */
+  free(a);                            // give it back, exactly once
+  a = NULL;
+
+The rules:
+- check every malloc, calloc and realloc for NULL;
+- calloc(n, size) is malloc plus zeroed memory, and the C library checks n * size for overflow;
+- realloc(p, new_size) grows or shrinks a block and may move it, so keep the old pointer until it succeeds: tmp = realloc(p, size); if (tmp != NULL) p = tmp;
+- free every block exactly once: forgetting is a leak, freeing twice is a double free, and using it afterwards is a use-after-free;
+- for every allocation, decide which function owns it and is responsible for freeing it.
+
+The growable array is the workhorse of C programs: keep a pointer, a
+length and a capacity, and when the length reaches the capacity, double
+the capacity with realloc. Because the capacity doubles, each element is
+copied fewer than two times on average, so appending stays fast however
+long the array gets.`,
+				Diagram: `  stack (automatic)              heap (malloc / free)
+  ┌──────────────────┐          ┌────┬────┬────┬────┐
+  │ int *data ───────┼────────▶ │ 10 │ 20 │ 30 │  ? │   len 3, cap 4
+  │ size_t len = 3   │          └────┴────┴────┴────┘
+  │ size_t cap = 4   │
+  └──────────────────┘
+   gone when the function        stays until free(data)
+   returns`,
+				UnderTheHood: `malloc is ordinary library code, not a system call. The C library's
+allocator keeps lists of free chunks of different sizes, and each chunk
+has a small header just before the pointer you are given, recording its
+size. Small requests come from the heap region, which the allocator
+grows with the brk system call when it runs out; large ones (glibc's
+default threshold is 128 KiB) get their own pages straight from the
+kernel with mmap, and free returns those with munmap. That is why
+strace shows only a handful of brk calls for millions of small mallocs.
+
+Writing past the end of a block, or freeing it twice, corrupts those
+headers, which is why heap bugs crash far from where they happened and
+why they become security holes (Stage 10). The address sanitizer puts
+poisoned red zones around every block to catch the overflow at the
+exact line, and its leak checker lists every block still allocated
+when the program exits, with the line that allocated it.`,
+				MentalModel: "Every malloc is a loan: the code that borrows it must know who pays it back, and when.",
+				TryIt:       "Read numbers until end of input into a growing array (capacity 4 at first, doubled with realloc), print their sum and free the array. Run it with -fsanitize=address; then delete the free, run it again, and read the leak report.",
+				Analogy: `Booking a table at a restaurant. The stack is the seat you take while
+you eat: when you leave, it is free again. The heap is a table you
+reserve for as long as you like: it stays reserved until you cancel.
+Forget to cancel and the restaurant slowly fills with empty reserved
+tables (a leak); cancel twice and you may cancel someone else's booking
+(a double free).`,
+				Example: `A long-running program that leaks a little memory on every request
+grows until the system runs out and kills it: browsers, games and
+servers have all shipped leaks that only showed after hours of use.
+Valgrind, the sanitizers' leak checker and heap profilers exist to find
+them, and garbage collection and Rust's ownership rules (Stage 12)
+exist largely to make these mistakes impossible.`,
+				Exercises: trio(
+					`What is wrong with each line? int *p = malloc(10); p[9] = 1;   char *s = malloc(strlen(t)); strcpy(s, t);   free(p); free(p);`,
+					"malloc(10) is 10 bytes, room for only two 4-byte ints; strlen leaves no room for the '\\0'; and freeing twice is undefined behaviour.",
+					`Write char *join(const char *a, const char *b), which returns a newly allocated string holding a, a space and b, and test it, freeing every result. Then write char *repeat(const char *s, int n).`,
+					"Allocate strlen(a) + 1 + strlen(b) + 1 bytes: the space and the terminating zero. The caller frees the result: say so in a comment above the function.",
+					`Read a text file of unknown length line by line into a growing array of strings (each line its own allocated copy), print the lines in reverse order, and free everything. Make it work for an empty file, a one-line file and a million-line file, with no leaks reported by -fsanitize=address.`,
+					"An array of char * that you realloc when full, and a copy of each line made with malloc(len + 1) and memcpy. Free each line, then the array. getline (POSIX) reads lines of any length.",
+				),
+			},
+			{
 				Name:    "Safe Input & Undefined Behavior",
 				Summary: "C trusts you completely, so check every input, every size and every return value.",
 				Body: `C gives you power, not protection. Many mistakes are undefined
@@ -489,6 +639,153 @@ exactly these kinds, which is why the habits in this concept matter.`,
 					"strtol sets an end pointer: after skipping trailing whitespace it must point at '\\0'. Check errno == ERANGE and the min/max range.",
 					`Take one of your earlier programs (the bill splitter or the CSV reader), compile it with -fsanitize=address,undefined, and feed it hostile input: empty lines, 10,000-character lines, negative numbers, missing fields. Fix every crash the sanitizers find, and write down each bug you found.`,
 					`Generate hostile input with python3 -c "print('A' * 10000)" | ./program. Each sanitizer report names the line and the kind of bug.`,
+				),
+			},
+			{
+				Name:    "Files & Streams: Reading and Writing Data",
+				Summary: "A file is a stream of bytes: open it, read or write it a piece at a time, check every step, and close it.",
+				Body: `Programs keep data between runs in files. The C library gives you
+streams (FILE *), which buffer reads and writes for speed:
+
+  FILE *f = fopen("notes.txt", "r");    // "r" read, "w" write (empties it first), "a" append
+  if (f == NULL) { perror("notes.txt"); return 1; }
+  char line[256];
+  while (fgets(line, sizeof line, f) != NULL) {
+      /* use line */
+  }
+  if (ferror(f)) perror("notes.txt");
+  fclose(f);
+
+Three streams are always open: stdin, stdout and stderr. That is why the
+same loop can read a file or a pipe: fgets(line, sizeof line, stdin)
+reads whatever the user or another program sends.
+
+The tools: fgetc and fputc for one byte, fgets and fputs for lines,
+fprintf for formatted text, and fread and fwrite for raw bytes. Each
+reports failure in its return value (NULL, EOF or a short count), and
+perror prints why, using errno ("No such file or directory"). A text
+file is just bytes, and so is a photo: the difference is how you read
+them. strlen stops at the first zero byte, so binary data needs fread
+and an explicit length. (On Windows, text mode also translates line
+endings: open with "rb" or "wb" to get the bytes exactly.)
+
+When writing, data waits in the stream's buffer until it is flushed.
+fclose (or fflush) hands it to the operating system and reports a
+failed write, so check what fclose returns too. Even then it sits in
+the kernel's page cache, not necessarily on the disk (Stage 7).`,
+				Diagram: `  your program          C library               kernel           disk
+  fprintf(f, …) ──▶  FILE buffer (a few KiB) ──▶ page cache ──▶ ▓▓▓▓
+                      flushed by fflush,          write()        fsync
+                      fclose or exit`,
+				UnderTheHood: `A FILE is a struct inside the C library holding a file descriptor (the
+small integer the kernel handed out when the file was opened; 0, 1 and
+2 are stdin, stdout and stderr) and a buffer. fopen makes the openat
+system call. Reading a 1 MB file with fgets makes about 260 read system
+calls, not a million, because each read fills a 4 KiB buffer that fgets
+then serves from:
+
+  strace -c -e trace=read ./program big.txt     # count the read calls
+
+When main returns, exit flushes and closes every open stream, which is
+why output still appears when you forget fclose, and why it can be lost
+when the program crashes before exiting.`,
+				MentalModel: "Open, check, loop over reads or writes, check, close; stdin is just a file that is already open.",
+				TryIt:       "Write a program that copies one file to another with fgetc and fputc, reporting errors with perror. Copy a photo with it and compare the two files with cmp, then run it under strace -c and count the read calls.",
+				Analogy: `A library's reading room. You fill in a request slip (fopen) and get a
+numbered ticket (the FILE *). The librarian brings pages in batches
+rather than one word at a time (the buffer). When you are done you
+return the book (fclose); if you leave without returning it, someone
+tidies up at closing time (exit), unless the building burns down first
+(a crash).`,
+				Example: `grep, sort and wc read stdin and write stdout, which is what lets you
+join them with pipes (Stage 9). Configuration files, logs, CSV exports
+and saved games are read and written exactly this way. This academy's
+own progress file is written to a temporary file, synced and renamed
+(Stage 7), so a crash never leaves it half written.`,
+				Exercises: trio(
+					`What does fopen("out.txt", "w") do to an existing out.txt, and how is "a" different? What should a program do when fopen returns NULL?`,
+					`"w" empties the file first; "a" adds to its end. Report why with perror and stop, or try something else: never carry on with a NULL FILE *.`,
+					`Write a program that prints the longest line of the file named by its first argument, with the line's number. Handle a missing argument, a file that cannot be opened and an empty file, each with a clear message on stderr and a non-zero exit status.`,
+					"Keep a copy of the longest line so far and its number. A line longer than your buffer arrives in several pieces: decide what you do with those, and say so in a comment.",
+					`Give the budget tracker a save file: write an array of transaction structs to a text file, one per line, read it back into a second array, and check that the two match. A truncated or corrupted file must fail with a clear message, never fill the array with garbage.`,
+					"fprintf one line per struct with a fixed field order; read with fgets and sscanf, and check that sscanf returned the number of fields you expected.",
+				),
+			},
+			{
+				Name:    "Headers, the Preprocessor & make",
+				Summary: "Split a program into files that compile separately, share declarations through headers, and let make rebuild only what changed.",
+				Body: `Real programs are many files. Each .c file is compiled on its own into
+an object file (.o), and the linker joins the objects into one
+executable. For that to work, each file must see the declarations of
+what it uses from the others. That is what headers are for:
+
+  /* stack.h: the interface */
+  #ifndef STACK_H
+  #define STACK_H
+  struct stack { int items[64]; int top; };
+  void stack_push(struct stack *s, int x);
+  #endif
+
+  /* stack.c: the implementation, and main.c: a user */
+  #include "stack.h"
+
+  gcc -Wall -Wextra -c stack.c     # → stack.o
+  gcc -Wall -Wextra -c main.c      # → main.o
+  gcc stack.o main.o -o app        # link
+
+#include, #define and #ifndef are preprocessor directives: before the
+compiler proper sees your code, the preprocessor pastes in included
+files, replaces macros and keeps or drops lines. The #ifndef … #endif
+include guard makes a header safe to include twice. Put declarations in
+headers and definitions in .c files, and mark helpers that only one
+file uses as static, so they stay private to it.
+
+make automates the build. A Makefile lists each target, the files it
+depends on, and the command that makes it:
+
+  app: main.o stack.o
+      gcc main.o stack.o -o app
+  %.o: %.c stack.h
+      gcc -Wall -Wextra -g -c $< -o $@
+
+make compares file times and reruns only the commands whose inputs
+changed, which turns minutes into seconds on big projects. The indented
+command lines must start with a real Tab character, not spaces.`,
+				Diagram: `  stack.h  (included by both)
+     │
+  stack.c ──▶ gcc -c ──▶ stack.o ──┐
+  main.c  ──▶ gcc -c ──▶ main.o  ──┴──▶ linker ──▶ app`,
+				UnderTheHood: `gcc -E main.c shows the program after preprocessing: every #include is
+replaced by the whole text of the header (stdio.h alone expands to
+about 800 lines). Each object file has a symbol table: nm stack.o lists
+stack_push with T (defined here, in the code section), and nm main.o
+lists it with U (undefined: needed from elsewhere). The linker matches
+every U with exactly one T. Two definitions of one name give "multiple
+definition"; none gives "undefined reference", the most common linker
+error, which usually means a .c file is missing from the command.
+
+Macros are text substitution, not functions: with #define SQUARE(x) x*x,
+SQUARE(1+2) becomes 1+2*1+2, which is 5. Write ((x)*(x)), or better, a
+static inline function, which the compiler checks like any other.`,
+				MentalModel: "A header is a promise (this exists, and looks like this); a .c file keeps it; the linker checks every promise was kept exactly once.",
+				TryIt:       "Split one of your programs into main.c, a module .c and its .h. Build it by hand with gcc -c and link it, then write a Makefile. Run make twice (the second does nothing), touch one .c file and watch make rebuild only that file. Then run nm on each .o.",
+				Analogy: `A restaurant menu and its kitchen. The menu (the header) promises what
+can be ordered and how to ask for it; the kitchen (the .c file) makes
+it. Waiters (other files) only need the menu. Before opening, the
+manager (the linker) checks that every dish on the menu has exactly one
+station that cooks it.`,
+				Example: `The Linux kernel has tens of thousands of .c files and is built with
+make: change one file and only what depends on it is rebuilt. Every C
+library you install (SQLite, zlib, OpenSSL) ships as headers plus
+compiled code: you include its header and link its library, as in
+gcc app.c -lsqlite3.`,
+				Exercises: trio(
+					`Which goes in the header and which in the .c file: a function prototype, a function body, a struct type that callers use, a static helper function, the definition of a global variable? Why does a header need an include guard?`,
+					"Prototypes and shared struct types in the header; bodies, static helpers and variable definitions in the .c file (the header gets only an extern declaration). Without a guard, including it twice defines the struct twice.",
+					`Turn the temperature functions into a module: temperature.h with the prototypes and an include guard, temperature.c with the code, and main.c printing a table. Build it with a Makefile whose first target is the program, plus a clean target.`,
+					".PHONY: clean, then clean: rm -f *.o and the program. Make each .o depend on the header too, so editing it rebuilds them.",
+					`Give your largest C program a real structure: one module per job (input, storage, reports), each with a header that exposes only what the others need, a Makefile with -Wall -Wextra -Werror, and a test target that builds and runs a small test program. Count how many functions you could make static.`,
+					"A test target can build test_storage.c against storage.o and run it. If one module needs another's internals, the interface between them is probably wrong.",
 				),
 			},
 			{
@@ -565,6 +862,10 @@ do.`,
 			{"Why does scanf need &x instead of x?", "C passes arguments by value; scanf needs x's address (a pointer) so that it can write the value into x."},
 			{"How many bytes does the string \"cat\" take in C, and why?", "4: three characters plus the terminating '\\0' that marks the end of the string."},
 			{"What is undefined behaviour, and name two causes.", "An operation the C standard gives no meaning to, so anything may happen. For example: reading past the end of an array, dereferencing NULL, signed overflow, using an uninitialised variable."},
+			{"What is the difference between s.age and p->age?", "s.age reaches a field of a struct value; p->age reaches a field through a pointer to a struct, and means (*p).age."},
+			{"Why should you not write p = realloc(p, n)?", "If realloc fails it returns NULL and leaves the old block untouched; assigning NULL to p loses the only pointer to that block, which leaks it. Use a temporary and assign only on success."},
+			{"Why check what fclose returns when you have been writing a file?", "Buffered data is only handed to the operating system when the stream is flushed, so a full disk or an I/O error may only show up then, as fclose returning EOF."},
+			{"What does an include guard prevent, and what does \"undefined reference\" at link time usually mean?", "It stops a header's contents being processed twice in one file. An undefined reference means the linker found no definition for a name: usually a .c file (or a library) is missing from the command."},
 			{"Which compiler flags should you use while learning, and why?", "-Wall -Wextra for warnings, -g for debugging information, and -fsanitize=address,undefined to catch memory and undefined-behaviour bugs at the exact line."},
 		},
 	},

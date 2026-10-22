@@ -24,15 +24,29 @@ After a walk through the app as a new learner, at 40, 80 and 160 columns:
   - Development builds show a short `dev-<commit>` instead of a long Go pseudo-version.
 
 ### Added
-- **Checked exercises: your C, compiled and tested for real.** Stage 1 has seven, one per step of C from zero: `hello`, `fizzbuzz`, `temperature`, `swap`, `letters`, `safe_number` and `fix_average`. You write the program in your own editor, in `Documents/Academy Labs/Stage 01/`. The academy then compiles it with your C compiler (`-std=c17 -Wall -Wextra -Werror`, plus AddressSanitizer and UBSan where available), runs it against the test cases, and explains each failure with the line that differs, the exit code, the sanitizer's report, or the usual cause.
+- **C from zero, completed: four new Stage 1 lessons.** Each comes with analogies, a diagram, an under-the-hood section checked against real gcc output, exercises, glossary words and quiz questions:
+  - **Structs:** fields, `.` and `->`, passing structs, padding and alignment;
+  - **Dynamic Memory:** malloc, calloc, realloc and free; ownership; leaks, double frees; the growable array;
+  - **Files & Streams:** modes, fgets, fgetc and fread, perror, buffering, fclose;
+  - **Headers, the Preprocessor & make:** separate compilation, include guards, static, the linker's symbols, macros, Makefiles.
+
+  Stage 1 now has twelve concepts, and the academy 122.
+- **Checked exercises: your C, compiled and tested for real.** Stage 1 has twelve, one per concept: `hello`, `types`, `fizzbuzz`, `temperature`, `swap`, `letters`, `scores`, `intvec`, `safe_number`, `count`, `stack` and `fix_average`. A project joins them all: `wordfreq`, the ten most frequent words of any text. You write the program in your own editor, in `Documents/Academy Labs/Stage 01/`. The academy then compiles it with your C compiler (`-std=c17 -Wall -Wextra -Werror`, plus AddressSanitizer and UBSan where available), runs it against the test cases, and explains each failure with the line that differs, the exit code, the sanitizer's report, or the usual cause.
   - **Where:** Study Hall → Checked exercises, or `academy -check ID` from another terminal (`academy -check list` shows them all).
+  - **The tests catch what matters:**
+    - memory never freed (the leak checker, for `intvec` and the project, where it works);
+    - a header without an include guard (the checker includes it twice);
+    - zero bytes in a file;
+    - a fixed-size buffer meeting a 5,000-letter word.
+  - **Build hints:** errors like "redefinition of" and "undefined reference" come with what to fix.
+  - **What's next** suggests a check as soon as you mark its concept as understood, and the project once the whole stage is.
   - **Evidence, not a tick.** Each run is appended to `academy_checks.jsonl` with the time, the compiler and the cases passed. A check shows as passed on your own, passed with hints, or how many cases pass. Concept cards show the check for their concept. Hints come one at a time and never give the solution.
   - **Limits:**
     - each run uses a fresh temporary folder and none of your environment variables;
     - each case has a 2-second limit, after which the whole process group is killed;
     - output is capped at 1 MB.
   - **Not a sandbox:** the academy only ever runs your own code. Checked exercises need Linux, macOS or a BSD (on Windows, use WSL).
-- **Concept prerequisites.** Concepts now list the earlier concepts it builds on (167 links across 113 concepts in all 21 stages), shown at the top of its card with a tick for each one you have marked as understood.
+- **Concept prerequisites.** Concepts now list the earlier concepts they build on (174 links across 117 concepts in all 21 stages). The list sits at the top of each card, with a tick for each one you have marked as understood.
   - **What's next and Today's workout** use them. When the next concept builds on one you have not marked yet, they send you to the first missing step and say which concept it leads to. They do not stop you reading anything.
   - **Tests check the graph:** every name is a real concept, every prerequisite comes earlier and agrees with the stage prerequisites (so there can be no cycle), and every concept from Stage 1 on lists at least one.
 - **Get hired: the career center** (`e`). It turns learning into the three things companies hire on: foundations, finished projects and interview skill.

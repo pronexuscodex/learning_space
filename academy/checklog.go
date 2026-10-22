@@ -55,6 +55,34 @@ func checkFile(regPath string, ch Check) string {
 	return filepath.Join(labsDir(regPath), fmt.Sprintf("Stage %02d", ch.Stage), ch.File)
 }
 
+// ensureStarters creates the check's main file and its other files, each
+// with its starter, where they do not exist yet. It returns the files it
+// created.
+func ensureStarters(regPath string, ch Check) ([]string, error) {
+	var created []string
+	main := checkFile(regPath, ch)
+	files := []struct {
+		path string
+		ch   Check
+	}{{main, ch}}
+	for _, f := range ch.Extra {
+		files = append(files, struct {
+			path string
+			ch   Check
+		}{filepath.Join(filepath.Dir(main), f.Name), Check{Starter: f.Starter}})
+	}
+	for _, f := range files {
+		made, err := ensureStarter(f.path, f.ch)
+		if err != nil {
+			return created, err
+		}
+		if made {
+			created = append(created, f.path)
+		}
+	}
+	return created, nil
+}
+
 // ensureStarter creates the check's file with its starter content if it
 // does not exist yet. It never overwrites the learner's work.
 func ensureStarter(path string, ch Check) (created bool, err error) {

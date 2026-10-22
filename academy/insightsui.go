@@ -20,6 +20,7 @@ import (
 
 // whatsNext shows the recommended next steps and runs the chosen one.
 func (a *App) whatsNext() error {
+	a.loadCheckStatuses() // a check run in another terminal counts at once
 	a.mu.Lock()
 	steps := a.reg.nextSteps(time.Now())
 	a.mu.Unlock()
@@ -76,6 +77,10 @@ func (a *App) doSuggestion(s Suggestion) error {
 		return a.techWatch()
 	case SuggestInterview:
 		return a.interviewProblem()
+	case SuggestCheck:
+		if ch, ok := checkByID(s.CheckID); ok {
+			return a.checkScreen(ch)
+		}
 	}
 	return nil
 }

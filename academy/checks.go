@@ -12,6 +12,7 @@ package main
 import (
 	"fmt"
 	"strings"
+	"time"
 )
 
 // Check is one checked exercise.
@@ -29,8 +30,29 @@ type Check struct {
 	// its Args to it.
 	Harness string
 
+	// Extra are the learner's other files for this check, beside File
+	// (a header, another .c file), each created with its starter.
+	Extra []CheckFile
+
+	Project    bool          // a stage project, joining several concepts (Concept is then "")
+	Leaks      bool          // also fail on memory never freed (where the leak checker works)
+	Timeout    time.Duration // per case, when the default 2 s is too short
+	BuildHints []BuildHint   // explanations for compiler messages this check tends to cause
+
 	Cases []CheckCase
 	Hints []string
+}
+
+// CheckFile is one more file the learner writes for a check.
+type CheckFile struct {
+	Name    string
+	Starter string
+}
+
+// BuildHint adds Note to the build report when the compiler's output
+// contains Match.
+type BuildHint struct {
+	Match, Note string
 }
 
 // CheckCase is one test: run the program with Args and Stdin, then compare
@@ -41,8 +63,9 @@ type CheckCase struct {
 	Stdin    string
 	Want     string
 	WantExit int
-	Stderr   bool   // the program must also print a message to standard error
-	Explain  string // shown when this case fails: the likely cause
+	Stderr   bool              // the program must also print a message to standard error
+	Files    map[string]string // files in the folder the program runs in
+	Explain  string            // shown when this case fails: the likely cause
 }
 
 // checks are all checked exercises, in teaching order.
@@ -62,6 +85,28 @@ var checks = []Check{
 		Hints: []string{
 			"Every C program starts at int main(void) { ... }.",
 			"#include <stdio.h> gives you printf. A string ends its line with \\n.",
+		},
+	},
+	{
+		ID: "types", Stage: 1, Concept: "Values, Types & Variables",
+		Title: "Predict, then print",
+		Task:  "Before you run anything, write down what you expect each of these to print. Then write a program that prints them, one per line, with the format given: 7 / 2 (%d), 7 % 2 (%d), 7.0 / 2 (%.1f), (int)3.99 (%d), 'A' + 1 (%d) and sizeof(int) * 8 (%zu). Compare the output with your predictions.",
+		File:  "types.c",
+		Starter: `/* Checked exercise: types
+ * Predict first! Then print, one per line:
+ *   7 / 2          with %d
+ *   7 % 2          with %d
+ *   7.0 / 2        with %.1f
+ *   (int)3.99      with %d
+ *   'A' + 1        with %d
+ *   sizeof(int) * 8   with %zu (the number of bits in an int)
+ */
+`,
+		Cases: []CheckCase{{Name: "six values", Want: "3\n1\n3.5\n3\n66\n32\n",
+			Explain: "Line 1 is 3 because int / int throws the fraction away. A cast cuts the fraction off rather than rounding, and 'A' is the number 65."}},
+		Hints: []string{
+			"Each line is one printf with the format shown, such as printf(\"%d\\n\", 7 / 2);.",
+			"sizeof gives a size_t, which is why it needs %zu rather than %d.",
 		},
 	},
 	{
@@ -203,6 +248,137 @@ int main(int argc, char **argv) {
 		},
 	},
 	{
+		ID: "scores", Stage: 1, Concept: "Structs: Grouping Related Data",
+		Title: "Best score and average",
+		Task:  "Read lines of the form NAME SCORE from standard input: a name of at most 31 letters, a whole score from 0 to 100, and at most 100 lines. Keep them in an array of struct student. Print best: NAME SCORE for the first student with the highest score, then average: and the mean score with one decimal. With no input at all, print no students.",
+		File:  "scores.c",
+		Starter: `/* Checked exercise: scores
+ * Read lines "NAME SCORE" (name: at most 31 letters; score: 0 to 100;
+ * at most 100 lines) into an array of struct student. Print:
+ *   best: NAME SCORE      the first student with the highest score
+ *   average: X.X          the mean, with one decimal
+ * With no input at all, print: no students
+ * Try it: printf 'ada 90\nbob 72\n' | ./scores
+ */
+`,
+		Cases: []CheckCase{
+			{Name: "three students", Stdin: "ada 90\nbob 72\ncy 85\n", Want: "best: ada 90\naverage: 82.3\n",
+				Explain: "The average of 90, 72 and 85 is 82.33…: divide as doubles, (double)sum / count, and print with %.1f."},
+			{Name: "a tie goes to the first", Stdin: "ann 80\nben 80\ncal 79\n", Want: "best: ann 80\naverage: 79.7\n",
+				Explain: "Replace the best student only when a score is strictly higher (>, not >=)."},
+			{Name: "one student with zero", Stdin: "zed 0\n", Want: "best: zed 0\naverage: 0.0\n",
+				Explain: "Start the best from the first student read, not from a score of 0 or 1."},
+			{Name: "no input", Stdin: "", Want: "no students\n",
+				Explain: "Check the count before dividing by it."},
+			{Name: "a 31-letter name", Stdin: "abcdefghijklmnopqrstuvwxyzabcde 100\n", Want: "best: abcdefghijklmnopqrstuvwxyzabcde 100\naverage: 100.0\n",
+				Explain: "31 letters need 32 bytes with the '\\0'. A width in the format (%31s) stops scanf writing past the array."},
+			{Name: "a hundred students", Stdin: hundredStudents(), Want: "best: s99 99\naverage: 49.5\n"},
+		},
+		Hints: []string{
+			"scanf(\"%31s %d\", name, &score) == 2 reads one line's two fields; the 31 stops it writing past a 32-byte name.",
+			"Keep a count of students read and the index of the best so far.",
+			"The mean is a double: (double)sum / count.",
+		},
+	},
+	{
+		ID: "intvec", Stage: 1, Concept: "Dynamic Memory: malloc, free & Leaks",
+		Title: "A growable array",
+		Task:  "Write vec_init, vec_push and vec_free for the struct intvec in the starter file: a growable array of ints whose data lives on the heap and doubles in capacity when full. No main: the checker calls your functions, a million times in one case, and also fails if any memory is never freed.",
+		File:  "intvec.c",
+		Leaks: true,
+		Starter: `/* Checked exercise: intvec
+ * A growable array of ints. Keep the struct exactly as it is, write the
+ * three functions, and do not write main: the checker has its own.
+ */
+#include <stddef.h>
+#include <stdlib.h>
+
+struct intvec {
+    int *data;     /* the elements, on the heap (NULL while empty) */
+    size_t len;    /* how many are in use */
+    size_t cap;    /* how many fit before data must grow */
+};
+
+/* vec_init makes v empty, without allocating anything yet. */
+void vec_init(struct intvec *v);
+
+/* vec_push appends x, doubling the capacity when data is full.
+ * It returns 0, or -1 if memory runs out (v is then unchanged). */
+int vec_push(struct intvec *v, int x);
+
+/* vec_free releases the memory and leaves v empty, as after vec_init. */
+void vec_free(struct intvec *v);
+`,
+		Harness: `#include <stdio.h>
+#include <string.h>
+
+struct intvec { int *data; size_t len; size_t cap; };
+void vec_init(struct intvec *v);
+int vec_push(struct intvec *v, int x);
+void vec_free(struct intvec *v);
+
+/* scrub overwrites old stack memory, so no stale copy of a pointer can
+ * hide a leak from the leak checker. */
+static int scrub(void) {
+    volatile char junk[8192];
+    for (int i = 0; i < 8192; i++) junk[i] = 0;
+    return junk[100];
+}
+
+int main(int argc, char **argv) {
+    if (argc < 2) return 2;
+    struct intvec v;
+    vec_init(&v);
+    if (strcmp(argv[1], "empty") == 0) {
+        printf("%zu %zu %s\n", v.len, v.cap, v.data == NULL ? "null" : "allocated");
+    } else if (strcmp(argv[1], "three") == 0) {
+        vec_push(&v, 10); vec_push(&v, 20); vec_push(&v, 30);
+        printf("%zu:", v.len);
+        for (size_t i = 0; i < v.len; i++) printf(" %d", v.data[i]);
+        printf("\n");
+    } else if (strcmp(argv[1], "million") == 0) {
+        long long sum = 0;
+        int bad = 0;
+        for (int i = 0; i < 1000000; i++) bad |= vec_push(&v, i) != 0;
+        for (size_t i = 0; i < v.len; i++) { sum += v.data[i]; bad |= v.data[i] != (int)i; }
+        printf("%zu %lld %s\n", v.len, sum, !bad && v.cap >= v.len ? "ok" : "wrong");
+    } else if (strcmp(argv[1], "free") == 0) {
+        vec_push(&v, 5);
+        vec_free(&v);
+        printf("%zu %zu %s\n", v.len, v.cap, v.data == NULL ? "null" : "dangling");
+    } else if (strcmp(argv[1], "reuse") == 0) {
+        vec_push(&v, 1);
+        vec_free(&v);
+        vec_push(&v, 7);
+        printf("%zu: %d\n", v.len, v.data[0]);
+    } else if (strcmp(argv[1], "leak") == 0) {
+        for (int i = 0; i < 100; i++) vec_push(&v, i);
+        vec_free(&v);
+        printf("freed%s\n", scrub() ? "?" : "");
+    } else return 2;
+    vec_free(&v);
+    return 0;
+}
+`,
+		Cases: []CheckCase{
+			{Name: "starts empty", Args: []string{"empty"}, Want: "0 0 null\n",
+				Explain: "vec_init should set data to NULL and len and cap to 0, and allocate nothing."},
+			{Name: "three pushes", Args: []string{"three"}, Want: "3: 10 20 30\n"},
+			{Name: "a million pushes", Args: []string{"million"}, Want: "1000000 499999500000 ok\n",
+				Explain: "Grow with realloc when len reaches cap; start from a small capacity (such as 4) when cap is 0, then double it. Growing by one each time is very slow."},
+			{Name: "free leaves it empty", Args: []string{"free"}, Want: "0 0 null\n",
+				Explain: "After free(v->data), set v->data to NULL and both counts to 0, so nothing points at freed memory."},
+			{Name: "usable after free", Args: []string{"reuse"}, Want: "1: 7\n"},
+			{Name: "frees everything", Args: []string{"leak"}, Want: "freed\n",
+				Explain: "Memory was still allocated when the program ended: vec_free must free(v->data). (Where the leak checker does not work, this case cannot catch it.)"},
+		},
+		Hints: []string{
+			"realloc(NULL, n) behaves like malloc(n), so the first push needs no special case if cap starts at 0.",
+			"Keep the old pointer until realloc succeeds: void *tmp = realloc(v->data, new_cap * sizeof *v->data); if (tmp == NULL) return -1;",
+			"Every case calls vec_free at the end: if the leak checker complains, vec_free is not freeing data.",
+		},
+	},
+	{
 		ID: "safe_number", Stage: 1, Concept: "Safe Input & Undefined Behavior",
 		Title: "Read a number safely",
 		Task:  "Read one line from standard input. If it holds a whole number that fits in an int (spaces before or after are fine), print ok and the number, and return 0. Otherwise print nothing to standard output, print a message to standard error, and return 1.",
@@ -236,6 +412,113 @@ int main(int argc, char **argv) {
 			"Read the line with fgets into a char array, and check what fgets returns.",
 			"strtol(text, &end, 10) converts and sets end to the first character it did not use. Compare end with text to see whether there were any digits.",
 			"Errors go to stderr with fprintf(stderr, ...); return 1 from main to report failure.",
+		},
+	},
+	{
+		ID: "count", Stage: 1, Concept: "Files & Streams: Reading and Writing Data",
+		Title: "Count lines, words and bytes",
+		Task:  "Write a program that opens the file named by its first argument and prints three numbers like wc: the lines (newline characters), the words (runs of characters that are not white space) and the bytes. Without an argument, print a usage message to standard error and return 2; if the file cannot be opened, report why on standard error (perror) and return 1. Files may hold any bytes, including zero bytes.",
+		File:  "count.c",
+		Starter: `/* Checked exercise: count
+ * Usage: ./count FILE
+ * Print LINES WORDS BYTES, like wc: lines are '\n' characters, words are
+ * runs of non-white-space characters, bytes are all bytes.
+ * No argument: usage message on stderr, return 2.
+ * Cannot open the file: perror, return 1.
+ */
+`,
+		Cases: []CheckCase{
+			{Name: "four lines", Args: []string{"a.txt"}, Files: map[string]string{"a.txt": "one two\nthree\n\nfour five six\n"}, Want: "4 6 29\n",
+				Explain: "An empty line still counts as a line; words are separated by any white space."},
+			{Name: "no newline at the end", Args: []string{"b.txt"}, Files: map[string]string{"b.txt": "last line"}, Want: "0 2 9\n",
+				Explain: "Like wc, count newline characters: a file without a final newline has one fewer line than it seems."},
+			{Name: "an empty file", Args: []string{"c.txt"}, Files: map[string]string{"c.txt": ""}, Want: "0 0 0\n"},
+			{Name: "tabs and spaces", Args: []string{"d.txt"}, Files: map[string]string{"d.txt": "  a\tb  \n"}, Want: "1 2 8\n",
+				Explain: "isspace (ctype.h) treats spaces, tabs and newlines alike."},
+			{Name: "zero bytes", Args: []string{"e.bin"}, Files: map[string]string{"e.bin": "\x00\xff a\n"}, Want: "1 2 5\n",
+				Explain: "fgets and strlen stop at a zero byte. Read with fgetc (or fread) and count every byte; pass a byte to isspace as an unsigned char."},
+			{Name: "a big file", Args: []string{"f.txt"}, Files: map[string]string{"f.txt": strings.Repeat("x\n", 100000)}, Want: "100000 100000 200000\n"},
+			{Name: "a missing file", Args: []string{"nope.txt"}, WantExit: 1, Stderr: true,
+				Explain: "Check fopen's result for NULL and report it with perror(argv[1])."},
+			{Name: "no argument", WantExit: 2, Stderr: true,
+				Explain: "Check argc before reading argv[1]: without an argument, argv[1] is NULL."},
+		},
+		Hints: []string{
+			"int c; while ((c = fgetc(f)) != EOF) visits every byte, zero bytes included.",
+			"A word starts when a non-space character follows a space (or the start of the file): keep one flag saying whether you are inside a word.",
+			"perror(argv[1]) prints the file name and the reason, such as No such file or directory.",
+		},
+	},
+	{
+		ID: "stack", Stage: 1, Concept: "Headers, the Preprocessor & make",
+		Title: "A stack module: header and implementation",
+		Task:  "Write a small module in two files. stack.h declares STACK_MAX (64), struct stack, and stack_init, stack_push and stack_pop, behind an include guard. stack.c includes it and defines the three functions. The checker's own main includes stack.h twice, on purpose, and links against your stack.c.",
+		File:  "stack.c",
+		Extra: []CheckFile{{Name: "stack.h", Starter: `/* Checked exercise: stack (the interface)
+ * Declare here, behind an include guard (#ifndef STACK_H ... #endif):
+ *   #define STACK_MAX 64
+ *   struct stack { int items[STACK_MAX]; int top; };
+ *   void stack_init(struct stack *s);
+ *   int  stack_push(struct stack *s, int x);    0, or -1 when full
+ *   int  stack_pop(struct stack *s, int *out);  0, or -1 when empty
+ * The checker includes this header twice, on purpose.
+ */
+`}},
+		Starter: `/* Checked exercise: stack (the implementation)
+ * #include "stack.h" and define stack_init, stack_push and stack_pop.
+ * Do not write main: the checker has its own.
+ */
+`,
+		Harness: `#include <stdio.h>
+#include <string.h>
+#include "stack.h"
+#include "stack.h" /* twice, on purpose: the include guard must make this harmless */
+
+int main(int argc, char **argv) {
+    if (argc < 2) return 2;
+    struct stack s;
+    stack_init(&s);
+    int x;
+    if (strcmp(argv[1], "lifo") == 0) {
+        stack_push(&s, 1); stack_push(&s, 2); stack_push(&s, 3);
+        while (stack_pop(&s, &x) == 0) printf("%d ", x);
+        printf("\n");
+    } else if (strcmp(argv[1], "empty") == 0) {
+        x = 42;
+        int r = stack_pop(&s, &x);
+        printf("%d %d\n", r, x);
+    } else if (strcmp(argv[1], "full") == 0) {
+        int ok = 0;
+        for (int i = 0; i < STACK_MAX; i++) ok += stack_push(&s, i) == 0;
+        printf("%d %d %d\n", ok == STACK_MAX, stack_push(&s, 99), STACK_MAX);
+    } else if (strcmp(argv[1], "independent") == 0) {
+        struct stack t;
+        stack_init(&t);
+        stack_push(&s, 1); stack_push(&t, 2);
+        stack_pop(&s, &x); printf("%d ", x);
+        stack_pop(&t, &x); printf("%d\n", x);
+    } else return 2;
+    return 0;
+}
+`,
+		BuildHints: []BuildHint{
+			{"redefinition of", "Something is defined twice: the checker includes stack.h twice, so the header needs an include guard (#ifndef STACK_H, #define STACK_H, ..., #endif)."},
+			{"stack.h: No such file", "Create stack.h in the same folder as stack.c."},
+			{"implicit declaration of function", "A function is used before it is declared: put its prototype in stack.h."},
+			{"undefined reference", "The linker found no definition: define every function declared in stack.h in stack.c."},
+		},
+		Cases: []CheckCase{
+			{Name: "last in, first out", Args: []string{"lifo"}, Want: "3 2 1\n"},
+			{Name: "pop from an empty stack", Args: []string{"empty"}, Want: "-1 42\n",
+				Explain: "Return -1 and leave *out untouched when the stack is empty."},
+			{Name: "full at STACK_MAX", Args: []string{"full"}, Want: "1 -1 64\n",
+				Explain: "Exactly STACK_MAX (64) pushes succeed; the next returns -1 instead of writing past items."},
+			{Name: "two stacks are separate", Args: []string{"independent"}, Want: "1 2\n",
+				Explain: "Keep all state inside the struct: a global or static counter would be shared by every stack."},
+		},
+		Hints: []string{
+			"The guard: #ifndef STACK_H on the first line, #define STACK_H on the second, #endif on the last.",
+			"top can be the number of items: push writes items[top++], pop reads items[--top].",
 		},
 	},
 	{
@@ -273,6 +556,44 @@ int main(void) {
 			"sum / n with two ints is integer division, even if the result is returned as a double.",
 		},
 	},
+	{
+		ID: "wordfreq", Stage: 1, Project: true,
+		Title:   "Stage 1 project: word frequencies",
+		Task:    "Read text from standard input and print its ten most frequent words, most frequent first, as COUNT WORD. A word is a run of ASCII letters, compared in lower case (The and the are one word); everything else separates words. Equal counts are listed in alphabetical order, and with fewer than ten different words print them all. Words can be any length and the input any size, so use memory you allocate, and free all of it. This joins the whole stage: loops, functions, strings, structs, dynamic memory and input.",
+		File:    "wordfreq.c",
+		Leaks:   true,
+		Timeout: 5 * time.Second,
+		Starter: `/* Stage 1 project: wordfreq
+ * Read text from stdin; print the 10 most frequent words, most frequent
+ * first, as "COUNT WORD". A word is a run of ASCII letters, in lower
+ * case. Ties: alphabetical order. Any word length, any input size: use
+ * malloc/realloc, and free everything before main returns.
+ * Try it: ./wordfreq < some_book.txt
+ */
+`,
+		Cases: []CheckCase{
+			{Name: "a sentence", Stdin: "The cat and the hat. The END!\n", Want: "3 the\n1 and\n1 cat\n1 end\n1 hat\n",
+				Explain: "Lower-case every letter before comparing, and treat punctuation as a separator."},
+			{Name: "ties in alphabetical order", Stdin: "b a c b a c d\n", Want: "2 a\n2 b\n2 c\n1 d\n",
+				Explain: "Sort by count (highest first), then by the word with strcmp."},
+			{Name: "only the top ten", Stdin: twelveWords(), Want: "12 aa\n11 bb\n10 cc\n9 dd\n8 ee\n7 ff\n6 gg\n5 hh\n4 ii\n3 jj\n"},
+			{Name: "no input", Stdin: "", Want: "",
+				Explain: "With no words your array is still NULL, and qsort(NULL, 0, …) is undefined behaviour: sort only when there is something to sort."},
+			{Name: "no letters at all", Stdin: "123 456 !!!\n", Want: "",
+				Explain: "Digits and punctuation only separate words: there are none here, so print nothing (and do not sort an empty array)."},
+			{Name: "upper and lower case", Stdin: "Apple apple APPLE banana\n", Want: "3 apple\n1 banana\n"},
+			{Name: "a 5000-letter word", Stdin: strings.Repeat("a", 5000) + " x " + strings.Repeat("a", 5000) + "\n", Want: "2 " + strings.Repeat("a", 5000) + "\n1 x\n",
+				Explain: "A fixed-size word buffer overflows here: grow the buffer for the current word with realloc."},
+			{Name: "200,000 words", Stdin: manyWords(), Want: "2000 aa\n2000 ab\n2000 ac\n2000 ad\n2000 ae\n2000 af\n2000 ag\n2000 ah\n2000 ai\n2000 aj\n",
+				Explain: "Every word appears 2000 times, so the ten shown are the first ten alphabetically."},
+		},
+		Hints: []string{
+			"Read with getchar into a growing buffer for the current word; when a non-letter arrives, the word is finished.",
+			"Keep an array of struct { char *word; long count; }, grown with realloc, and look each finished word up in it (a linear search is fast enough here).",
+			"qsort with a comparison that returns a positive number when a should come after b: higher counts first, then strcmp.",
+			"Before returning, free every word you copied and then the array itself.",
+		},
+	},
 }
 
 // fizzBuzzWant is the expected output of FizzBuzz from 1 to n.
@@ -288,6 +609,43 @@ func fizzBuzzWant(n int) string {
 			b.WriteString("Buzz\n")
 		default:
 			fmt.Fprintf(&b, "%d\n", i)
+		}
+	}
+	return b.String()
+}
+
+// hundredStudents is the input "s00 0" … "s99 99".
+func hundredStudents() string {
+	var b strings.Builder
+	for i := 0; i < 100; i++ {
+		fmt.Fprintf(&b, "s%02d %d\n", i, i)
+	}
+	return b.String()
+}
+
+// twelveWords has twelve words, "aa" twelve times down to "ll" once.
+func twelveWords() string {
+	var b strings.Builder
+	for i := 0; i < 12; i++ {
+		w := strings.Repeat(string(rune('a'+i)), 2)
+		for n := 0; n < 12-i; n++ {
+			b.WriteString(w + " ")
+		}
+	}
+	return b.String() + "\n"
+}
+
+// manyWords is 200,000 words: "aa" to "jj", 2,000 times each, mixed up.
+func manyWords() string {
+	var b strings.Builder
+	for k := 0; k < 200000; k++ {
+		i := k * 7 % 100
+		b.WriteByte(byte('a' + i/10))
+		b.WriteByte(byte('a' + i%10))
+		if k%12 == 11 {
+			b.WriteString(".\n")
+		} else {
+			b.WriteByte(' ')
 		}
 	}
 	return b.String()

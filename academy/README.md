@@ -200,7 +200,7 @@ Checked-exercise files live in `Documents/Academy Labs` (`$ACADEMY_LABS` chooses
 | | 19 | Network Defence & Monitoring |
 | | 20 | Incident Response, Forensics & Privacy |
 
-That is **118 concepts** and **354 exercises**, plus a glossary, a resource library, lab blueprints, a quiz and a mastery check for every stage. Start Here also lists electives for afterwards: graphics, quantum computing, embedded systems and bioinformatics.
+That is **122 concepts** and **366 exercises**, plus a glossary, a resource library, lab blueprints, a quiz and a mastery check for every stage. Start Here also lists electives for afterwards: graphics, quantum computing, embedded systems and bioinformatics.
 
 ## How computers work (Stage 0)
 
@@ -223,23 +223,30 @@ Stage 1 (C) builds on it, so a fresh campus starts at Stage 0.
 
 ## C first: see what is under the hood
 
-Stage 1 teaches programming **in C**. In C, every value has a size and an address, and the compiler turns your text into real machine instructions, so from the first week you see what other languages do for you behind the scenes. Stage 1 has eight concepts:
+Stage 1 teaches programming **in C**. In C, every value has a size and an address, and the compiler turns your text into real machine instructions, so from the first week you see what other languages do for you behind the scenes. Stage 1 has twelve concepts, each with a checked exercise you write and the academy compiles and tests (see below), and ends with a project:
 
 1. Your First C Program: Source, Compiler, Executable (including installing gcc or clang, on Linux, macOS, or Windows via WSL)
 2. Values, Types & Variables (sizes, integer division, casts, printf formats)
 3. Control Flow: Decisions & Loops
-4. Functions & Decomposition (prototypes, headers, pass-by-value, the stack)
+4. Functions & Decomposition (prototypes, pass-by-value, the stack)
 5. Memory, Addresses & Pointers
-6. Collections: arrays, strings with their '\0', and structs
-7. Safe Input & Undefined Behavior: fgets and strtol, checking return values, and -fsanitize=address,undefined
-8. Debugging & Reading Errors: compiler warnings, gdb, sanitizers
+6. Collections: arrays, and strings with their '\0'
+7. Structs: fields, `.` and `->`, passing structs, padding and alignment
+8. Dynamic Memory: malloc, calloc, realloc and free; ownership; leaks, double frees and use-after-free; the growable array
+9. Safe Input & Undefined Behavior: fgets and strtol, checking return values, and -fsanitize=address,undefined
+10. Files & Streams: fopen and its modes, fgets, fgetc and fread, perror, buffering and fclose
+11. Headers, the Preprocessor & make: separate compilation, include guards, static, the linker's symbols, macros, Makefiles
+12. Debugging & Reading Errors: compiler warnings, gdb, sanitizers
 
 Every Stage 1 concept also has an **🔧 Under the hood** section showing what the machine really does, taken from real gcc output on x86-64:
 - `int count = 3;` as a stack slot, and its little-endian bytes;
 - a loop as compare-and-jump, and an `if` turned into a conditional move;
 - the calling convention (arguments in `rdi` and `rsi`, the result in `eax`);
 - `*p` as a single load, and `a[i]` as `[a + i*4]`;
-- struct padding;
+- struct padding, and a field access as one load at a fixed offset;
+- malloc as library code over brk and mmap, and why heap bugs crash far away;
+- a FILE as a file descriptor plus a buffer: about 260 `read` calls for a 1 MB file;
+- `nm` showing the T and U symbols the linker matches, and a macro that computes 5 for SQUARE(1+2);
 - the path from `_start` through `__libc_start_main` to `main`, and printf as one `write` system call;
 - gcc -O2 deleting an overflow check that relies on undefined behaviour;
 - how gdb plants an `int3` breakpoint.
@@ -284,17 +291,23 @@ The **Exercise Gym** in each stage's Study Hall shows the exercises, reveals hin
 
 ## Checked exercises: your C, compiled and tested for real
 
-Ticking an exercise off says you did it; a checked exercise shows it. Stage 1 has seven, one for each step of C from zero:
+Ticking an exercise off says you did it; a checked exercise shows it. Stage 1 has twelve, one for each concept, and a project that joins them:
 
 | Check | Concept | What the tests catch |
 |-------|---------|----------------------|
 | `hello` | Your first C program | the exact greeting and a clean exit |
+| `types` | Values and types | your predictions: integer division, `%`, casts, characters as numbers, `sizeof` |
 | `fizzbuzz` | Control flow | the order of the tests, and loop bounds |
 | `temperature` | Functions | integer division (9 / 5 is 1), and that the two functions are inverses. The checker supplies `main` and calls your functions |
 | `swap` | Pointers | swapping copies instead of the originals, and the XOR trick that zeroes a variable swapped with itself |
 | `letters` | Arrays and strings | case, non-ASCII bytes, and 200,000 characters of input (no fixed-size buffer) |
+| `scores` | Structs | ties (the first wins), an empty input, a 31-letter name in a 32-byte field, a floating-point average |
+| `intvec` | Dynamic memory | a growable array (`vec_push` doubling with `realloc`), a million pushes, and the **leak checker**: memory never freed fails the check |
 | `safe_number` | Safe input | `fgets` and `strtol` used properly: `12abc`, empty input, end of input, and numbers that overflow `int` or even `long` |
+| `count` | Files | a `wc` of your own: test files given to the program, no final newline, zero bytes in the file, a missing file (perror, exit 1) and no argument (exit 2) |
+| `stack` | Headers and make | two files you write, `stack.h` and `stack.c`. The checker's `main` includes the header twice, so it needs an include guard; it also tests a full and an empty stack, and two stacks at once |
 | `fix_average` | Debugging | a program with two bugs: the sanitizer finds one, the wrong output the other |
+| `wordfreq` | **Stage 1 project** | the ten most frequent words of any text: case, ties in alphabetical order, a 5,000-letter word, 200,000 words, empty input, and no leaks |
 
 **How it works.**
 1. Open one from the Study Hall (**Checked exercises**). The academy creates your file in `Documents/Academy Labs/Stage 01/` with a short comment saying what to write. It never overwrites the file afterwards.
@@ -306,6 +319,8 @@ Ticking an exercise off says you did it; a checked exercise shows it. Stage 1 ha
 - Where your compiler supports them, AddressSanitizer and UndefinedBehaviorSanitizer are switched on. A read past the end of an array is then reported as one, with the function and line.
 - It runs the program on each test case. For every failure it says what was wrong ("line 15 should be "FizzBuzz", but was "Fizz"", "main returned 0, expected 1", "did not finish within 2s") and the usual cause.
 - Hints are revealed one at a time. None contains the solution.
+
+**What's next** suggests a check as soon as you mark its concept as understood: you've read it, now make it work. It suggests the project once the whole stage is understood.
 
 **Evidence.** Every run and every hint is appended to `academy_checks.jsonl`, beside your progress. Each run line records the time, the compiler, the cases passed, whether the sanitizers were on, and how many hints you had seen. The academy shows a check as **passed on your own** (no hints), **passed, with hints**, or the cases passing in the latest run. Concept cards show the check for their concept.
 

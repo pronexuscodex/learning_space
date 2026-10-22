@@ -54,6 +54,15 @@ func truncateBytes(s string, width int) string {
 	return s
 }
 
+// checkSubject is what a check gives evidence for: its concept, or the
+// stage as a whole for a project.
+func checkSubject(ch Check) string {
+	if ch.Project {
+		return fmt.Sprintf("the Stage %d project", ch.Stage)
+	}
+	return "“" + ch.Concept + "”"
+}
+
 // checkMark is a check's state as a mark and a few words.
 func checkMark(s CheckStatus) (string, string) {
 	switch {
@@ -67,13 +76,18 @@ func checkMark(s CheckStatus) (string, string) {
 	return sty.Gray("○"), "not run yet"
 }
 
-// loadCheckStatuses reads the check log, or returns empty statuses.
+// loadCheckStatuses reads the check log, or returns empty statuses. It
+// also keeps them on the registry, for What's next.
 func (a *App) loadCheckStatuses() map[string]CheckStatus {
 	events, err := readCheckLog(checkLogPath(a.path))
 	if err != nil {
 		a.con.warn("Could not read the check log: %v", err)
 	}
-	return checkStatuses(events)
+	st := checkStatuses(events)
+	a.mu.Lock()
+	a.reg.checkStatus = st
+	a.mu.Unlock()
+	return st
 }
 
 // checkedExercises lists a stage's checked exercises.
@@ -108,26 +122,37 @@ func (a *App) checkedExercises(stageID int) error {
 // checkScreen shows one checked exercise and runs it on request.
 func (a *App) checkScreen(ch Check) error {
 	file := checkFile(a.path, ch)
-	created, err := ensureStarter(file, ch)
+	created, err := ensureStarters(a.path, ch)
 	if err != nil {
-		a.con.fail("Could not create %s: %v", file, err)
+		a.con.fail("Could not create the files: %v", err)
 		return nil
 	}
-	if created {
-		a.con.ok("Created %s for you.", homeTilde(file))
+	for _, f := range created {
+		a.con.ok("Created %s for you.", filepath.Base(f))
 	}
 	for {
 		st := a.loadCheckStatuses()[ch.ID]
 		w := a.cols()
 		a.println("")
-		a.printf("  %s %s\n", sty.Bold(sty.Green(ch.Title)), sty.Gray(fmt.Sprintf("· Stage %d · %s", ch.Stage, truncate(ch.Concept, max(10, w-30-len(ch.Title))))))
+		a.printf("  %s\n", sty.Bold(sty.Green(truncate(ch.Title, w-4))))
+		for _, l := range wrap(fmt.Sprintf("Stage %d · %s", ch.Stage, checkSubject(ch)), w-4, "  ") {
+			a.println(sty.Gray(l))
+		}
 		for _, l := range wrap(ch.Task, w-4, "  ") {
 			a.println(l)
 		}
 		a.println("")
-		a.printf("  %s\n", sty.Bold("Your file:"))
-		for _, l := range wrapPath(homeTilde(file), w-6) {
+		files := append([]string{file}, extraPaths(filepath.Dir(file), ch)...)
+		label := "Your file:"
+		if len(files) > 1 {
+			label = "Your files:"
+		}
+		a.printf("  %s\n", sty.Bold(label))
+		for _, l := range wrapPath(homeTilde(filepath.Dir(file))+string(filepath.Separator), w-6) {
 			a.printf("    %s\n", l)
+		}
+		for _, f := range files {
+			a.printf("      %s\n", truncate(filepath.Base(f), w-8))
 		}
 		for _, l := range wrap(fmt.Sprintf("Edit it in any editor and save. Then run the check here, or in another terminal: academy -check %s", ch.ID), w-4, "  ") {
 			a.println(sty.Gray(l))
@@ -185,8 +210,13 @@ func (a *App) runCheckNow(ch Check, file string, hints int) {
 func writeCheckRun(w io.Writer, run CheckRun, width int) {
 	ch := run.Check
 	checks := "memory and undefined-behaviour checks (AddressSanitizer, UBSan)"
-	if !run.Sanitizers {
+	switch {
+	case !run.Sanitizers:
 		checks = "no memory checks (the sanitizers are not available with this compiler)"
+	case run.Leaks:
+		checks += " and the leak checker"
+	case ch.Leaks:
+		checks += "; the leak checker does not work here, so leaks are not caught"
 	}
 	fmt.Fprintln(w)
 	for _, l := range wrap(fmt.Sprintf("Built with %s: -std=c17 -Wall -Wextra -Werror, %s.", run.Compiler, checks), width-4, "  ") {
@@ -233,7 +263,7 @@ func writeCheckRun(w io.Writer, run CheckRun, width int) {
 		if len(ch.Cases) == 1 {
 			all = "It passes."
 		}
-		fmt.Fprintf(w, "  %s %s\n", sty.Green("✓"), sty.Bold(all+" Recorded as evidence for “"+ch.Concept+"”."))
+		fmt.Fprintf(w, "  %s %s\n", sty.Green("✓"), sty.Bold(all+" Recorded as evidence for "+checkSubject(ch)+"."))
 		return
 	}
 	fmt.Fprintf(w, "  %s\n", sty.Bold(fmt.Sprintf("%d of %d cases pass.", run.Passed, len(ch.Cases))))
@@ -283,13 +313,16 @@ func checkCommand(regPath, id string, out io.Writer, width int) int {
 		return 2
 	}
 	file := checkFile(regPath, ch)
-	created, err := ensureStarter(file, ch)
+	created, err := ensureStarters(regPath, ch)
 	if err != nil {
-		fmt.Fprintf(out, "✗ could not create %s: %v\n", file, err)
+		fmt.Fprintf(out, "✗ could not create the files: %v\n", err)
 		return 1
 	}
-	if created {
-		fmt.Fprintf(out, "Created %s.\nWrite your program there, save, and run academy -check %s again.\n", homeTilde(file), id)
+	if len(created) > 0 {
+		for _, f := range created {
+			fmt.Fprintf(out, "Created %s.\n", homeTilde(f))
+		}
+		fmt.Fprintf(out, "Write your program there, save, and run academy -check %s again.\n", id)
 		for _, l := range wrap(ch.Task, width-4, "  ") {
 			fmt.Fprintln(out, l)
 		}

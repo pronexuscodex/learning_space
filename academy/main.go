@@ -262,6 +262,10 @@ type Registry struct {
 	Watch         []WatchItem           `json:"watch"`          // the tech-watch log
 	WatchVisited  time.Time             `json:"watch_visited"`  // last time headlines were fetched
 
+	// checkStatus sums up the checked-exercise log (academy_checks.jsonl),
+	// which the app reads; it is never saved in the registry itself.
+	checkStatus map[string]CheckStatus
+
 	// Classic Mode (see classic.go).
 	ClassicMode    bool                 `json:"classic_mode"`
 	Notebook       []NotebookEntry      `json:"notebook"`
