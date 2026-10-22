@@ -34,6 +34,7 @@ const (
 	SuggestFocus     = "focus"
 	SuggestWatch     = "watch"
 	SuggestInterview = "interview"
+	SuggestCheck     = "check"
 )
 
 // Suggestion is one recommended next step.
@@ -42,8 +43,9 @@ type Suggestion struct {
 	Title    string
 	Why      string
 	Stage    int
-	Concept  int // index within the stage's guide
-	Exercise int // index within the concept's exercises
+	Concept  int    // index within the stage's guide
+	Exercise int    // index within the concept's exercises
+	CheckID  string // for a checked exercise
 }
 
 // stageOrder is the recommended order of study: Foundations first, then
@@ -92,6 +94,37 @@ func (r *Registry) currentStage() *Stage {
 		}
 	}
 	return fresh
+}
+
+// checkSuggestion is the first checked exercise not yet passed whose
+// concept is understood (or, for a stage project, whose stage's concepts
+// all are): reading an idea is not the same as making it work.
+func (r *Registry) checkSuggestion() (Suggestion, bool) {
+	if !runnerSupported {
+		return Suggestion{}, false
+	}
+	for _, ch := range checks {
+		st := r.checkStatus[ch.ID]
+		_, s := r.findStage(ch.Stage)
+		if st.Passed || s == nil {
+			continue
+		}
+		why := fmt.Sprintf("You marked “%s” as understood: now make it work. The academy compiles your program and runs the tests.", ch.Concept)
+		if ch.Project {
+			if studied, total := conceptProgress(s); studied < total {
+				continue
+			}
+			why = fmt.Sprintf("Every Stage %d concept is understood: the stage project joins them in one program.", ch.Stage)
+		} else if !s.hasStudied(ch.Concept) {
+			continue
+		}
+		if st.Runs > 0 {
+			why = fmt.Sprintf("Your last run passed %d of %d cases: finish it.", st.LastCount, st.Total)
+		}
+		return Suggestion{Kind: SuggestCheck, Stage: ch.Stage, CheckID: ch.ID,
+			Title: fmt.Sprintf("Checked exercise: %s (Stage %d)", ch.Title, ch.Stage), Why: why}, true
+	}
+	return Suggestion{}, false
 }
 
 // nextSteps returns up to four suggestions, most important first:
@@ -143,6 +176,10 @@ exercises:
 				break exercises
 			}
 		}
+	}
+
+	if sg, ok := r.checkSuggestion(); ok {
+		out = append(out, sg)
 	}
 
 	if sg, ok := r.interviewSuggestion(now); ok {

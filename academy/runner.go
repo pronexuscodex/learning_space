@@ -58,6 +58,7 @@ type CheckRun struct {
 	Check      Check
 	Compiler   string // the first line of "cc --version"
 	Sanitizers bool   // built with AddressSanitizer and UndefinedBehaviorSanitizer
+	Leaks      bool   // the leak checker was on (for checks about memory, where it works)
 	Built      bool
 	BuildLog   string // compiler messages: warnings count as errors
 	Cases      []CaseResult
@@ -135,10 +136,46 @@ func sanitizersWork(cc compiler) bool {
 			return false
 		}
 		cmd := exec.CommandContext(ctx, prog)
-		cmd.Env = childEnv(dir)
+		cmd.Env = childEnv(dir, false)
 		return cmd.Run() == nil
 	}()
 	sanitizerProbe.Store(cc.key(), ok)
+	return ok
+}
+
+var leakProbe sync.Map // compiler key → bool
+
+// leaksWork reports whether the sanitizers' leak checker works here. It
+// needs to stop the program's threads with ptrace at exit, which some
+// containers and macOS do not allow.
+func leaksWork(cc compiler) bool {
+	if v, ok := leakProbe.Load(cc.key()); ok {
+		return v.(bool)
+	}
+	ok := func() bool {
+		dir, err := os.MkdirTemp("", "academy-probe-")
+		if err != nil {
+			return false
+		}
+		defer os.RemoveAll(dir)
+		src := filepath.Join(dir, "leak.c")
+		leaky := "#include <stdlib.h>\nint main(void) { void *volatile p = malloc(64); (void)p; p = 0; return 0; }\n"
+		if os.WriteFile(src, []byte(leaky), 0o600) != nil {
+			return false
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), compileTimeout)
+		defer cancel()
+		prog := filepath.Join(dir, "leak")
+		args := append(sanitizerFlags(), "-o", prog, src)
+		if cc.command(ctx, args...).Run() != nil {
+			return false
+		}
+		cmd := exec.CommandContext(ctx, prog)
+		cmd.Env = childEnv(dir, true)
+		out, err := cmd.CombinedOutput()
+		return err != nil && strings.Contains(string(out), "LeakSanitizer: detected memory leaks")
+	}()
+	leakProbe.Store(cc.key(), ok)
 	return ok
 }
 
@@ -146,17 +183,21 @@ func sanitizerFlags() []string {
 	return []string{"-fsanitize=address,undefined", "-fno-sanitize-recover=all", "-fno-omit-frame-pointer"}
 }
 
-// childEnv is the whole environment a learner's program gets.
-func childEnv(dir string) []string {
+// childEnv is the whole environment a learner's program gets. Leak
+// checking is on only for checks about memory, and only where it works
+// (leaksWork).
+func childEnv(dir string, leaks bool) []string {
+	asan := "ASAN_OPTIONS=detect_leaks=0"
+	if leaks {
+		asan = "ASAN_OPTIONS=detect_leaks=1"
+	}
 	return []string{
 		"PATH=" + os.Getenv("PATH"),
 		"HOME=" + dir,
 		"TMPDIR=" + dir,
 		"LANG=C",
 		"LC_ALL=C",
-		// Leak reports need ptrace, which many containers forbid; the
-		// lessons cover leaks with valgrind and ASan by hand instead.
-		"ASAN_OPTIONS=detect_leaks=0",
+		asan,
 		"UBSAN_OPTIONS=print_stacktrace=1",
 	}
 }
@@ -179,7 +220,8 @@ func (b *cappedBuffer) Write(p []byte) (int, error) {
 	return b.Buffer.Write(p)
 }
 
-// runCheck compiles src and runs it against the check's cases.
+// runCheck compiles src (and the check's other files, which sit beside
+// it) and runs it against the check's cases.
 func runCheck(ch Check, src string) (CheckRun, error) {
 	run := CheckRun{Check: ch}
 	if !runnerSupported {
@@ -189,11 +231,21 @@ func runCheck(ch Check, src string) (CheckRun, error) {
 	if err != nil {
 		return run, err
 	}
-	if _, err := os.Stat(src); err != nil {
-		return run, fmt.Errorf("cannot read your file %s: %w", src, err)
+	srcDir := filepath.Dir(src)
+	sources := []string{src}
+	for _, f := range ch.Extra {
+		if strings.HasSuffix(f.Name, ".c") {
+			sources = append(sources, filepath.Join(srcDir, f.Name))
+		}
+	}
+	for _, f := range append([]string{src}, extraPaths(srcDir, ch)...) {
+		if _, err := os.Stat(f); err != nil {
+			return run, fmt.Errorf("cannot read your file %s: %w", f, err)
+		}
 	}
 	run.Compiler = compilerVersion(cc)
 	run.Sanitizers = sanitizersWork(cc)
+	run.Leaks = ch.Leaks && run.Sanitizers && leaksWork(cc)
 
 	dir, err := os.MkdirTemp("", "academy-check-")
 	if err != nil {
@@ -205,7 +257,8 @@ func runCheck(ch Check, src string) (CheckRun, error) {
 	if run.Sanitizers {
 		args = append(args, sanitizerFlags()...)
 	}
-	args = append(args, "-o", prog, src)
+	args = append(args, "-I", srcDir, "-o", prog)
+	args = append(args, sources...)
 	if ch.Harness != "" {
 		h := filepath.Join(dir, "check_main.c")
 		if err := os.WriteFile(h, []byte(ch.Harness), 0o600); err != nil {
@@ -217,7 +270,7 @@ func runCheck(ch Check, src string) (CheckRun, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), compileTimeout)
 	defer cancel()
 	build := cc.command(ctx, args...)
-	build.Dir = filepath.Dir(src)
+	build.Dir = srcDir
 	log := &cappedBuffer{max: maxCheckStderr}
 	build.Stdout, build.Stderr = log, log
 	err = build.Run()
@@ -226,6 +279,11 @@ func runCheck(ch Check, src string) (CheckRun, error) {
 		if ch.Harness != "" && (strings.Contains(run.BuildLog, "multiple definition of `main'") || strings.Contains(run.BuildLog, "duplicate symbol") && strings.Contains(run.BuildLog, "_main")) {
 			run.BuildLog += "\n\nYour file must not define main: the checker supplies its own and calls your functions."
 		}
+		for _, h := range ch.BuildHints {
+			if strings.Contains(run.BuildLog, h.Match) {
+				run.BuildLog += "\n\n" + h.Note
+			}
+		}
 		if ctx.Err() != nil {
 			run.BuildLog += "\n\nThe compiler did not finish within a minute."
 		}
@@ -233,8 +291,19 @@ func runCheck(ch Check, src string) (CheckRun, error) {
 	}
 	run.Built = true
 
-	for _, c := range ch.Cases {
-		r := runCase(prog, dir, c)
+	timeout := max(checkCaseTimeout, ch.Timeout)
+	for i, c := range ch.Cases {
+		// Each case runs in a folder of its own holding only its files.
+		caseDir := filepath.Join(dir, fmt.Sprintf("case-%d", i+1))
+		if err := os.Mkdir(caseDir, 0o700); err != nil {
+			return run, err
+		}
+		for name, content := range c.Files {
+			if err := os.WriteFile(filepath.Join(caseDir, name), []byte(content), 0o600); err != nil {
+				return run, err
+			}
+		}
+		r := runCase(prog, caseDir, c, timeout, run.Leaks)
 		if r.Pass {
 			run.Passed++
 		}
@@ -243,14 +312,23 @@ func runCheck(ch Check, src string) (CheckRun, error) {
 	return run, nil
 }
 
+// extraPaths are a check's other files, beside the main one in dir.
+func extraPaths(dir string, ch Check) []string {
+	var out []string
+	for _, f := range ch.Extra {
+		out = append(out, filepath.Join(dir, f.Name))
+	}
+	return out
+}
+
 // runCase runs the program once and judges the result.
-func runCase(prog, dir string, c CheckCase) CaseResult {
+func runCase(prog, dir string, c CheckCase, timeout time.Duration, leaks bool) CaseResult {
 	res := CaseResult{Case: c}
-	ctx, cancel := context.WithTimeout(context.Background(), checkCaseTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, prog, c.Args...)
 	cmd.Dir = dir
-	cmd.Env = childEnv(dir)
+	cmd.Env = childEnv(dir, leaks)
 	cmd.Stdin = strings.NewReader(c.Stdin)
 	stdout := &cappedBuffer{max: maxCheckStdout}
 	stderr := &cappedBuffer{max: maxCheckStderr}
@@ -269,7 +347,7 @@ func runCase(prog, dir string, c CheckCase) CaseResult {
 	case sanitizerReport(res.Stderr) != "": // even if the report ran past the time limit
 		res.Problem = sanitizerReport(res.Stderr)
 	case ctx.Err() != nil:
-		res.Problem = fmt.Sprintf("did not finish within %s: an endless loop, or waiting for input that never comes", checkCaseTimeout)
+		res.Problem = fmt.Sprintf("did not finish within %s: an endless loop, or waiting for input that never comes", timeout)
 	case stdout.over:
 		res.Problem = "printed more than 1 MB: probably an endless loop"
 	case err != nil && !errors.As(err, &exitErr):
@@ -314,12 +392,45 @@ func sanitizerReport(stderr string) string {
 			}
 			return strings.Join(parts, ", ")
 		}
+		if strings.Contains(l, "ERROR: LeakSanitizer: detected memory leaks") {
+			return leakSummary(lines[i+1:])
+		}
 		if loc, msg, ok := strings.Cut(l, ": runtime error: "); ok {
 			return "UndefinedBehaviorSanitizer: " + msg + ", at " + filepath.Base(loc)
 		}
 	}
 	return ""
 }
+
+// leakSummary sums up a LeakSanitizer report: how much leaked, and the
+// learner's line that allocated the first block.
+func leakSummary(lines []string) string {
+	out := "LeakSanitizer found memory that was never freed"
+	where := ""
+	for _, l := range lines {
+		l = strings.TrimSpace(l)
+		if after, ok := strings.CutPrefix(l, "SUMMARY: AddressSanitizer: "); ok {
+			out += ": " + strings.TrimSuffix(after, ".")
+			break
+		}
+		if where != "" || !strings.HasPrefix(l, "#") || strings.Contains(l, "sanitizer") || strings.Contains(l, "asan") {
+			continue // the allocator's own frames come first
+		}
+		if _, after, ok := strings.Cut(l, " in "); ok {
+			if fn, _, _ := strings.Cut(after, " "); !allocator[fn] {
+				where = frameWhere(l)
+			}
+		}
+	}
+	if where != "" {
+		out += ", allocated " + where
+	}
+	return out
+}
+
+// allocator names the C library's allocation functions, skipped when
+// finding the learner's own line in a leak report.
+var allocator = map[string]bool{"malloc": true, "calloc": true, "realloc": true, "strdup": true, "strndup": true, "reallocarray": true}
 
 // frameWhere turns a stack frame ("#0 0x55… in average /path/f.c:11") into
 // "in average, f.c:11".

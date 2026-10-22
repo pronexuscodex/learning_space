@@ -1130,6 +1130,7 @@ func (a *App) showShortcuts() {
 
 // run is the interactive loop. Ctrl-D (EOF) is treated as save & exit.
 func (a *App) run() {
+	a.loadCheckStatuses() // for What's next: checks run from another terminal count too
 	for {
 		a.printMenu()
 		a.con.setOnClear(a.printMenu) // Ctrl+L and resizes redraw the menu on a clean screen

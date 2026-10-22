@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -16,7 +17,10 @@ func TestChecksAreWellFormed(t *testing.T) {
 			t.Errorf("bad or duplicate check ID %q", ch.ID)
 		}
 		ids[ch.ID] = true
-		if id, _, ok := conceptAt(ch.Concept); !ok || id != ch.Stage {
+		switch id, _, ok := conceptAt(ch.Concept); {
+		case ch.Project && ch.Concept != "":
+			t.Errorf("%s: a project joins a whole stage, so it names no concept", ch.ID)
+		case !ch.Project && (!ok || id != ch.Stage):
 			t.Errorf("%s: concept %q is not in Stage %d", ch.ID, ch.Concept, ch.Stage)
 		}
 		if !strings.HasSuffix(ch.File, ".c") || strings.ContainsAny(ch.File, "/\\") {
@@ -127,6 +131,213 @@ func TestLabsDir(t *testing.T) {
 
 // referenceSolutions pass every case of their check.
 var referenceSolutions = map[string]string{
+	"types": `#include <stdio.h>
+
+int main(void) {
+    printf("%d\n", 7 / 2);
+    printf("%d\n", 7 % 2);
+    printf("%.1f\n", 7.0 / 2);
+    printf("%d\n", (int)3.99);
+    printf("%d\n", 'A' + 1);
+    printf("%zu\n", sizeof(int) * 8);
+    return 0;
+}
+`,
+	"scores": `#include <stdio.h>
+
+struct student {
+    char name[32];
+    int score;
+};
+
+int main(void) {
+    struct student s[100];
+    int n = 0;
+    while (n < 100 && scanf("%31s %d", s[n].name, &s[n].score) == 2) {
+        n++;
+    }
+    if (n == 0) {
+        printf("no students\n");
+        return 0;
+    }
+    int best = 0;
+    long sum = 0;
+    for (int i = 0; i < n; i++) {
+        sum += s[i].score;
+        if (s[i].score > s[best].score) {
+            best = i;
+        }
+    }
+    printf("best: %s %d\n", s[best].name, s[best].score);
+    printf("average: %.1f\n", (double)sum / n);
+    return 0;
+}
+`,
+	"intvec": `#include <stddef.h>
+#include <stdlib.h>
+
+struct intvec {
+    int *data;
+    size_t len;
+    size_t cap;
+};
+
+void vec_init(struct intvec *v) {
+    v->data = NULL;
+    v->len = 0;
+    v->cap = 0;
+}
+
+int vec_push(struct intvec *v, int x) {
+    if (v->len == v->cap) {
+        size_t cap = v->cap ? v->cap * 2 : 4;
+        int *tmp = realloc(v->data, cap * sizeof *tmp);
+        if (tmp == NULL) {
+            return -1;
+        }
+        v->data = tmp;
+        v->cap = cap;
+    }
+    v->data[v->len++] = x;
+    return 0;
+}
+
+void vec_free(struct intvec *v) {
+    free(v->data);
+    vec_init(v);
+}
+`,
+	"count": `#include <ctype.h>
+#include <stdio.h>
+
+int main(int argc, char **argv) {
+    if (argc < 2) {
+        fprintf(stderr, "usage: count FILE\n");
+        return 2;
+    }
+    FILE *f = fopen(argv[1], "rb");
+    if (f == NULL) {
+        perror(argv[1]);
+        return 1;
+    }
+    long lines = 0, words = 0, bytes = 0;
+    int in_word = 0, c;
+    while ((c = fgetc(f)) != EOF) {
+        bytes++;
+        if (c == '\n') {
+            lines++;
+        }
+        if (isspace((unsigned char)c)) {
+            in_word = 0;
+        } else if (!in_word) {
+            in_word = 1;
+            words++;
+        }
+    }
+    fclose(f);
+    printf("%ld %ld %ld\n", lines, words, bytes);
+    return 0;
+}
+`,
+	"stack": `#include "stack.h"
+
+void stack_init(struct stack *s) { s->top = 0; }
+
+int stack_push(struct stack *s, int x) {
+    if (s->top == STACK_MAX) {
+        return -1;
+    }
+    s->items[s->top++] = x;
+    return 0;
+}
+
+int stack_pop(struct stack *s, int *out) {
+    if (s->top == 0) {
+        return -1;
+    }
+    *out = s->items[--s->top];
+    return 0;
+}
+`,
+	"wordfreq": `#include <ctype.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+struct entry {
+    char *word;
+    long count;
+};
+
+static int cmp(const void *a, const void *b) {
+    const struct entry *x = a, *y = b;
+    if (x->count != y->count) {
+        return x->count < y->count ? 1 : -1;
+    }
+    return strcmp(x->word, y->word);
+}
+
+static void die(void) {
+    fprintf(stderr, "out of memory\n");
+    exit(1);
+}
+
+int main(void) {
+    struct entry *e = NULL;
+    size_t n = 0, cap = 0;
+    char *buf = NULL;
+    size_t len = 0, bcap = 0;
+    int c;
+    do {
+        c = getchar();
+        if (c != EOF && c < 128 && isalpha(c)) {
+            if (len + 1 >= bcap) {
+                bcap = bcap ? bcap * 2 : 16;
+                char *t = realloc(buf, bcap);
+                if (t == NULL) die();
+                buf = t;
+            }
+            buf[len++] = (char)tolower(c);
+            continue;
+        }
+        if (len == 0) {
+            continue;
+        }
+        buf[len] = '\0';
+        size_t i = 0;
+        while (i < n && strcmp(e[i].word, buf) != 0) {
+            i++;
+        }
+        if (i == n) {
+            if (n == cap) {
+                cap = cap ? cap * 2 : 16;
+                struct entry *t = realloc(e, cap * sizeof *t);
+                if (t == NULL) die();
+                e = t;
+            }
+            e[n].word = malloc(len + 1);
+            if (e[n].word == NULL) die();
+            memcpy(e[n].word, buf, len + 1);
+            e[n].count = 0;
+            n++;
+        }
+        e[i].count++;
+        len = 0;
+    } while (c != EOF);
+    if (n > 0) {
+        qsort(e, n, sizeof *e, cmp);
+    }
+    for (size_t i = 0; i < n && i < 10; i++) {
+        printf("%ld %s\n", e[i].count, e[i].word);
+    }
+    for (size_t i = 0; i < n; i++) {
+        free(e[i].word);
+    }
+    free(e);
+    free(buf);
+    return 0;
+}
+`,
 	"hello": `#include <stdio.h>
 
 int main(void) {
@@ -244,16 +455,49 @@ func needCompiler(t *testing.T) {
 	}
 }
 
-// runSource writes src as the check's file and runs the check.
+// referenceExtras are the reference versions of checks' other files.
+var referenceExtras = map[string]map[string]string{
+	"stack": {"stack.h": `#ifndef STACK_H
+#define STACK_H
+
+#define STACK_MAX 64
+
+struct stack {
+    int items[STACK_MAX];
+    int top;
+};
+
+void stack_init(struct stack *s);
+int stack_push(struct stack *s, int x);
+int stack_pop(struct stack *s, int *out);
+
+#endif
+`},
+}
+
+// runSource writes src as the check's file (and the reference versions of
+// its other files) and runs the check.
 func runSource(t *testing.T, id, src string) CheckRun {
+	t.Helper()
+	return runSourceWith(t, id, src, referenceExtras[id])
+}
+
+// runSourceWith is runSource with the other files given.
+func runSourceWith(t *testing.T, id, src string, extras map[string]string) CheckRun {
 	t.Helper()
 	ch, ok := checkByID(id)
 	if !ok {
 		t.Fatalf("no check %q", id)
 	}
-	path := filepath.Join(t.TempDir(), ch.File)
+	dir := t.TempDir()
+	path := filepath.Join(dir, ch.File)
 	if err := os.WriteFile(path, []byte(src), 0o644); err != nil {
 		t.Fatal(err)
+	}
+	for name, content := range extras {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
 	}
 	run, err := runCheck(ch, path)
 	if err != nil {
@@ -425,11 +669,11 @@ func TestCheckedExercisesScreen(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("ACADEMY_LABS", filepath.Join(dir, "labs"))
 	input := strings.Join([]string{
-		"1", // hello
-		"2", // reveal hint 1
-		"1", // run: the starter has no main, so it does not build
-		"3", // back
-		"8", // back to the Study Hall
+		"1",                               // hello
+		"2",                               // reveal hint 1
+		"1",                               // run: the starter has no main, so it does not build
+		"3",                               // back
+		fmt.Sprint(len(checksFor(1)) + 1), // back to the Study Hall
 	}, "\n") + "\n"
 	var out strings.Builder
 	a := &App{reg: seedRegistry(), path: filepath.Join(dir, "reg.json"), width: 80,
@@ -528,5 +772,120 @@ func TestWrapPath(t *testing.T) {
 	}
 	if got := wrapPath(p, 34); len(got) != 2 || got[0] != "/tmp/academy-labs-ootp9n8d/" {
 		t.Errorf("should break after a separator: %q", got)
+	}
+}
+
+// The new checks catch the mistakes they were written for.
+func TestNewChecksCatchTypicalMistakes(t *testing.T) {
+	needCompiler(t)
+
+	// >= instead of >: the last of the tied students wins.
+	tie := strings.Replace(referenceSolutions["scores"], "s[i].score > s[best].score", "s[i].score >= s[best].score", 1)
+	failsWith(t, "scores", tie, "a tie goes to the first", `"best: ann 80", but was "best: ben 80"`)
+
+	// No free in vec_free: the leak checker reports it, where it works.
+	noFree := strings.Replace(referenceSolutions["intvec"], "    free(v->data);\n", "", 1)
+	if cc, _ := findCompiler(os.Getenv); sanitizersWork(cc) && leaksWork(cc) {
+		failsWith(t, "intvec", noFree, "frees everything", "LeakSanitizer found memory that was never freed")
+	} else {
+		t.Log("the leak checker does not work here: skipping the leak case")
+	}
+
+	// A header without an include guard, included twice by the checker.
+	noGuard := strings.NewReplacer("#ifndef STACK_H\n", "", "#define STACK_H\n", "", "#endif\n", "").Replace(referenceExtras["stack"]["stack.h"])
+	run := runSourceWith(t, "stack", referenceSolutions["stack"], map[string]string{"stack.h": noGuard})
+	if run.Built || !strings.Contains(run.BuildLog, "include guard") {
+		t.Errorf("a header without a guard: built=%v, log should explain the guard:\n%s", run.Built, run.BuildLog)
+	}
+
+	// A missing stack.h is reported as a missing file, not a crash.
+	ch, _ := checkByID("stack")
+	dir := t.TempDir()
+	os.WriteFile(filepath.Join(dir, "stack.c"), []byte(referenceSolutions["stack"]), 0o644)
+	if _, err := runCheck(ch, filepath.Join(dir, "stack.c")); err == nil || !strings.Contains(err.Error(), "stack.h") {
+		t.Errorf("missing stack.h: err = %v", err)
+	}
+
+	// fgets and strlen stop at a zero byte.
+	fgetsCount := `#include <ctype.h>
+#include <stdio.h>
+#include <string.h>
+
+int main(int argc, char **argv) {
+    if (argc < 2) { fprintf(stderr, "usage\n"); return 2; }
+    FILE *f = fopen(argv[1], "r");
+    if (f == NULL) { perror(argv[1]); return 1; }
+    char line[4096];
+    long lines = 0, words = 0, bytes = 0;
+    int in = 0;
+    while (fgets(line, sizeof line, f) != NULL) {
+        size_t n = strlen(line);
+        bytes += (long)n;
+        for (size_t i = 0; i < n; i++) {
+            if (line[i] == '\n') lines++;
+            if (isspace((unsigned char)line[i])) in = 0;
+            else if (!in) { in = 1; words++; }
+        }
+    }
+    fclose(f);
+    printf("%ld %ld %ld\n", lines, words, bytes);
+    return 0;
+}
+`
+	failsWith(t, "count", fgetsCount, "zero bytes", `"1 2 5"`)
+
+	// A fixed-size word buffer overflows on a 5000-letter word.
+	fixed := `#include <ctype.h>
+#include <stdio.h>
+#include <string.h>
+
+int main(void) {
+    char word[64];
+    int len = 0, c;
+    char seen[100][64];
+    long count[100];
+    int n = 0;
+    do {
+        c = getchar();
+        if (c != EOF && c < 128 && isalpha(c)) { word[len++] = (char)tolower(c); continue; }
+        if (len == 0) continue;
+        word[len] = '\0';
+        int i = 0;
+        while (i < n && strcmp(seen[i], word) != 0) i++;
+        if (i == n) { strcpy(seen[n], word); count[n] = 0; n++; }
+        count[i]++;
+        len = 0;
+    } while (c != EOF);
+    for (int i = 0; i < n && i < 10; i++) printf("%ld %s\n", count[i], seen[i]);
+    return 0;
+}
+`
+	// With the sanitizers it is reported as a bug at its line; without
+	// them (a compiler lacking their runtime) it can only crash or misbehave.
+	run = runSource(t, "wordfreq", fixed)
+	for _, c := range run.Cases {
+		if c.Case.Name == "a 5000-letter word" {
+			if c.Pass || (run.Sanitizers && !strings.Contains(c.Problem, "Sanitizer")) {
+				t.Errorf("fixed word buffer: pass=%v sanitizers=%v problem=%q", c.Pass, run.Sanitizers, c.Problem)
+			}
+		}
+	}
+}
+
+func TestLeakSummary(t *testing.T) {
+	report := `=================================================================
+==456==ERROR: LeakSanitizer: detected memory leaks
+
+Direct leak of 16 byte(s) in 1 object(s) allocated from:
+    #0 0x7f4a760fd9c7 in malloc ../../../../src/libsanitizer/asan/asan_malloc_linux.cpp:69
+    #1 0x7f4a760fd9c8 in realloc ../../../../src/libsanitizer/asan/asan_malloc_linux.cpp:85
+    #2 0x55e92009b19e in vec_push /home/ana/Academy Labs/Stage 01/intvec.c:21
+    #3 0x55e92009b1ff in main /tmp/academy-check-1/check_main.c:17
+
+SUMMARY: AddressSanitizer: 16 byte(s) leaked in 1 allocation(s).
+`
+	want := "LeakSanitizer found memory that was never freed: 16 byte(s) leaked in 1 allocation(s), allocated in vec_push, intvec.c:21"
+	if got := sanitizerReport(report); got != want {
+		t.Errorf("got  %q\nwant %q", got, want)
 	}
 }

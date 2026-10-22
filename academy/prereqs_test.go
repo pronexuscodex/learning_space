@@ -171,3 +171,51 @@ func TestPrereqsOfReportsState(t *testing.T) {
 		}
 	}
 }
+
+// What's next offers a checked exercise once its concept is understood,
+// and the stage project once every concept of the stage is.
+func TestCheckSuggestion(t *testing.T) {
+	if !runnerSupported {
+		t.Skip("checked exercises need Linux, macOS or a BSD")
+	}
+	r := seedRegistry()
+	if _, ok := r.checkSuggestion(); ok {
+		t.Fatal("nothing understood yet, but a check was suggested")
+	}
+	_, s := r.findStage(1)
+	s.setStudied("Your First C Program: Source, Compiler, Executable", true)
+	sg, ok := r.checkSuggestion()
+	if !ok || sg.CheckID != "hello" || sg.Kind != SuggestCheck || !strings.Contains(sg.Why, "Your First C Program") {
+		t.Fatalf("got %+v", sg)
+	}
+	found := false
+	for _, x := range r.nextSteps(time.Now()) {
+		found = found || x.CheckID == "hello"
+	}
+	if !found {
+		t.Error("nextSteps does not include the checked exercise")
+	}
+
+	r.checkStatus = map[string]CheckStatus{"hello": {Runs: 1, Total: 1, LastCount: 0}}
+	if sg, _ := r.checkSuggestion(); !strings.Contains(sg.Why, "passed 0 of 1") {
+		t.Errorf("a started check should say how far it got: %q", sg.Why)
+	}
+	r.checkStatus["hello"] = CheckStatus{Runs: 1, Passed: true}
+	if sg, ok := r.checkSuggestion(); ok {
+		t.Errorf("a passed check was suggested again: %+v", sg)
+	}
+
+	// Every concept understood and every concept check passed: the project.
+	r.checkStatus = map[string]CheckStatus{}
+	for _, c := range curriculum[1].Concepts {
+		s.setStudied(c.Name, true)
+	}
+	for _, ch := range checksFor(1) {
+		if !ch.Project {
+			r.checkStatus[ch.ID] = CheckStatus{Passed: true}
+		}
+	}
+	if sg, ok := r.checkSuggestion(); !ok || sg.CheckID != "wordfreq" || !strings.Contains(sg.Why, "stage project") {
+		t.Errorf("project suggestion: %+v", sg)
+	}
+}

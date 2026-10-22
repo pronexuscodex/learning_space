@@ -32,7 +32,7 @@ KEYS = [
   "5\r", "n\r",             # blueprints
   "8\r", "1\r", "\r", "n\r", "3\r",  # classic corner → type-in lab listing → skip prediction → not run → back
   "q\r",                    # back to main
-  "6\r", "1\r", "10\r", "7\r", "1\r", WAIT, "2\r", "3\r", "8\r", "q\r",  # Stage 1 checked exercises: fix_average → run it for real (wait) → a hint → back
+  "6\r", "1\r", "10\r", "12\r", "1\r", WAIT, "2\r", "3\r", "11\r", "2\r", "3\r", "14\r", "q\r",  # Stage 1 checked exercises: fix_average → run it for real (wait) → a hint → back; stack (two files) → a hint → back; back
   "n\r", "q\r",             # what's next, then cancel
   "/\r", "memory cache\r", "1\r", "\r"*3, "n\r",  # search → open first hit (a concept) → don't mark
   "f\r", "\r", "1\r", "a goal that is rather long for a narrow terminal\r", "p", "p", "s", # focus timer, stop at once

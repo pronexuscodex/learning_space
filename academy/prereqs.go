@@ -32,12 +32,16 @@ var conceptPrereqs = map[string][]string{
 	"Functions & Decomposition":                          {"Control Flow: Decisions & Loops"},
 	"Memory, Addresses & Pointers":                       {"Memory & Storage: Where Data Lives", "Functions & Decomposition"},
 	"Collections: Lists, Dictionaries & Strings":         {"Memory, Addresses & Pointers"},
+	"Structs: Grouping Related Data":                     {"Collections: Lists, Dictionaries & Strings"},
+	"Dynamic Memory: malloc, free & Leaks":               {"Memory, Addresses & Pointers", "Structs: Grouping Related Data"},
 	"Safe Input & Undefined Behavior":                    {"Collections: Lists, Dictionaries & Strings"},
+	"Files & Streams: Reading and Writing Data":          {"Safe Input & Undefined Behavior"},
+	"Headers, the Preprocessor & make":                   {"Functions & Decomposition", "Structs: Grouping Related Data"},
 	"Debugging & Reading Errors":                         {"Functions & Decomposition"},
 
 	// ---- Stage 2
 	"Big-O: Measuring Growth":               {"Control Flow: Decisions & Loops"},
-	"Arrays, Linked Lists, Stacks & Queues": {"Big-O: Measuring Growth", "Memory, Addresses & Pointers", "Collections: Lists, Dictionaries & Strings"},
+	"Arrays, Linked Lists, Stacks & Queues": {"Big-O: Measuring Growth", "Collections: Lists, Dictionaries & Strings", "Dynamic Memory: malloc, free & Leaks"},
 	"Hash Tables":                           {"Arrays, Linked Lists, Stacks & Queues"},
 	"Trees, Heaps & Sorting":                {"Arrays, Linked Lists, Stacks & Queues", "Functions & Decomposition"},
 	"Graphs, BFS/DFS & Shortest Paths":      {"Arrays, Linked Lists, Stacks & Queues", "Trees, Heaps & Sorting"},
@@ -57,7 +61,7 @@ var conceptPrereqs = map[string][]string{
 	"Pipelining, Branch Prediction & Parallelism": {"The CPU: Datapath & Instruction Cycle"},
 
 	// ---- Stage 5
-	"The Compilation Pipeline":                   {"Your First C Program: Source, Compiler, Executable", "From Source Code to Running Program"},
+	"The Compilation Pipeline":                   {"Headers, the Preprocessor & make", "From Source Code to Running Program"},
 	"Registers, the Stack & Calling Conventions": {"Functions & Decomposition", "The CPU: Datapath & Instruction Cycle"},
 	"Integers & Floating Point in Bits":          {"Binary & Number Representation", "Values, Types & Variables"},
 	"The Memory Hierarchy & Locality":            {"Memory & Storage: Where Data Lives", "Memory: Latches, Registers & RAM"},
@@ -71,7 +75,7 @@ var conceptPrereqs = map[string][]string{
 	"Synchronisation & Memory Ordering": {"Scheduling & Context Switches"},
 
 	// ---- Stage 7
-	"Durability: Page Cache, fsync & Atomic Rename": {"System Calls & Privilege", "Memory & Storage: Where Data Lives"},
+	"Durability: Page Cache, fsync & Atomic Rename": {"System Calls & Privilege", "Files & Streams: Reading and Writing Data"},
 	"B-Trees":                        {"Trees, Heaps & Sorting", "The Memory Hierarchy & Locality"},
 	"LSM-Trees":                      {"B-Trees", "Durability: Page Cache, fsync & Atomic Rename"},
 	"Write-Ahead Logging & Recovery": {"Durability: Page Cache, fsync & Atomic Rename"},
@@ -98,7 +102,7 @@ var conceptPrereqs = map[string][]string{
 	"Hashing & Password Storage":                     {"Hash Tables"},
 	"Encryption: Symmetric & Public-Key":             {"Counting & Combinatorics"},
 	"TLS & Authentication on the Web":                {"Encryption: Symmetric & Public-Key", "HTTP, DNS & How the Web Works"},
-	"Memory-Safety Bugs: Overflows & Use-After-Free": {"Safe Input & Undefined Behavior", "Registers, the Stack & Calling Conventions"},
+	"Memory-Safety Bugs: Overflows & Use-After-Free": {"Safe Input & Undefined Behavior", "Dynamic Memory: malloc, free & Leaks", "Registers, the Stack & Calling Conventions"},
 	"Access Control: Who May Do What":                {"TLS & Authentication on the Web"},
 	"Network Attacks & Defences":                     {"TCP: Handshake, Flow & Congestion Control", "TLS & Authentication on the Web"},
 	"Secrets & the Software Supply Chain":            {"Thinking Like an Attacker: Threat Modelling", "Encryption: Symmetric & Public-Key"},
@@ -114,7 +118,7 @@ var conceptPrereqs = map[string][]string{
 	// ---- Stage 12
 	"Paradigms: Imperative, Object-Oriented & Functional": {"Functions & Decomposition"},
 	"Type Systems":                       {"Values, Types & Variables"},
-	"Memory Management":                  {"Memory, Addresses & Pointers", "Safe Input & Undefined Behavior"},
+	"Memory Management":                  {"Dynamic Memory: malloc, free & Leaks", "Safe Input & Undefined Behavior"},
 	"Interpreters, Compilers & Runtimes": {"The Compilation Pipeline"},
 	"Concurrency Models":                 {"Paradigms: Imperative, Object-Oriented & Functional"},
 
