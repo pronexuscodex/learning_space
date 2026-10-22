@@ -24,6 +24,34 @@ func homeTilde(p string) string {
 	return p
 }
 
+// wrapPath breaks a path into lines of at most width columns, after a
+// separator where it can, so a long path never runs off a narrow screen.
+func wrapPath(p string, width int) []string {
+	width = max(width, 8)
+	var lines []string
+	for visibleLen(p) > width {
+		cut := strings.LastIndex(p[:min(len(p), width)], string(filepath.Separator)) + 1
+		if cut <= 1 { // no separator in reach: cut anywhere
+			cut = len(truncateBytes(p, width))
+		}
+		lines = append(lines, p[:cut])
+		p = p[cut:]
+	}
+	return append(lines, p)
+}
+
+// truncateBytes is the longest prefix of s that is at most width columns.
+func truncateBytes(s string, width int) string {
+	n := 0
+	for i, r := range s {
+		if n+visibleLen(string(r)) > width {
+			return s[:i]
+		}
+		n += visibleLen(string(r))
+	}
+	return s
+}
+
 // checkMark is a check's state as a mark and a few words.
 func checkMark(s CheckStatus) (string, string) {
 	switch {
@@ -95,7 +123,10 @@ func (a *App) checkScreen(ch Check) error {
 			a.println(l)
 		}
 		a.println("")
-		a.printf("  %s %s\n", sty.Bold("Your file:"), homeTilde(file))
+		a.printf("  %s\n", sty.Bold("Your file:"))
+		for _, l := range wrapPath(homeTilde(file), w-6) {
+			a.printf("    %s\n", l)
+		}
 		for _, l := range wrap(fmt.Sprintf("Edit it in any editor and save. Then run the check here, or in another terminal: academy -check %s", ch.ID), w-4, "  ") {
 			a.println(sty.Gray(l))
 		}

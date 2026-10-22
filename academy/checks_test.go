@@ -512,3 +512,21 @@ func TestFindCompilerHonoursCC(t *testing.T) {
 		t.Errorf("a CC that is not installed should fall back to cc: %+v, %v", cc, err)
 	}
 }
+
+func TestWrapPath(t *testing.T) {
+	p := "/tmp/academy-labs-ootp9n8d/Stage 01/fix_average.c"
+	for _, w := range []int{10, 20, 34, 80} {
+		lines := wrapPath(p, w)
+		if strings.Join(lines, "") != p {
+			t.Errorf("width %d: %q does not rejoin to the path", w, lines)
+		}
+		for _, l := range lines {
+			if visibleLen(l) > w {
+				t.Errorf("width %d: line %q is too wide", w, l)
+			}
+		}
+	}
+	if got := wrapPath(p, 34); len(got) != 2 || got[0] != "/tmp/academy-labs-ootp9n8d/" {
+		t.Errorf("should break after a separator: %q", got)
+	}
+}
