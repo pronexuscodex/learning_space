@@ -641,21 +641,35 @@ deep enough to matter, but well within an 8 MiB stack.`,
 	// -----------------------------------------------------------------
 	6: {
 		Overview: `The operating system is the program that shares the hardware among
-programs that do not trust each other. Learn how it virtualises the CPU
-and memory, and what really happens on a system call, a page fault and a
-context switch.`,
+programs that do not trust each other. Learn how it gives every process
+a private computer: its own address space, backed lazily by pages; a
+heap that malloc carves out of memory the kernel hands over; files,
+pipes and sockets behind small integers; signals that interrupt it; a
+share of the CPU, switched in and out by the scheduler; and the rules
+that keep threads from corrupting what they share. Every lesson is
+measured with strace, /proc and C programs on a real Linux system.`,
 		Concepts: []Concept{
 			{
 				Name:    "Processes & the Address Space",
 				Summary: "Every process believes it owns all of memory.",
 				Body: `A process is a running program: an address space, one or more threads,
-and kernel state such as open files and credentials. Each process gets a
-private virtual address space with a conventional layout. ASLR
-randomises the base addresses so attackers cannot predict them.
+and kernel state such as open files, the current directory and
+credentials. Each process gets a private virtual address space with a
+conventional layout. ASLR randomises the base addresses so attackers
+cannot predict them.
 
-fork() clones a process, exec() replaces its image with a new program,
-and wait() collects a child's exit status. Every shell is built from
-those three calls.`,
+Three system calls build every process tree:
+- fork() clones the calling process; both copies return from it, the
+  child with 0 and the parent with the child's PID;
+- exec() (execvp and friends) replaces the process's program with a new
+  one, keeping its PID and open files;
+- wait() (waitpid) collects a child's exit status; until then, a child
+  that has exited lingers as a "zombie".
+
+A shell runs a command by forking, exec-ing the command in the child,
+and waiting in the parent. The exit status packs either the exit code
+or the signal that killed the process; WIFEXITED, WEXITSTATUS and
+WTERMSIG unpack it.`,
 				Diagram: `0x7fff… ┌───────────────────┐
         │ stack        ↓    │  locals, return addrs
         │        …          │
@@ -666,6 +680,25 @@ those three calls.`,
         │ .data             │  initialised globals
         │ .text             │  code (r-x)
 0x0000… └───────────────────┘  unmapped: NULL deref faults`,
+				UnderTheHood: `/proc/self/maps lists the current process's address space. Running
+grep for the heap and the stack twice gave different addresses each
+time:
+
+  run 1   5605c0adb000-…  [heap]     7ffcbbcfb000-…  [stack]
+  run 2   55f624ba2000-…  [heap]     7ffeac7ad000-…  [stack]
+
+That is ASLR: every run gets a randomised layout.
+
+Processes are not free. A C program that started /bin/true 1,000 times
+measured, on a test machine (a virtual machine):
+
+  fork + exec + waitpid      1,554 µs per program
+  fork + waitpid (no exec)     257 µs per child
+
+Most of the cost is exec: loading a new program, mapping its libraries
+and starting it from scratch. fork alone is cheaper because it copies
+only the page tables, not the memory, which is shared copy-on-write
+(next lesson).`,
 				MentalModel: "A process is an illusion of a private computer, maintained by the kernel.",
 				TryIt:       "Run cat /proc/self/maps twice and compare the addresses (ASLR in action).",
 			},
@@ -680,11 +713,105 @@ memory accesses.
 When a translation is missing or not permitted, the CPU raises a page
 fault and the kernel decides what to do. That one mechanism implements:
 - lazy allocation (memory is only backed when first touched);
-- copy-on-write fork;
+- copy-on-write fork (parent and child share pages until one writes);
 - memory-mapped files and swapping;
-- segfaults, when the access is truly invalid.`,
+- segfaults, when the access is truly invalid.
+
+So two numbers describe a process's memory: its virtual size (VmSize,
+every address it has reserved) and its resident set (VmRSS, the pages
+actually in RAM). They can differ enormously, and only the second costs
+RAM.`,
+				Diagram: `virtual address 0x00007f3a12345678
+  ┌─────────┬─────────┬─────────┬─────────┬──────────────┐
+  │ L4 idx  │ L3 idx  │ L2 idx  │ L1 idx  │ offset (12b) │
+  └────┬────┴────┬────┴────┬────┴────┬────┴──────────────┘
+       ▼         ▼         ▼         ▼
+     table  ─▶ table  ─▶ table  ─▶ table ─▶ physical page + offset
+   (a TLB hit skips all four lookups)`,
+				UnderTheHood: `Measured from /proc/self/status inside a C program:
+
+  at start                   VmSize    2,696 kB   VmRSS    1,412 kB
+  after malloc(1 GiB)        VmSize 1,051,276 kB  VmRSS    1,548 kB
+  after writing one byte
+  in every 4 KiB page        VmSize 1,051,276 kB  VmRSS 1,050,120 kB
+
+malloc reserved a gigabyte of addresses and used almost no memory. The
+loop that touched each page caused 262,143 minor page faults (by
+getrusage): one per page, each one the kernel finding a free page of
+RAM, zeroing it and mapping it in. That is why a program can "allocate"
+more than the machine has, and why Linux's out-of-memory killer acts
+only later, when the pages are actually touched.`,
 				MentalModel: "Memory is a lookup table that the kernel fills in only when you trip over a hole.",
-				TryIt:       "malloc 1 GiB, check RSS in /proc/self/status, touch every 4096th byte, and check again.",
+				TryIt:       "malloc 1 GiB, check VmRSS in /proc/self/status, touch every 4096th byte, and check again.",
+			},
+			{
+				Name:    "Memory Allocators: How malloc Works",
+				Summary: "malloc is ordinary library code that carves big chunks from the kernel into small blocks, and fragmentation is its enemy.",
+				Body: `The kernel only hands out memory in pages, through two system calls:
+brk moves the end of the heap, and mmap maps a fresh region anywhere.
+malloc, in the C library, turns those pages into blocks of any size:
+- each block has a small header recording its size, just before the
+  pointer you get, so free knows how much to release;
+- freed blocks go on free lists, often one per size class, to be reused;
+- neighbouring free blocks are merged (coalesced), so the heap does not
+  splinter into pieces too small to use;
+- large requests (128 KiB by default in glibc) get their own mmap, so
+  freeing them returns memory to the kernel at once.
+
+Fragmentation is the cost: free memory scattered in small holes that no
+request fits. Allocators fight it with size classes and coalescing, and
+programs fight it by allocating fewer, larger blocks.
+
+For many short-lived objects there is a simpler design: an arena (or
+bump allocator). Take one big block, hand out pieces by advancing a
+pointer, and free everything at once. Compilers, games and web servers
+use arenas per compilation, frame or request: allocation is a few
+instructions and there is nothing to leak.`,
+				Diagram: `  arena: one block, a bump pointer, freed all at once
+
+  ┌──────┬─────────┬───┬──────────┬───────────────────────┐
+  │ a 24 │ b 100   │ c │ d 64     │        free           │
+  └──────┴─────────┴───┴──────────┴───────────────────────┘
+                                  ▲ next allocation starts here
+                                    (rounded up to 16 bytes)`,
+				UnderTheHood: `strace -e trace=brk,mmap,munmap on a C program shows what malloc asks
+the kernel for (glibc 2.39):
+
+  1,000 × malloc(100)    one brk call, growing the heap by 135,168 bytes
+  malloc(1 MiB)          mmap(NULL, 1052672, …)   its own mapping
+  free of that block     munmap(…, 1052672)       straight back
+
+A thousand small allocations cost a single system call: malloc took a
+large slice and carved it up itself. The 1 MiB block got a private
+mapping of 1 MiB plus one 4 KiB page for its header, and went back to
+the kernel the moment it was freed.
+
+Each 100-byte block really occupied 112 bytes (consecutive blocks were
+112 bytes apart; malloc_usable_size reported 104 usable). And glibc
+adapts: after that 1 MiB block was freed, it raised its mmap threshold,
+so a later 129 KiB request came from the heap with brk, not from mmap.`,
+				MentalModel: "malloc is a retailer: it buys memory wholesale from the kernel and sells it by the byte.",
+				TryIt:       "Run a program that mallocs 1,000 small blocks and one large one under strace -e trace=brk,mmap,munmap, and match each system call to the line that caused it.",
+				Analogy: `A wholesale warehouse and a corner shop. The kernel sells memory only by
+the pallet (pages); malloc is the shopkeeper who buys pallets and sells
+single items, keeps returned items on the shelf to sell again, and only
+sends a whole pallet back when it was never split. An arena is a
+packed lunch: you take everything you need in one box and throw the box
+away at the end of the day.`,
+				Example: `Firefox, Redis and many game engines replace the default malloc with
+allocators such as jemalloc or mimalloc for speed and lower
+fragmentation, and Google's tcmalloc runs much of its server fleet.
+Compilers (including gcc's obstacks) and Go's and Zig's standard
+libraries use arenas. Heap exploits (Stage 10) work by corrupting the
+headers and free lists described here.`,
+				Exercises: trio(
+					"A program mallocs blocks of 24, 100 and 7 bytes in a row, and the allocator rounds every block, header included, up to a multiple of 16 with an 8-byte header. How many bytes of heap do the three use?",
+					"24 + 8 = 32; 100 + 8 = 108, rounded to 112; 7 + 8 = 15, rounded to 16: 160 bytes for 131 asked for.",
+					"In C, write an arena: struct arena { char *base; size_t size, used; }, arena_init (one malloc), arena_alloc(a, n) that returns 16-byte-aligned pointers or NULL when full, and arena_reset. Use it to build a linked list of a million nodes and free them all with one reset.",
+					"Round used up with (used + 15) & ~(size_t)15 before handing out a block. Check that n plus the padding fits in what is left before advancing.",
+					"Write a tiny malloc replacement with a free list: one big region from mmap, a header of the block size before each block, first-fit search, splitting of large free blocks and coalescing of neighbours on free. Test it with random malloc/free sequences and compare its speed with the C library's.",
+					"Keep the free list sorted by address, so coalescing only has to look at the previous and next free blocks.",
+				),
 			},
 			{
 				Name:    "System Calls & Privilege",
@@ -695,11 +822,172 @@ at a fixed entry point with arguments in registers. The kernel validates
 everything (pointers from user space are hostile until proven otherwise),
 does the work and returns.
 
-A syscall costs on the order of hundreds of nanoseconds, more with
-speculative-execution mitigations. That cost is why buffered I/O exists
-and why batching interfaces such as io_uring matter.`,
+A syscall costs on the order of a hundred nanoseconds, more with
+speculative-execution mitigations, and far more if it has to wait for a
+disk or the network. That cost is why buffered I/O exists (fwrite and
+printf collect bytes and make one write call per buffer) and why
+batching interfaces such as io_uring matter.
+
+The C library wraps each syscall in a function (read, write, open,
+fork); errors come back as -1 with the reason in errno. strace shows
+every syscall a program makes, with its arguments and result: the
+single most useful tool for finding out what a program is really doing.`,
+				Diagram: `user mode          │  kernel mode
+                   │
+read(fd, buf, n) ──┼─▶ syscall entry ─▶ check fd, check buf
+  (libc wrapper)   │                    copy data into buf
+     ◀─────────────┼── return n (or -1 and errno)`,
+				UnderTheHood: `Timed in C on a test machine (a virtual machine):
+
+  syscall(SYS_getppid)          about 101 ns per call
+  an ordinary function call     about 0.9 ns
+
+A hundred times the cost of a function call, for a syscall that does
+almost nothing. So the block size of I/O decides its speed. Copying a
+1 MB file with read and write:
+
+  1-byte buffer       about 2 million syscalls     374 ms
+  4,096-byte buffer   258 reads, 256 writes          4.6 ms
+
+(strace -c counted the calls; the extra reads are the end-of-file read
+and the dynamic linker loading libc.) With 64 KiB blocks it was no
+faster, 5.5 ms: once the syscalls are few, starting the program
+dominates.`,
 				MentalModel: "A syscall is a function call across a trust boundary, so it is checked and not free.",
-				TryIt:       "Run strace -c on ls and on a simple Go program, and compare the syscall counts.",
+				TryIt:       "Run strace -c on ls and on a simple C program, and compare the syscall counts.",
+			},
+			{
+				Name:    "File Descriptors, Files & Pipes",
+				Summary: "Files, pipes, sockets and terminals all hide behind small integers, and redirection is just rearranging them.",
+				Body: `A file descriptor is a small integer that indexes the process's table
+of open files. open returns the lowest free number; read, write and
+close take it. By convention 0 is standard input, 1 standard output and
+2 standard error. The same calls work on files, pipes, sockets and
+terminals: "everything is a file" means everything is a descriptor.
+
+Three calls make the shell possible:
+- dup2(old, new) makes new refer to the same open file as old: that is
+  how > file and 2>&1 work, by rearranging descriptors before exec;
+- pipe(fds) creates a one-way channel: bytes written to fds[1] come out
+  of fds[0], held in a kernel buffer;
+- descriptors survive exec, so a child started by fork and exec inherits
+  them (unless opened with O_CLOEXEC).
+
+So ls | wc -l is: create a pipe; fork a child that dup2s the pipe's
+write end onto 1 and execs ls; fork another that dup2s the read end
+onto 0 and execs wc; close every pipe end in the parent; wait for both.
+Forgetting to close an unused write end is the classic bug: the reader
+never sees end-of-file, because a writer still exists, and it waits
+forever.`,
+				Diagram: `ls | wc -l
+
+  ls  fd 1 ──▶ [ pipe: kernel buffer, 64 KiB ] ──▶ fd 0  wc -l
+  fd 2 ──▶ terminal                                fd 1 ──▶ terminal`,
+				UnderTheHood: `ls -l /proc/self/fd < /dev/null | cat shows ls's own descriptors:
+
+  0 -> /dev/null
+  1 -> pipe:[21586]          ; the pipe to cat
+  2 -> pipe:[21586]
+  3 -> /proc/7323/fd          ; the directory ls itself opened
+
+strace -f shows the shell implementing echo hi > out.txt:
+
+  openat(AT_FDCWD, "out.txt", O_WRONLY|O_CREAT|O_TRUNC, 0666) = 3
+  dup2(3, 1)                 ; standard output is now out.txt
+  …                          ; echo writes to fd 1
+  dup2(10, 1)                ; put back the original, saved in fd 10
+
+and fcntl(fds[1], F_GETPIPE_SZ) on a fresh pipe reported 65,536 bytes:
+a writer can get 64 KiB ahead of its reader before write blocks.`,
+				MentalModel: "A descriptor is a number in a table; redirection is copying one entry over another before exec.",
+				TryIt:       "Run ls -l /proc/self/fd, then ls -l /proc/self/fd > /tmp/x and cat /tmp/x: which entry changed, and why?",
+				Analogy: `The numbered lockers at a station. Each locker (descriptor) holds a
+ticket to something: a file, a pipe, the terminal. Programs only ever
+say "put this in locker 1"; the shell, before the program arrives,
+decides what locker 1 actually leads to.`,
+				Example: `Every pipeline you type in a shell (grep error log | sort | uniq -c),
+every web server's sockets and every log rotation relies on
+descriptors. The classic "too many open files" error is a process
+running out of descriptors (ulimit -n), usually because something opens
+files or sockets and never closes them.`,
+				Exercises: trio(
+					"A program has descriptors 0, 1 and 2 open and then calls open twice and close(3) once, then open again. Which numbers did the three opens return?",
+					"3, 4, then 3 again: open always returns the lowest free descriptor.",
+					"In C, run ls -l | wc -l yourself: create a pipe, fork two children, dup2 the right ends onto 1 and 0, execvp the two commands, close every unused end, and wait for both. Then remove one close and watch the program hang.",
+					"The parent must close both ends too. If any copy of the write end stays open, wc never sees end-of-file.",
+					"Find a descriptor leak: write a program that opens a file in a loop without closing it, run it until open fails, and print errno with strerror. Then check the limit with ulimit -n and watch the count grow in ls /proc/<pid>/fd.",
+					"open fails with EMFILE (\"Too many open files\") at the soft limit, often 1,024.",
+				),
+			},
+			{
+				Name:    "Signals",
+				Summary: "Asynchronous notifications that interrupt a process: how it is told to stop, crashes, and hears about its children.",
+				Body: `A signal is a small numbered notification the kernel delivers to a
+process, interrupting whatever it was doing. Some come from other
+processes (kill), some from the terminal (Ctrl-C sends SIGINT), and some
+from the process's own mistakes (SIGSEGV for a bad memory access,
+SIGFPE for an integer division by zero, SIGPIPE for writing to a pipe
+nobody reads).
+
+For each signal a process can take the default action (usually
+terminate), ignore it, or install a handler with sigaction. Two signals
+can never be caught or ignored: SIGKILL and SIGSTOP. That is why kill -9
+always works, and why it should be the last resort: the program gets no
+chance to save or clean up. SIGTERM, the polite request, is what
+service managers send first.
+
+A handler runs in the middle of anything, even inside malloc or printf,
+so it may only call async-signal-safe functions and should do almost
+nothing. The standard pattern is to set a flag and let the main loop
+act on it:
+
+  static volatile sig_atomic_t stop;
+  static void on_term(int sig) { (void)sig; stop = 1; }
+  …
+  struct sigaction sa = {0};
+  sa.sa_handler = on_term;
+  sigaction(SIGTERM, &sa, NULL);
+  while (!stop) { /* work */ }
+  /* save, close, exit cleanly */`,
+				Diagram: `  kill -TERM pid
+       │
+       ▼                     main loop:  work ─ work ─ work ─ check stop ─▶ save, exit 0
+  kernel interrupts ─▶ on_term(): stop = 1 ─┘ (return to where it was)`,
+				UnderTheHood: `A shell reports a process killed by signal n with exit status 128 + n.
+Measured in bash on Linux:
+
+  yes | head -1           yes exits with 141   SIGPIPE (13): its reader quit
+  kill -TERM of a sleep    143                 SIGTERM (15)
+  kill -KILL of a sleep    137                 SIGKILL  (9), "Killed"
+
+yes kept writing after head had read its one line and exited; the next
+write to the pipe raised SIGPIPE, whose default action terminated it.
+That is how pipelines shut down early producers, and why a network
+server must ignore SIGPIPE (or use MSG_NOSIGNAL), or a client that
+disconnects at the wrong moment kills the whole server.
+
+kill -l on Linux lists 62 signals: the 31 classic ones plus the
+"real-time" signals 34 to 64, which queue instead of merging.`,
+				MentalModel: "A signal is a tap on the shoulder at any moment: note it in a flag, and act on it when it is safe.",
+				TryIt:       "Write a C program that loops printing a counter, catches SIGINT with sigaction, and prints a summary instead of dying when you press Ctrl-C; press Ctrl-\\ to see SIGQUIT's default action.",
+				Analogy: `A fire alarm in an office. Whatever you are doing, it interrupts you.
+Sensible people do not start packing the whole office on the spot; they
+note it and head for the exit in an orderly way. kill -9 is the
+building being demolished with you inside: no time to save anything.`,
+				Example: `systemd and Docker stop services with SIGTERM and wait (10 seconds by
+default in docker stop) before sending SIGKILL: services that handle
+SIGTERM can finish requests and flush data. Database servers flush
+their logs on SIGTERM, nginx reloads its configuration on SIGHUP, and
+every crash report you have seen ("Segmentation fault (core dumped)")
+started as a SIGSEGV.`,
+				Exercises: trio(
+					"A program dies and the shell says its exit status was 139. Which signal killed it, and what does that usually mean?",
+					"139 − 128 = 11, SIGSEGV: an invalid memory access, such as a NULL or dangling pointer.",
+					"In C, write a program that counts up in a loop until it receives SIGTERM or SIGINT, then prints how far it got and exits with status 0. Test it with kill -TERM and Ctrl-C, and confirm that kill -KILL still ends it at once.",
+					"Use the flag pattern: the handler only sets a volatile sig_atomic_t; the loop checks it and does the printing.",
+					"Make a server shut down gracefully: on SIGTERM it stops accepting new connections, finishes the requests in progress, flushes its log and exits, all within a deadline. Test it by sending SIGTERM in the middle of a burst of requests.",
+					"Accept with a timeout (or poll) so the loop sees the flag even when no connection arrives; keep a count of requests in progress, and exit when it reaches 0 or the deadline passes.",
+				),
 			},
 			{
 				Name:    "Scheduling & Context Switches",
@@ -708,27 +996,77 @@ and why batching interfaces such as io_uring matter.`,
 scheduler picks the next runnable thread. Linux used CFS for years and
 has used EEVDF since 6.6. A context switch saves one thread's registers
 and restores another's. Switching between processes may also switch page
-tables and lose TLB entries.
+tables and lose TLB entries, and a thread moved to another CPU arrives
+with cold caches.
+
+A thread is in one of three broad states: running, runnable (waiting for
+a CPU) or blocked (waiting for I/O, a lock or a timer). Most threads,
+most of the time, are blocked: the scheduler's job is to give the CPUs to
+whatever is runnable, fairly, while keeping interactive tasks
+responsive. nice values and priorities bias that choice.
 
 Threads in one process share an address space, so switching between them
 is cheaper, but they also share every bug. Green threads (goroutines,
 async runtimes) do the switching in user space and avoid the kernel
 entirely.`,
+				Diagram: `CPU 0  │ A ███████ │ B ████ │ A ██████ │ C ███ │ A …
+                    ▲         ▲          ▲
+          timer interrupt or blocking call: save A's registers,
+          pick the next runnable thread, restore its registers`,
+				UnderTheHood: `Two processes passing a byte back and forth through two pipes force a
+context switch on every hop. On a test machine (a virtual machine):
+
+  both free to run on any CPU      36.4 µs per round trip
+  both pinned to CPU 0 (taskset)    2.85 µs per round trip
+
+Pinned, each round trip is two switches on one CPU. Unpinned, each
+wake-up crossed CPUs: the sleeping process was woken by another CPU,
+which had to interrupt it (an inter-processor interrupt), and in a
+virtual machine that is expensive. Where threads run, and which CPU
+wakes them, can matter more than the switch itself.`,
 				MentalModel: "Concurrency is an illusion made of interrupts and saved registers.",
-				TryIt:       "Write a coroutine library with a hand-written assembly context switch and round-robin scheduling.",
+				TryIt:       "Write the two-pipe ping-pong in C, time 100,000 round trips, then run it again under taskset -c 0 and explain the difference.",
 			},
 			{
 				Name:    "Synchronisation & Memory Ordering",
 				Summary: "Shared memory without rules is a data race.",
 				Body: `Two threads doing count++ lose updates because it is a load, an add and
-a store. Atomic read-modify-write instructions (compare-and-swap,
-fetch-add) are the hardware primitive underneath. A mutex is an atomic
-fast path plus a futex so that waiting threads sleep in the kernel.
+a store, and the other thread can run in between. Atomic read-modify-
+write instructions (compare-and-swap, fetch-add) are the hardware
+primitive underneath. A mutex is an atomic fast path plus a futex so
+that waiting threads sleep in the kernel.
+
+In C, a data race (two threads touching the same variable, at least one
+writing, without synchronisation) is undefined behaviour. The compiler
+may assume it never happens, and keep a shared variable in a register
+for a whole loop.
 
 CPUs and compilers reorder memory operations. Acquire and release
 semantics (and fences) define which reorderings other threads can
-observe. A deadlock needs all four Coffman conditions: mutual exclusion,
-hold-and-wait, no preemption and circular wait. Break any one of them.`,
+observe: a release store publishes everything written before it to any
+thread that does an acquire load of it. A deadlock needs all four
+Coffman conditions: mutual exclusion, hold-and-wait, no preemption and
+circular wait. Break any one of them, for example by always taking
+locks in the same order.`,
+				Diagram: `thread A: load count (5)  add 1  store 6
+thread B:     load count (5)  add 1  store 6     two increments, one lost
+                                                   (count should be 7)`,
+				UnderTheHood: `Two threads each incremented a shared long 10 million times. Results
+from one test machine:
+
+  plain long, gcc -O0         10.6 to 11.0 million of 20 million
+  plain long, gcc -O1         exactly 10,000,000, every time
+  atomic_fetch_add            20,000,000 in about 290 ms
+  pthread mutex around ++     20,000,000 in about 1.8 s
+
+At -O0 the race lost about half the increments. At -O1 it lost exactly
+half, because gcc compiled each thread's loop into one load at the start
+and one store at the end, a single "+= 10,000,000": the threads'
+results overwrote each other whole. That is legal, because a data race
+is undefined: the compiler owes you nothing. Only the atomic and the
+mutex were correct, and correctness cost speed: contended atomics are
+70 times slower than the plain increment, and a contended mutex six
+times slower again.`,
 				MentalModel: "Without a happens-before edge, another thread may see anything.",
 				TryIt:       "Build a spinlock with atomics, then a futex-based mutex, and benchmark both under contention.",
 			},
@@ -756,6 +1094,14 @@ hold-and-wait, no preemption and circular wait. Break any one of them.`,
 			{"Why does the TLB exist?", "A page-table walk needs several dependent memory accesses. The TLB caches recent virtual-to-physical translations so most accesses skip the walk."},
 			{"What do threads share that processes do not?", "The address space: heap, globals, code and file descriptors. Each thread still has its own stack and registers."},
 			{"Name the four conditions required for deadlock.", "Mutual exclusion, hold-and-wait, no preemption and circular wait."},
+			{"Why can a process have a virtual size of 1 GB but use only 2 MB of RAM?", "Pages are only backed by RAM when first touched: malloc reserved the addresses, but the kernel allocates each page lazily, on its first page fault."},
+			{"Where does malloc get memory from, and why is a thousand small mallocs only one system call?", "From the kernel, with brk (growing the heap) or mmap (a new mapping, for large blocks). It asks for a large slice at once and carves small blocks out of it itself."},
+			{"Why is copying a file one byte at a time so slow?", "Every read and write is a system call, about a hundred times the cost of a function call, so a 1 MB copy makes two million of them. A buffer of a few KiB cuts that to a few hundred."},
+			{"What do dup2 and pipe do, and how does a shell use them for a | b?", "pipe creates a channel with a read end and a write end; dup2 makes one descriptor refer to another's open file. The shell dup2s the write end onto a's standard output and the read end onto b's standard input before exec-ing each."},
+			{"Why does a reader of a pipe hang forever if a write end is left open?", "End-of-file only arrives when every copy of the write end is closed; while one is open, the reader waits for more data."},
+			{"Which two signals can never be caught or ignored, and why is kill -9 a last resort?", "SIGKILL and SIGSTOP. kill -9 gives the program no chance to save data or clean up; send SIGTERM first."},
+			{"What may a signal handler safely do?", "Very little: set a volatile sig_atomic_t flag, or call async-signal-safe functions such as write. It can interrupt the program inside malloc or printf, so calling those is unsafe."},
+			{"Why can an unsynchronised counter shared by two threads lose a whole thread's work at -O1?", "A data race is undefined behaviour, so the compiler may keep the counter in a register for the whole loop and store it once at the end, overwriting the other thread's total."},
 		},
 	},
 

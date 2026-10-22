@@ -1,15 +1,17 @@
 package main
 
-// Checked exercises for the Foundations track's theory stages: data
-// structures and algorithms (Stage 2), discrete mathematics (Stage 3) and
-// computer architecture (Stage 4). Most read standard input and are timed
-// on inputs big enough that only the efficient idea passes.
+// Checked exercises added when Stages 2 to 8 were deepened: data
+// structures and algorithms (Stage 2), discrete mathematics (Stage 3),
+// computer architecture (Stage 4), computer systems (Stage 5) and
+// operating systems (Stage 6). Most read standard input and are timed on
+// inputs big enough that only the efficient idea passes.
 
 import (
 	"fmt"
 	"math/rand/v2"
 	"slices"
 	"strings"
+	"time"
 )
 
 var foundationsChecks = []Check{
@@ -890,6 +892,297 @@ int main(int argc, char **argv) {
 			"Addition: if (b > 0 ? a > INT_MAX - b : a < INT_MIN - b) return 0; INT_MAX - b cannot overflow when b > 0, nor INT_MIN - b when b < 0.",
 			"Multiplication without division: compute the product in a long long, which holds any product of two ints exactly, then check the range before storing.",
 			"Or use the compiler's builtins: if (__builtin_mul_overflow(a, b, &r)) return 0;",
+		},
+	},
+	{
+		ID: "arena", Stage: 6, Concept: "Memory Allocators: How malloc Works",
+		Title: "An arena allocator",
+		Task:  "Write an arena: arena_init takes one block of size bytes from malloc; arena_alloc hands out the next n bytes of it, at an address that is a multiple of 16, or returns NULL when they do not fit; arena_reset makes the whole block free again; arena_destroy frees it. arena_alloc must never call malloc, and a request too big to fit must give NULL, however big. Keep struct arena exactly as given: the checker's file uses it too. No main.",
+		File:  "arena.c",
+		Leaks: true,
+		Starter: `/* Checked exercise: arena
+ * One malloc up front; every allocation after it is a pointer bump.
+ *   int   arena_init(struct arena *a, size_t size);  1 on success, 0 if malloc failed
+ *   void *arena_alloc(struct arena *a, size_t n);    next n bytes, 16-byte aligned, or NULL
+ *   void  arena_reset(struct arena *a);              everything free again
+ *   void  arena_destroy(struct arena *a);            give the block back to free
+ * Align the address, not just the offset: round (uintptr_t)(base + used)
+ * up to a multiple of 16 with (p + 15) & ~(uintptr_t)15.
+ * Beware: used + n can wrap around past SIZE_MAX to a small number.
+ * Compare n with what is left instead.
+ */
+#include <stddef.h>
+#include <stdint.h>
+#include <stdlib.h>
+
+struct arena {
+    char *base;   /* the block, from one malloc */
+    size_t size;  /* its size in bytes */
+    size_t used;  /* bytes handed out so far, padding included */
+};
+`,
+		Harness: `#include <stddef.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <string.h>
+
+struct arena {
+    char *base;
+    size_t size;
+    size_t used;
+};
+
+int arena_init(struct arena *a, size_t size);
+void *arena_alloc(struct arena *a, size_t n);
+void arena_reset(struct arena *a);
+void arena_destroy(struct arena *a);
+
+struct node { struct node *next; long value; };
+
+static int inside(struct arena *a, void *p, size_t n) {
+    char *c = p;
+    return c >= a->base && c + n <= a->base + a->size;
+}
+
+static void report(struct arena *a, size_t n) {
+    void *p = arena_alloc(a, n);
+    if (p == NULL) { printf("%zu null\n", n); return; }
+    if ((uintptr_t)p % 16 != 0) printf("%zu not aligned\n", n);
+    else if (!inside(a, p, n)) printf("%zu outside the block\n", n);
+    else { memset(p, 0x5a, n); printf("%zu ok\n", n); }
+}
+
+int main(int argc, char **argv) {
+    struct arena a;
+    if (argc < 2) return 2;
+    if (!arena_init(&a, strcmp(argv[1], "nodes") == 0 ? 1000000 * sizeof(struct node) : 256)) {
+        printf("arena_init failed\n");
+        return 0;
+    }
+    if (strcmp(argv[1], "sizes") == 0) {
+        size_t sizes[] = {1, 3, 24, 100, 7};
+        unsigned char *p[5];
+        char *end = NULL;
+        for (int i = 0; i < 5; i++) {
+            p[i] = arena_alloc(&a, sizes[i]);
+            if (p[i] == NULL) { printf("block %d: NULL, but it fits\n", i); goto done; }
+            if ((uintptr_t)p[i] % 16 != 0) { printf("block %d: address not a multiple of 16\n", i); goto done; }
+            if (!inside(&a, p[i], sizes[i])) { printf("block %d: outside the arena's block\n", i); goto done; }
+            if (end != NULL && (char *)p[i] < end) { printf("block %d overlaps the one before\n", i); goto done; }
+            end = (char *)p[i] + sizes[i];
+            memset(p[i], i + 1, sizes[i]);
+        }
+        for (int i = 0; i < 5; i++)
+            for (size_t j = 0; j < sizes[i]; j++)
+                if (p[i][j] != i + 1) { printf("block %d was overwritten\n", i); goto done; }
+        printf("5 blocks: aligned, inside, apart\n");
+    } else if (strcmp(argv[1], "full") == 0) {
+        report(&a, 200); report(&a, 100); report(&a, 40); report(&a, 8);
+    } else if (strcmp(argv[1], "huge") == 0) {
+        report(&a, 16); report(&a, SIZE_MAX); report(&a, SIZE_MAX - 8); report(&a, 240); report(&a, 1);
+    } else if (strcmp(argv[1], "reset") == 0) {
+        void *first = arena_alloc(&a, 64);
+        arena_alloc(&a, 64);
+        arena_alloc(&a, 64);
+        arena_reset(&a);
+        void *again = arena_alloc(&a, 200);
+        printf(again == first ? "the block is reused\n" : "after reset, the first allocation should start at the beginning again\n");
+    } else if (strcmp(argv[1], "nodes") == 0) {
+        for (int round = 0; round < 2; round++) {
+            struct node *head = NULL;
+            for (long i = 0; i < 1000000; i++) {
+                struct node *n = arena_alloc(&a, sizeof *n);
+                if (n == NULL) { printf("node %ld: NULL, but the arena has room for a million\n", i); goto done; }
+                n->value = i;
+                n->next = head;
+                head = n;
+            }
+            long sum = 0;
+            for (struct node *n = head; n != NULL; n = n->next) sum += n->value;
+            printf("%ld\n", sum);
+            arena_reset(&a);
+        }
+    } else return 2;
+done:
+    arena_destroy(&a);
+    return 0;
+}
+`,
+		Cases: []CheckCase{
+			{Name: "sizes 1, 3, 24, 100 and 7", Args: []string{"sizes"}, Want: "5 blocks: aligned, inside, apart\n",
+				Explain: "Every block must start at a multiple of 16, inside the one block from arena_init, after the end of the block before it."},
+			{Name: "until it is full", Args: []string{"full"}, Want: "200 ok\n100 null\n40 ok\n8 null\n",
+				Explain: "In a 256-byte arena, after 200 bytes the next block starts at 208: 100 bytes do not fit, 40 do (208 + 40 = 248), and then 8 do not (256 + 8 > 256). A failed request must not use up any space."},
+			{Name: "a request too big to add", Args: []string{"huge"}, Want: "16 ok\n18446744073709551615 null\n18446744073709551607 null\n240 ok\n1 null\n",
+				Explain: "used + n wraps around past SIZE_MAX to a small number, and the check passes. Compare n with what is left, a->size - start, instead: that cannot overflow."},
+			{Name: "reset", Args: []string{"reset"}, Want: "the block is reused\n"},
+			{Name: "a million nodes, twice", Args: []string{"nodes"}, Want: "499999500000\n499999500000\n",
+				Explain: "A million 16-byte nodes fill the arena exactly: no padding is needed when every size is already a multiple of 16."},
+		},
+		Timeout: 10 * time.Second,
+		Hints: []string{
+			"uintptr_t p = (uintptr_t)(a->base + a->used); p = (p + 15) & ~(uintptr_t)15; is the next aligned address; its offset is p - (uintptr_t)a->base.",
+			"Fail when start > a->size || n > a->size - start: that order of checks never overflows. Only then set a->used = start + n.",
+			"arena_reset only sets used back to 0; arena_destroy calls free(a->base) once.",
+		},
+	},
+	{
+		ID: "pipeline", Stage: 6, Concept: "File Descriptors, Files & Pipes",
+		Title: "Connect two programs with a pipe",
+		Task:  "./pipeline A ARGS... '|' B ARGS... runs A | B as a shell does: create a pipe, start both programs as child processes with fork and execvp, standard output of A going into the pipe and standard input of B coming out of it, then wait for both and return B's exit status. If exec fails, the child reports why on standard error and exits with 127. Without a | argument (or with nothing on either side), print a usage message to standard error and return 2.",
+		File:  "pipeline.c",
+		Starter: posixDefine + `/* Checked exercise: pipeline
+ * Usage: ./pipeline echo hi '|' tr a-z A-Z
+ * 1. Find the "|" argument and replace it with NULL: argv[1] and the
+ *    word after the "|" are now two argument vectors for execvp.
+ * 2. pipe(fds): fds[0] is the read end, fds[1] the write end.
+ * 3. Fork twice. In the first child dup2(fds[1], 1); in the second
+ *    dup2(fds[0], 0). Each child then closes both fds and calls execvp.
+ * 4. The parent closes both fds too, then waits for both children.
+ * A pipe only reports end-of-file when every copy of its write end is
+ * closed, so one forgotten close makes the reader wait forever.
+ */
+`,
+		Cases: []CheckCase{
+			{Name: "echo hi | tr a-z A-Z", Args: []string{"echo", "hi", "|", "tr", "a-z", "A-Z"}, Want: "HI\n"},
+			{Name: "echo hello | cat", Args: []string{"echo", "hello", "|", "cat"}, Want: "hello\n",
+				Explain: "cat finishes only at end-of-file, which comes when every copy of the write end is closed: in the parent, and in the second child after its dup2."},
+			{Name: "more than the pipe holds", Args: []string{"seq", "1", "100000", "|", "tail", "-n", "1"}, Want: "100000\n",
+				Explain: "seq prints about 575 KB, far more than the pipe's 64 KiB: start both children before waiting for either, or the first blocks on a full pipe while you wait for it."},
+			{Name: "yes | head -n 3", Args: []string{"yes", "|", "head", "-n", "3"}, Want: "y\ny\ny\n",
+				Explain: "yes never stops by itself: it ends with SIGPIPE when nobody can read the pipe any more. If the parent (or yes itself) still holds the read end, yes blocks on a full pipe instead and nothing ends."},
+			{Name: "B's exit status", Args: []string{"true", "|", "false"}, WantExit: 1,
+				Explain: "Return the exit status of the second program, decoded with WIFEXITED and WEXITSTATUS, like a shell does."},
+			{Name: "only B's exit status counts", Args: []string{"false", "|", "true"}},
+			{Name: "a program that does not exist", Args: []string{"echo", "hi", "|", "/no/such/program"}, WantExit: 127, Stderr: true,
+				Explain: "execvp only returns when it fails: then perror and _exit(127) in the child."},
+			{Name: "no pipe", Args: []string{"echo", "hi"}, WantExit: 2, Stderr: true},
+			{Name: "nothing after the pipe", Args: []string{"echo", "hi", "|"}, WantExit: 2, Stderr: true},
+		},
+		Timeout: 5 * time.Second,
+		Hints: []string{
+			"Count the open copies of the write end: the pipe makes one; each fork copies it. Every copy except the one dup2 put on A's descriptor 1 must be closed.",
+			"After dup2(fds[1], 1) the pipe is reachable as descriptor 1, so close(fds[0]) and close(fds[1]) lose nothing.",
+			"Call fflush(stdout) before fork if you have printed anything, and use _exit in a child whose exec failed.",
+		},
+	},
+	{
+		ID: "graceful", Stage: 6, Concept: "Signals",
+		Title: "Stop when asked",
+		Task:  "Write int install_stop_handlers(void), which makes SIGTERM and SIGINT stop the program politely instead of killing it (return 0, or -1 if sigaction fails), and int stop_signal(void), which returns 0 until one of them arrives and then the signal's number. The handler may only record the signal. Install it with sigaction and without SA_RESTART, so that a blocking call such as read returns early (with errno EINTR) and the program notices. No main: the checker sends the signals.",
+		File:  "graceful.c",
+		Starter: posixDefine + `/* Checked exercise: graceful
+ *   int install_stop_handlers(void);  SIGTERM and SIGINT; 0, or -1 on failure
+ *   int stop_signal(void);            0 until one arrives, then its number
+ * A handler can run between any two instructions, even inside printf or
+ * malloc, so it must only set a flag:
+ *   static volatile sig_atomic_t got;
+ *   static void on_stop(int sig) { got = sig; }
+ * Install it with sigaction, sa_flags = 0. (signal() on Linux and macOS
+ * sets SA_RESTART: a blocking read would then carry on waiting.)
+ */
+#include <signal.h>
+`,
+		Harness: posixDefine + `#include <errno.h>
+#include <signal.h>
+#include <stdio.h>
+#include <string.h>
+#include <sys/wait.h>
+#include <time.h>
+#include <unistd.h>
+
+int install_stop_handlers(void);
+int stop_signal(void);
+
+static void nap(long ms) {
+    struct timespec t = {ms / 1000, (ms % 1000) * 1000000L};
+    nanosleep(&t, NULL);
+}
+
+/* child runs in a new process: it signals that it is ready, then waits
+   for SIGTERM in a busy loop or in a blocking read. */
+static void child(int ready, int blocking) {
+    int p[2];
+    if (install_stop_handlers() != 0 || pipe(p) != 0) _exit(3);
+    if (write(ready, "r", 1) != 1) _exit(3);
+    if (blocking) {
+        char c;
+        ssize_t n = read(p[0], &c, 1);   /* nobody writes: only a signal ends this */
+        if (n < 0 && errno == EINTR)
+            printf("child: read interrupted, stop %d\n", stop_signal());
+        else
+            printf("child: read returned %zd\n", n);
+    } else {
+        volatile unsigned long spins = 0;
+        while (stop_signal() == 0) spins++;
+        printf("child: stop %d\n", stop_signal());
+    }
+    fflush(stdout);
+    _exit(0);
+}
+
+static void from_outside(int blocking) {
+    int ready[2];
+    char c;
+    if (pipe(ready) != 0) return;
+    fflush(stdout);
+    pid_t pid = fork();
+    if (pid == 0) { close(ready[0]); child(ready[1], blocking); }
+    close(ready[1]);
+    if (read(ready[0], &c, 1) != 1) { printf("the child could not install its handlers\n"); return; }
+    int status = 0;
+    pid_t done = 0;
+    for (int i = 0; i < 20 && done == 0; i++) {   /* SIGTERM every 100 ms, for 2 s */
+        kill(pid, SIGTERM);
+        nap(100);
+        done = waitpid(pid, &status, WNOHANG);
+    }
+    if (done == 0) {
+        kill(pid, SIGKILL);
+        waitpid(pid, &status, 0);
+        printf(blocking ? "the read was restarted after SIGTERM, so the child never noticed\n"
+                        : "the child kept running after SIGTERM\n");
+    } else if (WIFSIGNALED(status)) {
+        printf("child killed by signal %d\n", WTERMSIG(status));
+    } else {
+        printf("child exited %d\n", WEXITSTATUS(status));
+    }
+}
+
+int main(int argc, char **argv) {
+    if (argc < 2) return 2;
+    if (strcmp(argv[1], "nothing") == 0) {
+        if (install_stop_handlers() != 0) { printf("install_stop_handlers failed\n"); return 0; }
+        printf("stop %d\n", stop_signal());
+    } else if (strcmp(argv[1], "term") == 0 || strcmp(argv[1], "int") == 0) {
+        if (install_stop_handlers() != 0) { printf("install_stop_handlers failed\n"); return 0; }
+        fflush(stdout);
+        raise(argv[1][0] == 't' ? SIGTERM : SIGINT);
+        printf("stop %d\nstill running, free to clean up\n", stop_signal());
+    } else if (strcmp(argv[1], "busy") == 0) {
+        from_outside(0);
+    } else if (strcmp(argv[1], "blocked") == 0) {
+        from_outside(1);
+    } else return 2;
+    return 0;
+}
+`,
+		Cases: []CheckCase{
+			{Name: "no signal yet", Args: []string{"nothing"}, Want: "stop 0\n"},
+			{Name: "SIGTERM", Args: []string{"term"}, Want: "stop 15\nstill running, free to clean up\n",
+				Explain: "Catch SIGTERM with sigaction: by default it kills the program. The handler records the signal and returns; it must not exit or print."},
+			{Name: "SIGINT", Args: []string{"int"}, Want: "stop 2\nstill running, free to clean up\n",
+				Explain: "Ctrl-C sends SIGINT (2): install the same handler for it."},
+			{Name: "from another process, while working", Args: []string{"busy"}, Want: "child: stop 15\nchild exited 0\n",
+				Explain: "kill(pid, SIGTERM) from another process must set the flag a running loop reads. Make the flag volatile sig_atomic_t, or the compiler may keep a copy of it in a register."},
+			{Name: "from another process, while blocked in read", Args: []string{"blocked"}, Want: "child: read interrupted, stop 15\nchild exited 0\n",
+				Explain: "Without SA_RESTART, the signal makes read return -1 with errno EINTR. signal(), or sa_flags = SA_RESTART, restarts the read instead, and a server blocked in read or accept never notices it was asked to stop."},
+		},
+		Timeout: 6 * time.Second,
+		Hints: []string{
+			"struct sigaction sa; memset(&sa, 0, sizeof sa); sa.sa_handler = on_stop; sigemptyset(&sa.sa_mask); then sigaction(SIGTERM, &sa, NULL) and the same for SIGINT.",
+			"The handler only stores: got = sig. stop_signal just returns got.",
+			"printf, malloc and exit are not async-signal-safe: never call them from a handler.",
 		},
 	},
 }

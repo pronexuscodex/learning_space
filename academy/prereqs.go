@@ -81,11 +81,14 @@ var conceptPrereqs = map[string][]string{
 	"Parsing: Recursive Descent & Pratt":         {"The Compilation Pipeline", "Trees, Heaps & Sorting"},
 
 	// ---- Stage 6
-	"Processes & the Address Space":     {"The Operating System: The Machine's Manager", "The Compilation Pipeline"},
-	"Virtual Memory & Paging":           {"Processes & the Address Space", "Memory, Addresses & Pointers", "The Memory Hierarchy & Locality"},
-	"System Calls & Privilege":          {"The Operating System: The Machine's Manager", "Registers, the Stack & Calling Conventions"},
-	"Scheduling & Context Switches":     {"Processes & the Address Space", "Input & Output: Keys, Screens & Interrupts"},
-	"Synchronisation & Memory Ordering": {"Scheduling & Context Switches"},
+	"Processes & the Address Space":       {"The Operating System: The Machine's Manager", "The Compilation Pipeline"},
+	"Virtual Memory & Paging":             {"Processes & the Address Space", "Memory, Addresses & Pointers", "The Memory Hierarchy & Locality"},
+	"Memory Allocators: How malloc Works": {"Virtual Memory & Paging", "Dynamic Memory: malloc, free & Leaks"},
+	"System Calls & Privilege":            {"The Operating System: The Machine's Manager", "Registers, the Stack & Calling Conventions"},
+	"File Descriptors, Files & Pipes":     {"System Calls & Privilege", "Processes & the Address Space", "Files & Streams: Reading and Writing Data"},
+	"Signals":                             {"Processes & the Address Space", "File Descriptors, Files & Pipes"},
+	"Scheduling & Context Switches":       {"Processes & the Address Space", "Input & Output: Keys, Screens & Interrupts"},
+	"Synchronisation & Memory Ordering":   {"Scheduling & Context Switches"},
 
 	// ---- Stage 7
 	"Durability: Page Cache, fsync & Atomic Rename": {"System Calls & Privilege", "Files & Streams: Reading and Writing Data"},

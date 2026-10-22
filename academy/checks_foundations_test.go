@@ -577,6 +577,101 @@ int checked_mul(int a, int b, int *product) {
     return 1;
 }
 `,
+	"arena": `#include <stddef.h>
+#include <stdint.h>
+#include <stdlib.h>
+
+struct arena {
+    char *base;   /* the block, from one malloc */
+    size_t size;  /* its size in bytes */
+    size_t used;  /* bytes handed out so far, padding included */
+};
+
+int arena_init(struct arena *a, size_t size) {
+    a->base = malloc(size);
+    a->size = a->base ? size : 0;
+    a->used = 0;
+    return a->base != NULL;
+}
+
+void *arena_alloc(struct arena *a, size_t n) {
+    uintptr_t p = (uintptr_t)(a->base + a->used);
+    p = (p + 15) & ~(uintptr_t)15;
+    size_t start = p - (uintptr_t)a->base;
+    if (start > a->size || n > a->size - start) return NULL;
+    a->used = start + n;
+    return a->base + start;
+}
+
+void arena_reset(struct arena *a) { a->used = 0; }
+
+void arena_destroy(struct arena *a) {
+    free(a->base);
+    a->base = NULL;
+    a->size = a->used = 0;
+}
+`,
+	"pipeline": `#define _POSIX_C_SOURCE 200809L
+#include <stdio.h>
+#include <string.h>
+#include <sys/wait.h>
+#include <unistd.h>
+
+static pid_t start(char **argv, int fd, int onto, int fds[2]) {
+    pid_t pid = fork();
+    if (pid == 0) {
+        dup2(fd, onto);
+        close(fds[0]);
+        close(fds[1]);
+        execvp(argv[0], argv);
+        perror(argv[0]);
+        _exit(127);
+    }
+    return pid;
+}
+
+int main(int argc, char **argv) {
+    int bar = 0;
+    for (int i = 1; i < argc; i++)
+        if (strcmp(argv[i], "|") == 0) { bar = i; break; }
+    if (bar <= 1 || bar == argc - 1) {
+        fprintf(stderr, "usage: pipeline A ARGS... '|' B ARGS...\n");
+        return 2;
+    }
+    argv[bar] = NULL;
+    int fds[2];
+    if (pipe(fds) != 0) { perror("pipe"); return 1; }
+    pid_t a = start(&argv[1], fds[1], 1, fds);
+    pid_t b = start(&argv[bar + 1], fds[0], 0, fds);
+    close(fds[0]);
+    close(fds[1]);
+    int status = 0, bstatus = 0;
+    waitpid(a, &status, 0);
+    waitpid(b, &bstatus, 0);
+    return WIFEXITED(bstatus) ? WEXITSTATUS(bstatus) : 128 + WTERMSIG(bstatus);
+}
+`,
+	"graceful": `#define _POSIX_C_SOURCE 200809L
+#include <signal.h>
+#include <string.h>
+
+static volatile sig_atomic_t got;
+
+static void on_stop(int sig) { got = sig; }
+
+int install_stop_handlers(void) {
+    struct sigaction sa;
+    memset(&sa, 0, sizeof sa);
+    sa.sa_handler = on_stop;
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = 0;
+    if (sigaction(SIGTERM, &sa, NULL) != 0) return -1;
+    if (sigaction(SIGINT, &sa, NULL) != 0) return -1;
+    return 0;
+}
+
+int stop_signal(void) { return got; }
+`,
 }
 
 // Each Foundations check fails the typical wrong answer, for the reason
@@ -769,4 +864,29 @@ int main(void) {
 	failsWith(t, "rv_decode", mutate("rv_decode", "int32_t imm = (int32_t)w >> 20;", "int32_t imm = (int32_t)(w >> 20);"), "assembled by LLVM", `"addi x2, x1, 4095"`)
 	// funct7 ignored: sub decodes as add, and junk as an instruction.
 	failsWith(t, "rv_decode", mutate("rv_decode", "            if (f7 == 0 && f3 == 0) name = \"add\";", "            if (f7 != 0x20 && f3 == 0) name = \"add\";"), "not ours", "")
+
+	// Aligning the offset alone is fine here, but used + n wraps around.
+	failsWith(t, "arena", mutate("arena", "if (start > a->size || n > a->size - start) return NULL;", "if (start + n > a->size) return NULL;"), "a request too big to add", "")
+	// No alignment at all.
+	failsWith(t, "arena", mutate("arena", "    p = (p + 15) & ~(uintptr_t)15;\n", ""), "sizes 1, 3, 24, 100 and 7", "multiple of 16")
+	// A malloc per allocation is not an arena (and leaks, where the leak checker runs).
+	failsWith(t, "arena", mutate("arena", "    a->used = start + n;\n    return a->base + start;", "    a->used = start + n;\n    return malloc(n);"), "sizes 1, 3, 24, 100 and 7", "")
+	// Forgetting to free the block leaks it.
+	if run := runSource(t, "arena", mutate("arena", "    free(a->base);\n", "")); run.Leaks && run.OK() {
+		t.Error("arena: a block never freed must be reported as a leak")
+	}
+
+	// The parent keeps the write end open: cat never sees end-of-file.
+	failsWith(t, "pipeline", mutate("pipeline", "    close(fds[0]);\n    close(fds[1]);\n    int status", "    close(fds[0]);\n    int status"), "echo hello | cat", "did not finish")
+	// Waiting for A before starting B deadlocks on a full pipe.
+	failsWith(t, "pipeline", mutate("pipeline", "    pid_t b = start(&argv[bar + 1], fds[0], 0, fds);\n", "    int early;\n    waitpid(a, &early, 0);\n    pid_t b = start(&argv[bar + 1], fds[0], 0, fds);\n"), "more than the pipe holds", "did not finish")
+	// Returning A's status instead of B's.
+	failsWith(t, "pipeline", mutate("pipeline", "return WIFEXITED(bstatus) ? WEXITSTATUS(bstatus) : 128 + WTERMSIG(bstatus);", "return WEXITSTATUS(status);"), "B's exit status", "expected 1")
+
+	// signal() restarts the blocking read.
+	failsWith(t, "graceful", mutate("graceful", "    sa.sa_flags = 0;", "    sa.sa_flags = SA_RESTART;"), "from another process, while blocked in read", "restarted")
+	// SIGINT forgotten: Ctrl-C still kills the program.
+	failsWith(t, "graceful", mutate("graceful", "    if (sigaction(SIGINT, &sa, NULL) != 0) return -1;\n", ""), "SIGINT", "")
+	// A handler that exits straight away gives the program no chance to clean up.
+	failsWith(t, "graceful", strings.Replace(mutate("graceful", "static void on_stop(int sig) { got = sig; }", "static void on_stop(int sig) { got = sig; _exit(0); }"), "#include <string.h>", "#include <string.h>\n#include <unistd.h>", 1), "SIGTERM", "")
 }
