@@ -1,27 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
-  <!-- Systems & AI Academy: a CPU chip with a terminal prompt inside. -->
-  <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#262637"/>
-      <stop offset="1" stop-color="#11111b"/>
-    </linearGradient>
-    <linearGradient id="edge" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#94e2d5"/>
-      <stop offset="1" stop-color="#cba6f7"/>
-    </linearGradient>
-  </defs>
-  <rect x="8" y="8" width="240" height="240" rx="56" fill="url(#bg)"/>
-  <rect x="8.5" y="8.5" width="239" height="239" rx="55.5" fill="none" stroke="#ffffff" stroke-opacity=".08"/>
-  <!-- pins -->
-  <g stroke="url(#edge)" stroke-width="10" stroke-linecap="round">
-    <path d="M100 44v20M128 44v20M156 44v20"/>
-    <path d="M100 192v20M128 192v20M156 192v20"/>
-    <path d="M44 100h20M44 128h20M44 156h20"/>
-    <path d="M192 100h20M192 128h20M192 156h20"/>
-  </g>
-  <!-- chip body -->
-  <rect x="64" y="64" width="128" height="128" rx="20" fill="#181825" stroke="url(#edge)" stroke-width="10"/>
-  <!-- prompt: › and a cursor -->
-  <path d="M94 104l26 24-26 24" fill="none" stroke="#94e2d5" stroke-width="13" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M130 152h32" stroke="#f9e2af" stroke-width="13" stroke-linecap="round"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256" role="img" aria-labelledby="title">
+<title id="title">Systems &amp; AI Academy</title>
+<rect id="tile" x="8" y="8" width="240" height="240" rx="56" fill="#1e1e2e"/>
+<path id="chip" fill="#cba6f7" d="M92.48 61.4 H163.52 A31.08 31.08 0 0 1 194.6 92.48 V163.52 A31.08 31.08 0 0 1 163.52 194.6 H92.48 A31.08 31.08 0 0 1 61.4 163.52 V92.48 A31.08 31.08 0 0 1 92.48 61.4 Z M92.48 76.2 A16.28 16.28 0 0 0 76.2 92.48 V163.52 A16.28 16.28 0 0 0 92.48 179.8 H163.52 A16.28 16.28 0 0 0 179.8 163.52 V92.48 A16.28 16.28 0 0 0 163.52 76.2 Z M117.64 51.04 L117.64 65.84 A7.4 7.4 0 0 1 102.84 65.84 L102.84 51.04 A7.4 7.4 0 0 1 117.64 51.04 Z M117.64 190.16 L117.64 204.96 A7.4 7.4 0 0 1 102.84 204.96 L102.84 190.16 A7.4 7.4 0 0 1 117.64 190.16 Z M51.04 102.84 L65.84 102.84 A7.4 7.4 0 0 1 65.84 117.64 L51.04 117.64 A7.4 7.4 0 0 1 51.04 102.84 Z M190.16 102.84 L204.96 102.84 A7.4 7.4 0 0 1 204.96 117.64 L190.16 117.64 A7.4 7.4 0 0 1 190.16 102.84 Z M153.16 51.04 L153.16 65.84 A7.4 7.4 0 0 1 138.36 65.84 L138.36 51.04 A7.4 7.4 0 0 1 153.16 51.04 Z M153.16 190.16 L153.16 204.96 A7.4 7.4 0 0 1 138.36 204.96 L138.36 190.16 A7.4 7.4 0 0 1 153.16 190.16 Z M51.04 138.36 L65.84 138.36 A7.4 7.4 0 0 1 65.84 153.16 L51.04 153.16 A7.4 7.4 0 0 1 51.04 138.36 Z M190.16 138.36 L204.96 138.36 A7.4 7.4 0 0 1 204.96 153.16 L190.16 153.16 A7.4 7.4 0 0 1 190.16 138.36 Z"/><path id="prompt" fill="#94e2d5" d="M106.59 102.05 L127.31 122.77 A7.4 7.4 0 0 1 116.85 133.23 L96.13 112.51 A7.4 7.4 0 0 1 106.59 102.05 Z M127.31 133.23 L106.59 153.95 A7.4 7.4 0 0 1 96.13 143.49 L116.85 122.77 A7.4 7.4 0 0 1 127.31 133.23 Z"/><path id="cursor" fill="#f9e2af" d="M133.92 141.32 L156.12 141.32 A7.4 7.4 0 0 1 156.12 156.12 L133.92 156.12 A7.4 7.4 0 0 1 133.92 141.32 Z"/>
 </svg>

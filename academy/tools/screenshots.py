@@ -50,7 +50,7 @@ SHOTS = {
     "roadmap": (80, ["m"], r"ROADMAP", r"more sense later", 40),
     "progress": (80, ["p"], r"PROGRESS REPORT", r"Achievements", 45),
     "library": (80, ["l"], r"LIBRARY", r"Stage 2 ·", 30),
-    "techwatch": (80, ["w", "4"], r"MY TECH RADAR", r"end · Enter", 30),
+    "techwatch": (80, ["w", "4"], r"MY TECH RADAR", "", 30),  # the page ends at the pager's silent pause
     "workout": (80, ["j"], r"TODAY'S WORKOUT", r"Ready\?", 30),
     "career": (80, ["e", "1", "1", "y"], r"GET HIRED", r"Back to the main menu", 32, -1),
     "hint-ladder": (80, ["6", "0", "2", "3", "3", "2", "2"], r"Stuck\?", r"this exercise\.", 40, -3),
@@ -241,7 +241,7 @@ def shoot(name, chrome, demo):
             if re.search(last, plain(lines[i])):
                 end = min(i + 1, start + limit)
                 break
-    chosen = [l for l in lines[start:end] if not re.search(r"── (“[^”]*” \d+/\d+ · )?(\d+%|end) · Enter[^─]*──|── Enter · q ──", plain(l))]
+    chosen = lines[start:end]
     while chosen and not plain(chosen[-1]).strip():
         chosen.pop()
     body = "\n".join(to_html(l) for l in chosen)

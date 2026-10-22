@@ -46,12 +46,29 @@ func TestPagerTypeAhead(t *testing.T) {
 	}
 }
 
-// Like man and less, an answered pager prompt is erased on a terminal, so
-// "Enter for more" never stays in the middle of the text; with output
-// going to a file or pipe, nothing extra is written.
-func TestPagerErasesAnsweredPrompt(t *testing.T) {
-	t.Setenv("LINES", "12")
+// pagerPromptWords are the words of the old "Enter more · b back · /word
+// find · q stop · or type your choice" line, in any of its forms. None of
+// them may be shown between pages any more.
+var pagerPromptWords = []string{"Enter more", "Enter for more", "Enter to continue", "Enter continue", "q stop", "or type your choice", "/word find", "b back"}
+
+func assertNoPagerPrompt(t *testing.T, out string) {
+	t.Helper()
+	plain := stripANSI(out)
+	for _, w := range pagerPromptWords {
+		if strings.Contains(plain, w) {
+			t.Errorf("a pagination prompt (%q) was shown:\n%s", w, plain)
+		}
+	}
+}
+
+// Enter shows the next page at once, with no prompt or key list printed
+// under a page. On a terminal the line the reader pressed Enter on is
+// erased, so each page follows the last seamlessly; with output going to
+// a file or pipe, nothing extra is written.
+func TestPagerEnterAdvancesWithoutPrompt(t *testing.T) {
+	t.Setenv("LINES", "12") // pages of 10 lines
 	t.Setenv("TERM", "xterm-256color")
+	const erase = "\x1b[1A\r\x1b[2K"
 	for _, screen := range []bool{true, false} {
 		var out bytes.Buffer
 		a := &App{
@@ -65,14 +82,73 @@ func TestPagerErasesAnsweredPrompt(t *testing.T) {
 				a.println(fmt.Sprintf("line %d", i))
 			}
 		})
-		const erase = "\x1b[1A\r\x1b[2K"
-		got := strings.Count(out.String(), erase)
-		if want := map[bool]int{true: 3, false: 0}[screen]; got != want {
-			t.Errorf("screen=%v: %d prompts erased, want %d", screen, got, want)
+		got := out.String()
+		assertNoPagerPrompt(t, got)
+		if !strings.Contains(got, "line 25") || a.con.pending != nil {
+			t.Errorf("screen=%v: three Enters must show all 25 lines and type nothing ahead:\n%s", screen, got)
 		}
-		if screen && !strings.Contains(out.String(), "more · ") && !strings.Contains(out.String(), "for more") {
-			t.Error("the prompt must still be shown before it is answered")
+		if want := map[bool]int{true: 3, false: 0}[screen]; strings.Count(got, erase) != want {
+			t.Errorf("screen=%v: %d answered lines erased, want %d", screen, strings.Count(got, erase), want)
 		}
+		// Nothing at all is printed between a page and the next one.
+		between := map[bool]string{true: "line 10\n" + erase + "line 11\n", false: "line 10\nline 11\n"}[screen]
+		if !strings.Contains(got, between) {
+			t.Errorf("screen=%v: the next page must follow the last line directly (%q):\n%q", screen, between, got)
+		}
+	}
+}
+
+// A real lesson: Enter pages through a concept card without any prompt,
+// and the questions that follow the card are still asked and answered as
+// before; an Enter that turned a page is never taken as their answer.
+func TestLessonEnterAdvancesThenQuestionsStillWork(t *testing.T) {
+	t.Setenv("LINES", "12")
+	t.Setenv("TERM", "xterm-256color")
+	g, _ := guideFor(1)
+
+	// The card as one block, to count its pages (10 lines each).
+	var whole bytes.Buffer
+	dry := &App{reg: seedRegistry(), width: 80, con: &console{in: bufio.NewReader(strings.NewReader("n\n")), out: &whole}}
+	if err := dry.studyConceptAt(1, g, 0); err != nil {
+		t.Fatal(err)
+	}
+	card, _, ok := strings.Cut(whole.String(), "  "+sty.Bold("Do you understand it"))
+	if !ok {
+		t.Fatalf("the card must end with the understanding question:\n%s", whole.String())
+	}
+	cardLines := strings.Split(strings.TrimRight(card, "\n"), "\n")
+	enters := (len(cardLines)+9)/10 - 1
+	if enters < 2 {
+		t.Fatalf("the card should span several pages, got %d lines", len(cardLines))
+	}
+	var lastLine string // the card's last line of text (not its border)
+	for i := len(cardLines) - 1; i >= 0 && lastLine == ""; i-- {
+		if l := strings.Trim(stripANSI(cardLines[i]), " ┃┗━"); l != "" {
+			lastLine = l
+		}
+	}
+
+	var out bytes.Buffer
+	input := strings.Repeat("\n", enters) + "y\n" + "Code becomes machine instructions\n"
+	a := &App{reg: seedRegistry(), width: 80, pager: true,
+		con: &console{in: bufio.NewReader(strings.NewReader(input)), out: &out, screen: true}}
+	if err := a.studyConceptAt(1, g, 0); err != nil {
+		t.Fatal(err)
+	}
+	shown := stripANSI(out.String())
+	assertNoPagerPrompt(t, out.String())
+	if !strings.Contains(shown, lastLine) {
+		t.Errorf("Enter must page through to the card's last line (%q):\n%s", lastLine, shown)
+	}
+	if strings.Contains(shown, "you read") {
+		t.Error("paging with Enter reads the card to the end; it must not count as leaving early")
+	}
+	if !strings.Contains(shown, "Do you understand it") || !strings.Contains(shown, "Your explanation") {
+		t.Errorf("the card's questions must still be asked:\n%s", shown)
+	}
+	_, s := a.reg.findStage(1)
+	if !s.hasStudied(g.Concepts[0].Name) || s.Notes[g.Concepts[0].Name] != "Code becomes machine instructions" {
+		t.Error("the answers typed after paging must be taken as before")
 	}
 }
 
@@ -112,9 +188,7 @@ func TestPagerKeys(t *testing.T) {
 	if !strings.Contains(out, "line 40") || strings.Contains(out, "line 21\n") || strings.Count(out, "line 1\n") != 2 {
 		t.Errorf("> must show the last page and < the first, without the pages between:\n%s", out)
 	}
-	if !strings.Contains(out, "end") {
-		t.Error("the last page's prompt must say it is the end")
-	}
+	assertNoPagerPrompt(t, out)
 
 	// /word finds the next line containing it, / alone the one after,
 	// wrapping to the first match at the end.
@@ -133,19 +207,6 @@ func TestPagerKeys(t *testing.T) {
 	_, a = pagerRun(t, "/\n", false)
 	if a.con.pending == nil || *a.con.pending != "/" {
 		t.Error("/ alone must answer the next prompt when nothing has been searched")
-	}
-}
-
-func TestPagerPromptFits(t *testing.T) {
-	for _, cols := range []int{40, 60, 80, 130} {
-		a := &App{width: cols, con: &console{out: &bytes.Buffer{}}}
-		for _, end := range []int{10, 40} {
-			for _, f := range []pagerSearch{{current: -1}, {query: "stack", matches: []int{1, 5}, current: 0}} {
-				if p := a.pagerPrompt(0, end, 40, &f); visibleLen(p) >= cols {
-					t.Errorf("%d columns: prompt is %d wide: %q", cols, visibleLen(p), stripANSI(p))
-				}
-			}
-		}
 	}
 }
 

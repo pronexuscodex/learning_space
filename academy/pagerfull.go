@@ -31,8 +31,8 @@ const (
 )
 
 // fullScreenOK reports whether the full-screen pager can be used.
-// ACADEMY_PAGER=inline keeps long screens in the normal scrollback, paged
-// with a prompt under each page, as before.
+// ACADEMY_PAGER=inline keeps long screens in the normal scrollback, a page
+// at a time, with Enter for the next page (pager.go).
 func (a *App) fullScreenOK() bool {
 	return a.con.raw && a.con.screen && os.Getenv("TERM") != "dumb" && os.Getenv("ACADEMY_PAGER") != "inline"
 }

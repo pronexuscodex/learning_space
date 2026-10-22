@@ -63,9 +63,10 @@ KEYS = [
   "5\r",                    # commit & exit
 ]
 
-PAGER = re.compile(r"── (“[^”]*” \d+/\d+ · )?(\d+%|end) · Enter[^─]*──|── Enter · q ──")
-
-def run(cols, rows=60):
+# Taller than any screen, so a long screen is never split into pages: the
+# pager shows no prompt between pages, so the keys below could not tell a
+# pause inside a screen from the one at its end.
+def run(cols, rows=2000):
     reg = os.path.join(tempfile.mkdtemp(prefix=f"academy-layout-{cols}-"), "registry.json")  # the check log sits beside it: fresh each run
     pid, fd = pty.fork()
     if pid == 0:
@@ -84,7 +85,6 @@ def run(cols, rows=60):
                 try: out += os.read(fd, 1 << 16)
                 except OSError: return
     read(1.0)
-    pause = re.compile(r"(── (“[^”]*” \d+/\d+ · )?\d+% · Enter[^─]*──|── Enter · q ──)\s*$")
     before_last = 0
     for i, k in enumerate(KEYS):
         if i == len(KEYS) - 1:
@@ -96,14 +96,6 @@ def run(cols, rows=60):
                     break
                 read(0.25)
             continue
-        # A long screen may pause ("Enter for more"). If the script is not
-        # about to press Enter anyway, press it first, as a person would,
-        # so the keys stay in step with the screens.
-        for _ in range(10):
-            tail = ANSI.sub("", out[-400:].decode("utf-8", "replace"))
-            if k == "\r" or not pause.search(tail):
-                break
-            os.write(fd, b"\r"); read(0.25)
         os.write(fd, k.encode()); read(0.25)
     read(1.0)
     text = ANSI.sub("", out.decode("utf-8", "replace")).replace("\r\n", "\n")
@@ -122,12 +114,6 @@ def run(cols, rows=60):
             continue
         if " › " in line and not line.rstrip().endswith("›"):  # echoed typing: the terminal wraps it
             continue
-        # A pager prompt is an input point too: on a slow machine the next
-        # keys can be typed while it is showing, and the terminal echoes
-        # them after it. Measure only the app's own part of the line.
-        m = PAGER.search(line)
-        if m:
-            line = line[:m.end()]
         if width(line) > cols:
             bad.append((width(line), line))
     return bad

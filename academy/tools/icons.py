@@ -56,12 +56,12 @@ def render_png(svg, size, out):
 
 def social_preview(out):
     src = "file://" + os.path.join(ASSETS, "icon.svg")
-    html = f"""<html><body style="margin:0;width:1280px;height:640px;background:linear-gradient(135deg,#1e1e2e,#11111b);
+    html = f"""<html><body style="margin:0;width:1280px;height:640px;background:#1e1e2e;
 display:flex;align-items:center;gap:64px;padding:0 96px;box-sizing:border-box;font-family:'DejaVu Sans',sans-serif">
 <img src="{src}" width="300" height="300">
 <div><div style="font-size:64px;font-weight:700;color:#cdd6f4;line-height:1.1">Systems &amp; AI<br>Academy</div>
 <div style="margin-top:24px;font-size:28px;color:#94e2d5">From how computers work and C<br>to operating systems, security and AI</div>
-<div style="margin-top:28px;font-size:22px;color:#7f849c;font-family:'DejaVu Sans Mono',monospace;white-space:nowrap">17 stages · spaced repetition · offline</div></div>
+<div style="margin-top:28px;font-size:22px;color:#7f849c;font-family:'DejaVu Sans Mono',monospace;white-space:nowrap">21 stages · real compiler checks · offline</div></div>
 </body></html>"""
     screenshot(html, 1280, 640, out)
 
