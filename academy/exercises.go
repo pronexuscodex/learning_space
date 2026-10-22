@@ -94,7 +94,7 @@ var conceptExercises = map[string][]Exercise{
 	"Durability: Page Cache, fsync & Atomic Rename": trio(
 		"Put the steps of a safe save in order: rename, write temp file, fsync directory, fsync file.",
 		"Write the temp file, fsync it, rename it, then fsync the directory.",
-		"Write a safe saver (temp file + fsync + rename) and a naive one. Kill each with kill -9 in the middle of large writes many times, and check which ever leaves a corrupted file.",
+		"In C, write a safe saver (temp file, fsync, rename, fsync the directory) and a naive one (open with O_TRUNC and write). Kill each with kill -9 in the middle of large writes many times, and check which ever leaves a corrupted file.",
 		"Include a checksum in the file so corruption is detectable.",
 		"Your note-taking app loses the last minute of notes after crashes. Add an autosave that writes safely every 30 seconds, and a start-up step that recovers the newest valid save.",
 		"Keep the previous good file until the new one is fully written.",
@@ -110,7 +110,7 @@ var conceptExercises = map[string][]Exercise{
 	"LSM-Trees": trio(
 		"Writes to key x arrive in order: x=1, x=2, delete x, x=3. What does a read of x return at the end, and what is a tombstone?",
 		"The newest entry wins: 3. A delete is written as a tombstone record.",
-		"Build a mini-LSM: an in-memory dictionary that flushes to a sorted file every 1,000 keys, reads that check memory and then files from newest to oldest, and a compaction step that merges the files.",
+		"Build a mini-LSM in C: a sorted in-memory array that flushes to a sorted file every 1,000 keys, reads that check memory and then the files from newest to oldest, and a compaction step that merges the files.",
 		"Keeping the files sorted lets you binary-search and merge them.",
 		"Your app ingests 50,000 sensor readings per second and a B-tree database cannot keep up. Explain why an LSM store copes better, and benchmark inserts in SQLite against your mini-LSM or a RocksDB-based store.",
 		"Batch the writes, and compare throughput.",
@@ -118,7 +118,7 @@ var conceptExercises = map[string][]Exercise{
 	"Write-Ahead Logging & Recovery": trio(
 		"Why must the log record reach the disk before the data page it describes?",
 		"Otherwise a crash could leave a change on disk with no record to redo or undo it.",
-		"Add a write-ahead log to a key-value dictionary: append each operation to a log file and fsync it, and on start-up rebuild the dictionary by replaying the log.",
+		"In C, add a write-ahead log to a key-value table: append each operation to a log file and fsync it, and on start-up rebuild the table by replaying the log. Add a checksum to each record and stop replaying at the first bad one.",
 		`One line per operation: "SET key value" or "DEL key".`,
 		"Turn on SQLite's WAL mode (PRAGMA journal_mode=WAL) and measure small transactions per second with and without it, and with synchronous=NORMAL versus FULL. Explain the durability trade-off.",
 		"Time 10,000 single-row inserts, each in its own transaction.",
@@ -126,8 +126,8 @@ var conceptExercises = map[string][]Exercise{
 	"Transactions, Isolation & MVCC": trio(
 		"A transfer moves £50 from A to B in two steps. What can go wrong if the system crashes between the steps, without a transaction?",
 		"The money disappears from A without arriving at B.",
-		"In SQLite or PostgreSQL, write a transfer that uses a transaction, simulate a failure halfway through (raise an exception), and verify that both balances are unchanged.",
-		"BEGIN … COMMIT, or ROLLBACK on error.",
+		"In the sqlite3 shell (or from C with the SQLite library), write a transfer that uses a transaction, stop it halfway through (quit the shell between the two UPDATEs), and verify that both balances are unchanged when you reopen the database.",
+		"BEGIN … COMMIT; without the COMMIT, SQLite rolls the transaction back.",
 		"Two people book the last hotel room at the same instant. Reproduce the double booking with two concurrent database sessions, then prevent it with SELECT … FOR UPDATE, a unique constraint, or SERIALIZABLE isolation.",
 		"Two psql windows make this easy to demonstrate in PostgreSQL.",
 	),

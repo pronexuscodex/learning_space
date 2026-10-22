@@ -3,7 +3,7 @@ package main
 // Checked exercises added when Stages 2 to 8 were deepened: data
 // structures and algorithms (Stage 2), discrete mathematics (Stage 3),
 // computer architecture (Stage 4), computer systems (Stage 5) and
-// operating systems (Stage 6). Most read standard input and are timed on
+// operating systems (Stage 6) and storage engines (Stage 7). Most read standard input and are timed on
 // inputs big enough that only the efficient idea passes.
 
 import (
@@ -1185,6 +1185,206 @@ int main(int argc, char **argv) {
 			"printf, malloc and exit are not async-signal-safe: never call them from a handler.",
 		},
 	},
+	{
+		ID: "buffer_pool", Stage: 7, Concept: "Pages, Records & the Buffer Pool",
+		Title: "A buffer pool with LRU eviction",
+		Task:  "Simulate a database's buffer pool. The first line of input is the number of frames and a mode, trace or summary; each line after it is r P (read page P), w P (write page P: it becomes dirty), p P (pin P: read it and keep it from being evicted) or u P (unpin P once). A read, write or pin of a page already in the pool is a hit. A miss loads the page into a free frame, or else evicts the least recently used unpinned page, writing it back first if it is dirty; if every frame is pinned, nothing is loaded. In trace mode print one line per miss (see the starter); in both modes finish with hits H, misses M, writes W.",
+		File:  "buffer_pool.c",
+		Starter: `/* Checked exercise: buffer_pool
+ * Input:  3 trace          frames, and trace or summary
+ *         r 1              read page 1
+ *         w 2              write page 2 (dirty from now on)
+ *         p 3              pin page 3 (an access too)
+ *         u 3              unpin page 3 (not an access)
+ * On a miss, in trace mode, print one of:
+ *   load 4                       a frame was free
+ *   evict 2, load 4              2 was the least recently used unpinned page
+ *   write 2, evict 2, load 4     ... and it was dirty: written back first
+ *   no frame for 4               every frame is pinned: nothing loaded
+ * At the end, in both modes:
+ *   hits H, misses M, writes W   (a "no frame" access counts as a miss)
+ * Each frame needs: page number, pin count, dirty flag, time of last use.
+ */
+#include <stdio.h>
+`,
+		Cases: []CheckCase{
+			{Name: "three frames", Stdin: "3 trace\nr 1\nr 2\nr 3\nr 1\nr 4\nr 2\nr 1\n",
+				Want:    "load 1\nload 2\nload 3\nevict 2, load 4\nevict 3, load 2\nhits 2, misses 5, writes 0\n",
+				Explain: "Reading 1 again made it the most recently used, so 4 evicts 2, the least recently used; then 2 evicts 3."},
+			{Name: "dirty pages are written back", Stdin: "2 trace\nw 1\nr 2\nr 3\nw 2\nr 1\nr 4\n",
+				Want:    "load 1\nload 2\nwrite 1, evict 1, load 3\nevict 3, load 1\nwrite 2, evict 2, load 4\nhits 1, misses 5, writes 2\n",
+				Explain: "Page 1 was written, so evicting it writes it back. Page 1 comes back clean. Page 2 became dirty on the hit w 2."},
+			{Name: "a pinned page stays", Stdin: "2 trace\np 1\nr 2\nr 3\nr 4\nu 1\nr 5\n",
+				Want:    "load 1\nload 2\nevict 2, load 3\nevict 3, load 4\nevict 1, load 5\nhits 0, misses 5, writes 0\n",
+				Explain: "While 1 is pinned it is never the victim, even though it is the least recently used. Once unpinned, it goes first."},
+			{Name: "every frame pinned", Stdin: "2 trace\np 1\np 2\nr 3\np 1\nu 1\nr 3\nu 1\nr 3\n",
+				Want:    "load 1\nload 2\nno frame for 3\nno frame for 3\nevict 1, load 3\nhits 1, misses 5, writes 0\n",
+				Explain: "Page 1 was pinned twice, so it needs two unpins. Until then, there is no frame for page 3: print that and load nothing."},
+			{Name: "a scan floods LRU", Stdin: "4 summary\n" + strings.Repeat("r 1\nr 2\nr 3\nr 4\nr 5\n", 20),
+				Want:    "hits 0, misses 100, writes 0\n",
+				Explain: "Scanning five pages in a loop through four frames always evicts exactly the page needed next: LRU's worst case."},
+			{Name: "a million accesses", Stdin: bufferPoolInput(), Want: bufferPoolWant(),
+				Explain: "Use the same rules as the small cases: a hit refreshes the time of last use, and only a dirty page is written back."},
+		},
+		Hints: []string{
+			"Keep a counter that goes up by one per access; a frame's last use is the counter's value at its last access, and the victim is the unpinned frame with the smallest one.",
+			"Look for the page first (a hit); on a miss, look for a free frame before choosing a victim.",
+			"u P does nothing unless P is in the pool with a pin count above 0, and it does not count as an access.",
+		},
+	},
+	{
+		ID: "bloom", Stage: 7, Concept: "LSM-Trees",
+		Title: "A Bloom filter",
+		Task:  "Write a Bloom filter of m bits with k hash functions: bloom_init clears m bits (allocated with malloc or calloc, rounded up to whole bytes), bloom_add sets the k bits for a key, bloom_maybe returns 1 if all k bits for the key are set and 0 otherwise, and bloom_free frees the bits. It must never say 0 for a key that was added, and with 10 bits per key and k = 7 it should say 1 for fewer than 1.5% of the keys that were not. Keep struct bloom exactly as given. No main.",
+		File:  "bloom.c",
+		Leaks: true,
+		Starter: `/* Checked exercise: bloom
+ *   int  bloom_init(struct bloom *b, size_t m, int k);   1 on success
+ *   void bloom_add(struct bloom *b, const char *key);
+ *   int  bloom_maybe(const struct bloom *b, const char *key);
+ *   void bloom_free(struct bloom *b);
+ * Bit i lives in byte i / 8, at position i % 8.
+ * k hash functions from two: compute h1 and h2 of the key (for example
+ * 64-bit FNV-1a, and FNV-1a with a different starting value), then use
+ * positions (h1 + j * h2) % m for j = 0 .. k-1. Make h2 odd.
+ * FNV-1a: h = 14695981039346656037; for each byte: h ^= byte; h *= 1099511628211;
+ */
+#include <stddef.h>
+#include <stdint.h>
+#include <stdlib.h>
+
+struct bloom {
+    unsigned char *bits;  /* m bits, (m + 7) / 8 bytes */
+    size_t m;             /* number of bits */
+    int k;                /* number of hash functions */
+};
+`,
+		Harness: `#include <stddef.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <string.h>
+
+struct bloom {
+    unsigned char *bits;
+    size_t m;
+    int k;
+};
+
+int bloom_init(struct bloom *b, size_t m, int k);
+void bloom_add(struct bloom *b, const char *key);
+int bloom_maybe(const struct bloom *b, const char *key);
+void bloom_free(struct bloom *b);
+
+static size_t ones(const struct bloom *b) {
+    size_t n = 0;
+    for (size_t i = 0; i < b->m; i++) n += (b->bits[i / 8] >> (i % 8)) & 1;
+    return n;
+}
+
+int main(int argc, char **argv) {
+    struct bloom b;
+    char key[32];
+    if (argc < 2) return 2;
+    if (strcmp(argv[1], "one") == 0) {
+        if (!bloom_init(&b, 1000, 7)) { printf("bloom_init failed\n"); return 0; }
+        printf("empty: %s\n", bloom_maybe(&b, "hello") ? "maybe" : "no");
+        bloom_add(&b, "hello");
+        size_t n = ones(&b);
+        printf("bits set: %s\n", n >= 1 && n <= 7 ? "1 to 7" : "not 1 to 7");
+        printf("hello: %s\n", bloom_maybe(&b, "hello") ? "maybe" : "no");
+    } else if (strcmp(argv[1], "added") == 0) {
+        if (!bloom_init(&b, 1000000, 7)) { printf("bloom_init failed\n"); return 0; }
+        for (int i = 0; i < 100000; i++) { snprintf(key, sizeof key, "key%d", i); bloom_add(&b, key); }
+        for (int i = 0; i < 100000; i++) {
+            snprintf(key, sizeof key, "key%d", i);
+            if (!bloom_maybe(&b, key)) { printf("%s was added, but bloom_maybe says no\n", key); goto done; }
+        }
+        printf("all 100000 keys: maybe\n");
+    } else if (strcmp(argv[1], "rate") == 0) {
+        if (!bloom_init(&b, 1000000, 7)) { printf("bloom_init failed\n"); return 0; }
+        for (int i = 0; i < 100000; i++) { snprintf(key, sizeof key, "user:%06d", i); bloom_add(&b, key); }
+        double set = ones(&b) / 1e6;
+        if (set < 0.45 || set > 0.56) printf("%.1f%% of the bits are set, expected about 50%%\n", set * 100);
+        else printf("about half the bits set\n");
+        int fp = 0;
+        for (int i = 0; i < 100000; i++) { snprintf(key, sizeof key, "item:%06d", i); fp += bloom_maybe(&b, key); }
+        if (fp < 1500) printf("false positives under 1.5%%\n");
+        else printf("false positives: %.2f%%\n", fp / 1000.0);
+    } else if (strcmp(argv[1], "odd") == 0) {
+        if (!bloom_init(&b, 1001, 3)) { printf("bloom_init failed\n"); return 0; }
+        for (int i = 0; i < 100; i++) { snprintf(key, sizeof key, "k%d", i); bloom_add(&b, key); }
+        for (int i = 0; i < 100; i++) {
+            snprintf(key, sizeof key, "k%d", i);
+            if (!bloom_maybe(&b, key)) { printf("%s was added, but bloom_maybe says no\n", key); goto done; }
+        }
+        if (ones(&b) > 300) { printf("100 keys set more than 3 bits each\n"); goto done; }
+        printf("1001 bits: all 100 keys found\n");
+    } else return 2;
+done:
+    bloom_free(&b);
+    return 0;
+}
+`,
+		Cases: []CheckCase{
+			{Name: "one key", Args: []string{"one"}, Want: "empty: no\nbits set: 1 to 7\nhello: maybe\n",
+				Explain: "A new filter has every bit clear (calloc, or memset after malloc), and one key sets at most k bits."},
+			{Name: "no false negatives", Args: []string{"added"}, Want: "all 100000 keys: maybe\n",
+				Explain: "bloom_add and bloom_maybe must compute exactly the same k positions, and set and test the same bit: byte i / 8, bit i % 8."},
+			{Name: "the false-positive rate", Args: []string{"rate"}, Want: "about half the bits set\nfalse positives under 1.5%\n",
+				Explain: "With 10 bits per key and k = 7, theory says 0.82%. A higher rate means the positions are not independent: a hash that ignores part of the key, or k positions that are all the same."},
+			{Name: "a size that is not a multiple of 8", Args: []string{"odd"}, Want: "1001 bits: all 100 keys found\n",
+				Explain: "1,001 bits need 126 bytes: (m + 7) / 8, not m / 8."},
+		},
+		Timeout: 10 * time.Second,
+		Hints: []string{
+			"Set bit i: b->bits[i / 8] |= (unsigned char)(1u << (i % 8)); test it: (b->bits[i / 8] >> (i % 8)) & 1.",
+			"Use uint64_t for the hashes, so that the multiplication wraps around instead of overflowing, then take % b->m.",
+			"bloom_init: b->bits = calloc((m + 7) / 8, 1); remember m and k in the struct.",
+		},
+	},
+	{
+		ID: "hash_join", Stage: 7, Concept: "Query Planning & Join Algorithms",
+		Title: "A hash join",
+		Task:  "Read two tables from standard input and print their join on the key. Each table is a line with its number of rows, then one row per line: an integer key (64-bit, possibly negative) and a word of up to 15 characters. For each row of the second table, in order, print key a b for every row of the first table with the same key, in the first table's order. The tables can have 100,000 rows each, so compare keys through a hash table, not every pair.",
+		File:  "hash_join.c",
+		Starter: `/* Checked exercise: hash_join
+ * Input:   3          rows of table A
+ *          1 apple
+ *          2 pear
+ *          1 plum
+ *          2          rows of table B
+ *          1 red
+ *          3 blue
+ * Output:  1 apple red
+ *          1 plum red
+ * Build: put every row of A into a hash table keyed on the key, keeping
+ * rows with the same key in A's order. Probe: for each row of B, look up
+ * its key and print every match.
+ * A nested loop compares 100,000 x 100,000 = ten billion pairs: too slow.
+ */
+#include <stdio.h>
+#include <stdlib.h>
+`,
+		Cases: []CheckCase{
+			{Name: "the example", Stdin: "3\n1 apple\n2 pear\n1 plum\n2\n1 red\n3 blue\n", Want: "1 apple red\n1 plum red\n",
+				Explain: "For key 1, both rows of A match, printed in A's order: apple, then plum."},
+			{Name: "no matches", Stdin: "2\n1 a\n2 b\n2\n3 c\n4 d\n", Want: ""},
+			{Name: "an empty table", Stdin: "0\n2\n1 a\n2 b\n", Want: ""},
+			{Name: "duplicates on both sides", Stdin: "3\n5 x\n5 y\n6 z\n3\n5 p\n6 q\n5 r\n", Want: "5 x p\n5 y p\n6 z q\n5 x r\n5 y r\n",
+				Explain: "Every pair of rows with the same key is one line of output: two A rows times two B rows with key 5 make four lines."},
+			{Name: "negative and huge keys", Stdin: "3\n-7 neg\n9223372036854775807 max\n-9223372036854775808 min\n3\n-9223372036854775808 m\n-7 n\n9223372036854775807 x\n",
+				Want:    "-9223372036854775808 min m\n-7 neg n\n9223372036854775807 max x\n",
+				Explain: "In C, key % buckets is negative for a negative key: an index before the start of the array. Convert the key to an unsigned type before hashing."},
+			{Name: "100,000 rows each", Stdin: hashJoinInput(), Want: hashJoinWant(),
+				Explain: "Ten billion comparisons take minutes; building a hash table of A and probing it once per row of B takes milliseconds."},
+		},
+		Timeout: 5 * time.Second,
+		Hints: []string{
+			"Read with scanf(\"%lld %15s\", &key, word); store A's rows in an array, and the hash table as bucket heads plus a next index per row.",
+			"To keep A's order within a bucket, insert A's rows in reverse order at the head of each chain, or keep a tail pointer per bucket.",
+			"Choose more buckets than rows (a power of two, such as 262,144) and mix the key's bits: (uint64_t)key * 0x9E3779B97F4A7C15 >> 46 for 2^18 buckets.",
+		},
+	},
 }
 
 // duplicatesValue is the number at position i of duplicatesInput.
@@ -1711,4 +1911,143 @@ func rvWant() string {
 		b.WriteString(rvDecode(w) + "\n")
 	}
 	return b.String()
+}
+
+// bufferPoolOps is the trace of the big buffer_pool case: mostly hot
+// pages with a long tail, a third of them writes, and some pinned
+// stretches.
+func bufferPoolOps() []string {
+	r := rand.New(rand.NewPCG(10, 10))
+	var ops []string
+	var pinned []int
+	for len(ops) < 1000000 {
+		page := r.IntN(100)
+		if r.IntN(5) == 0 {
+			page = r.IntN(10000)
+		}
+		switch x := r.IntN(100); {
+		case x < 2 && len(pinned) < 8:
+			pinned = append(pinned, page)
+			ops = append(ops, fmt.Sprintf("p %d", page))
+		case x < 4 && len(pinned) > 0:
+			ops = append(ops, fmt.Sprintf("u %d", pinned[0]))
+			pinned = pinned[1:]
+		case x < 35:
+			ops = append(ops, fmt.Sprintf("w %d", page))
+		default:
+			ops = append(ops, fmt.Sprintf("r %d", page))
+		}
+	}
+	return ops
+}
+
+func bufferPoolInput() string {
+	return "64 summary\n" + strings.Join(bufferPoolOps(), "\n") + "\n"
+}
+
+// bufferPoolSim runs the buffer_pool rules over ops with the given number
+// of frames and returns the summary line.
+func bufferPoolSim(frames int, ops []string) string {
+	type frame struct {
+		page, pins int
+		dirty      bool
+		used       int
+	}
+	var pool []*frame
+	find := func(page int) *frame {
+		for _, f := range pool {
+			if f.page == page {
+				return f
+			}
+		}
+		return nil
+	}
+	hits, misses, writes, clock := 0, 0, 0, 0
+	for _, op := range ops {
+		var kind string
+		var page int
+		fmt.Sscanf(op, "%s %d", &kind, &page)
+		if kind == "u" {
+			if f := find(page); f != nil && f.pins > 0 {
+				f.pins--
+			}
+			continue
+		}
+		clock++
+		f := find(page)
+		if f != nil {
+			hits++
+		} else {
+			misses++
+			if len(pool) < frames {
+				f = &frame{page: page}
+				pool = append(pool, f)
+			} else {
+				var victim *frame
+				for _, g := range pool {
+					if g.pins == 0 && (victim == nil || g.used < victim.used) {
+						victim = g
+					}
+				}
+				if victim == nil {
+					continue
+				}
+				if victim.dirty {
+					writes++
+				}
+				*victim = frame{page: page}
+				f = victim
+			}
+		}
+		f.used = clock
+		if kind == "w" {
+			f.dirty = true
+		}
+		if kind == "p" {
+			f.pins++
+		}
+	}
+	return fmt.Sprintf("hits %d, misses %d, writes %d\n", hits, misses, writes)
+}
+
+func bufferPoolWant() string { return bufferPoolSim(64, bufferPoolOps()) }
+
+// hashJoinData is the big hash_join case: two tables of 100,000 rows with
+// keys drawn from two million values, so about 5,000 rows match.
+func hashJoinData() (a, b []int64) {
+	r := rand.New(rand.NewPCG(11, 11))
+	for i := 0; i < 100000; i++ {
+		a = append(a, int64(r.IntN(2000000))-1000000)
+		b = append(b, int64(r.IntN(2000000))-1000000)
+	}
+	return a, b
+}
+
+func hashJoinInput() string {
+	a, b := hashJoinData()
+	var sb strings.Builder
+	fmt.Fprintf(&sb, "%d\n", len(a))
+	for i, k := range a {
+		fmt.Fprintf(&sb, "%d a%d\n", k, i)
+	}
+	fmt.Fprintf(&sb, "%d\n", len(b))
+	for i, k := range b {
+		fmt.Fprintf(&sb, "%d b%d\n", k, i)
+	}
+	return sb.String()
+}
+
+func hashJoinWant() string {
+	a, b := hashJoinData()
+	rows := map[int64][]int{}
+	for i, k := range a {
+		rows[k] = append(rows[k], i)
+	}
+	var sb strings.Builder
+	for j, k := range b {
+		for _, i := range rows[k] {
+			fmt.Fprintf(&sb, "%d a%d b%d\n", k, i, j)
+		}
+	}
+	return sb.String()
 }

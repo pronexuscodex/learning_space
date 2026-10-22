@@ -163,6 +163,8 @@ var conceptLinks = map[string]links{
 	// ---- Stage 7
 	"Durability: Page Cache, fsync & Atomic Rename": {[]string{"Memory: Latches, Registers & RAM", "Write-Ahead Logging & Recovery"},
 		"Build Your Own Database: its chapters on durability and fsync. DDIA chapter 3 (Storage and Retrieval)."},
+	"Pages, Records & the Buffer Pool": {[]string{"Virtual Memory & Paging", "The Memory Hierarchy & Locality", "B-Trees"},
+		"CMU 15-445: the lectures on database storage and buffer pools. The SQLite file format page (sqlite.org/fileformat.html)."},
 	"B-Trees": {[]string{"Trees, Heaps & Sorting", "SQL & the Relational Model"},
 		"CMU 15-445: the lectures on B+tree indexes. Use The Index, Luke for how indexes behave from SQL."},
 	"LSM-Trees": {[]string{"Write-Ahead Logging & Recovery", "B-Trees"},
@@ -173,6 +175,8 @@ var conceptLinks = map[string]links{
 		"DDIA chapter 7 (Transactions). CMU 15-445's concurrency-control lectures."},
 	"SQL & the Relational Model": {[]string{"Sets, Functions & Relations", "B-Trees", "Web Vulnerabilities: Injection & XSS"},
 		"Use The Index, Luke. CMU 15-445's opening lectures on the relational model and SQL."},
+	"Query Planning & Join Algorithms": {[]string{"SQL & the Relational Model", "Hash Tables", "Big-O: Measuring Growth"},
+		"CMU 15-445: the lectures on join algorithms and query optimisation. The SQLite query planner overview (sqlite.org/queryplanner.html)."},
 
 	// ---- Stage 8
 	"The Layered Stack & Encapsulation": {[]string{"HTTP, DNS & How the Web Works", "Binary & Number Representation"},

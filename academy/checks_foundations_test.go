@@ -672,6 +672,151 @@ int install_stop_handlers(void) {
 
 int stop_signal(void) { return got; }
 `,
+	"buffer_pool": `#include <stdio.h>
+#include <string.h>
+
+#define MAXFRAMES 4096
+
+struct frame { long page; int pins, dirty; long used; };
+
+int main(void) {
+    struct frame pool[MAXFRAMES];
+    int frames, n = 0;
+    char mode[16], op[4];
+    long page, clock = 0, hits = 0, misses = 0, writes = 0;
+    if (scanf("%d %15s", &frames, mode) != 2 || frames < 1 || frames > MAXFRAMES) return 1;
+    int trace = strcmp(mode, "trace") == 0;
+    while (scanf("%3s %ld", op, &page) == 2) {
+        struct frame *f = NULL;
+        for (int i = 0; i < n; i++)
+            if (pool[i].page == page) { f = &pool[i]; break; }
+        if (op[0] == 'u') {
+            if (f != NULL && f->pins > 0) f->pins--;
+            continue;
+        }
+        clock++;
+        if (f != NULL) {
+            hits++;
+        } else {
+            misses++;
+            if (n < frames) {
+                f = &pool[n++];
+                if (trace) printf("load %ld\n", page);
+            } else {
+                for (int i = 0; i < n; i++)
+                    if (pool[i].pins == 0 && (f == NULL || pool[i].used < f->used)) f = &pool[i];
+                if (f == NULL) {
+                    if (trace) printf("no frame for %ld\n", page);
+                    continue;
+                }
+                if (f->dirty) {
+                    writes++;
+                    if (trace) printf("write %ld, ", f->page);
+                }
+                if (trace) printf("evict %ld, load %ld\n", f->page, page);
+            }
+            f->page = page;
+            f->pins = 0;
+            f->dirty = 0;
+        }
+        f->used = clock;
+        if (op[0] == 'w') f->dirty = 1;
+        if (op[0] == 'p') f->pins++;
+    }
+    printf("hits %ld, misses %ld, writes %ld\n", hits, misses, writes);
+    return 0;
+}
+`,
+	"bloom": `#include <stddef.h>
+#include <stdint.h>
+#include <stdlib.h>
+
+struct bloom {
+    unsigned char *bits;  /* m bits, (m + 7) / 8 bytes */
+    size_t m;             /* number of bits */
+    int k;                /* number of hash functions */
+};
+
+static uint64_t fnv1a(const char *key, uint64_t h) {
+    for (const unsigned char *p = (const unsigned char *)key; *p; p++) {
+        h ^= *p;
+        h *= 1099511628211u;
+    }
+    return h;
+}
+
+static size_t position(const struct bloom *b, const char *key, int j) {
+    uint64_t h1 = fnv1a(key, 14695981039346656037u);
+    uint64_t h2 = fnv1a(key, 0x9E3779B97F4A7C15u) | 1;
+    return (size_t)((h1 + (uint64_t)j * h2) % b->m);
+}
+
+int bloom_init(struct bloom *b, size_t m, int k) {
+    b->bits = calloc((m + 7) / 8, 1);
+    b->m = m;
+    b->k = k;
+    return b->bits != NULL;
+}
+
+void bloom_add(struct bloom *b, const char *key) {
+    for (int j = 0; j < b->k; j++) {
+        size_t i = position(b, key, j);
+        b->bits[i / 8] |= (unsigned char)(1u << (i % 8));
+    }
+}
+
+int bloom_maybe(const struct bloom *b, const char *key) {
+    for (int j = 0; j < b->k; j++) {
+        size_t i = position(b, key, j);
+        if (!((b->bits[i / 8] >> (i % 8)) & 1)) return 0;
+    }
+    return 1;
+}
+
+void bloom_free(struct bloom *b) {
+    free(b->bits);
+    b->bits = NULL;
+}
+`,
+	"hash_join": `#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+
+#define BUCKETS (1 << 18)
+
+struct row { long long key; char word[16]; int next; };
+
+static size_t bucket(long long key) {
+    return (size_t)(((uint64_t)key * 0x9E3779B97F4A7C15u) >> 46);
+}
+
+int main(void) {
+    int n, m;
+    if (scanf("%d", &n) != 1 || n < 0) return 1;
+    struct row *a = malloc(((size_t)n + 1) * sizeof *a);
+    int *head = malloc(BUCKETS * sizeof *head);
+    if (a == NULL || head == NULL) return 1;
+    for (size_t i = 0; i < BUCKETS; i++) head[i] = -1;
+    for (int i = 0; i < n; i++)
+        if (scanf("%lld %15s", &a[i].key, a[i].word) != 2) return 1;
+    for (int i = n - 1; i >= 0; i--) {   /* backwards, so each chain is in A's order */
+        size_t h = bucket(a[i].key);
+        a[i].next = head[h];
+        head[h] = i;
+    }
+    if (scanf("%d", &m) != 1) return 1;
+    for (int j = 0; j < m; j++) {
+        long long key;
+        char word[16];
+        if (scanf("%lld %15s", &key, word) != 2) return 1;
+        for (int i = head[bucket(key)]; i != -1; i = a[i].next)
+            if (a[i].key == key) printf("%lld %s %s\n", key, a[i].word, word);
+    }
+    free(a);
+    free(head);
+    return 0;
+}
+`,
 }
 
 // Each Foundations check fails the typical wrong answer, for the reason
@@ -889,4 +1034,32 @@ int main(void) {
 	failsWith(t, "graceful", mutate("graceful", "    if (sigaction(SIGINT, &sa, NULL) != 0) return -1;\n", ""), "SIGINT", "")
 	// A handler that exits straight away gives the program no chance to clean up.
 	failsWith(t, "graceful", strings.Replace(mutate("graceful", "static void on_stop(int sig) { got = sig; }", "static void on_stop(int sig) { got = sig; _exit(0); }"), "#include <string.h>", "#include <string.h>\n#include <unistd.h>", 1), "SIGTERM", "")
+
+	// Evicting the oldest loaded page (FIFO) instead of the least recently used.
+	failsWith(t, "buffer_pool", mutate("buffer_pool", "        f->used = clock;\n        if (op[0] == 'w')", "        if (f->used == 0 || misses + hits == 1) f->used = clock;\n        if (op[0] == 'w')"), "three frames", "")
+	// Ignoring pins.
+	failsWith(t, "buffer_pool", mutate("buffer_pool", "if (pool[i].pins == 0 && (f == NULL", "if ((f == NULL"), "a pinned page stays", "")
+	// Writing back every evicted page, dirty or not.
+	failsWith(t, "buffer_pool", mutate("buffer_pool", "                if (f->dirty) {", "                if (1) {"), "three frames", "")
+
+	// One hash for all k positions: the false-positive rate soars.
+	failsWith(t, "bloom", mutate("bloom", "    return (size_t)((h1 + (uint64_t)j * h2) % b->m);", "    (void)h2;\n    (void)j;\n    return (size_t)(h1 % b->m);"), "the false-positive rate", "")
+	// A hash of the first two characters only.
+	failsWith(t, "bloom", mutate("bloom", "    for (const unsigned char *p = (const unsigned char *)key; *p; p++) {", "    for (const unsigned char *p = (const unsigned char *)key; *p && p < (const unsigned char *)key + 2; p++) {"), "the false-positive rate", "")
+	// m / 8 bytes is one byte short for 1,001 bits.
+	if run := runSource(t, "bloom", mutate("bloom", "calloc((m + 7) / 8, 1)", "calloc(m / 8, 1)")); run.Sanitizers && run.OK() {
+		t.Error("bloom: m / 8 bytes must overflow for 1,001 bits")
+	}
+	// add and maybe disagree on the bit order.
+	failsWith(t, "bloom", mutate("bloom", "        if (!((b->bits[i / 8] >> (i % 8)) & 1)) return 0;", "        if (!((b->bits[i / 8] >> (7 - i % 8)) & 1)) return 0;"), "no false negatives", "")
+
+	// A nested loop is correct but far too slow.
+	nestedJoin := mutate("hash_join", "        for (int i = head[bucket(key)]; i != -1; i = a[i].next)", "        for (int i = 0; i < n; i++)")
+	failsWith(t, "hash_join", nestedJoin, "100,000 rows each", "did not finish")
+	// Chains built forwards come out in reverse order.
+	failsWith(t, "hash_join", mutate("hash_join", "for (int i = n - 1; i >= 0; i--) {", "for (int i = 0; i < n; i++) {"), "the example", "")
+	// A signed modulo gives a negative bucket for a negative key.
+	if run := runSource(t, "hash_join", mutate("hash_join", "    return (size_t)(((uint64_t)key * 0x9E3779B97F4A7C15u) >> 46);", "    return (size_t)(long long)(key % BUCKETS);")); run.OK() {
+		t.Error("hash_join: a negative bucket index must not pass")
+	}
 }

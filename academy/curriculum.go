@@ -1108,8 +1108,11 @@ times slower again.`,
 	// -----------------------------------------------------------------
 	7: {
 		Overview: `A database is a data structure that survives crashes. Learn how bytes
-are laid out on disk, how indexes trade write cost for read cost, and how
-durability is actually guaranteed. Hint: this very program uses the
+are laid out on disk in pages, how a buffer pool keeps the hot ones in
+memory, how indexes trade write cost for read cost, how durability is
+actually guaranteed, and how a query planner turns SQL into loops over
+those structures. Every lesson is measured, mostly on SQLite, which
+your phone already runs. Hint: this very program uses the
 fsync-and-rename trick.`,
 		Concepts: []Concept{
 			{
@@ -1117,32 +1120,152 @@ fsync-and-rename trick.`,
 				Summary: "write() returning does not mean your data is on disk.",
 				Body: `write() copies data into the kernel page cache and returns. The disk may
 see it seconds later, or never if the power fails. fsync() forces the
-file's data and metadata to stable storage. A new directory entry also
-needs an fsync of the directory.
+file's data and metadata to stable storage; fdatasync() skips metadata
+that is not needed to read the data back, such as the modification time.
+A new directory entry (a created or renamed file) also needs an fsync
+of the directory.
 
 The classic atomic-update recipe is: write a temp file, fsync it, rename
 it over the target, then fsync the directory. rename is atomic, so
-readers see the old file or the new one, never a mix. SSDs add their own
-layer: flash is erased in large blocks, so the drive's firmware
-constantly remaps and rewrites data (write amplification).`,
+readers see the old file or the new one, never a mix. Skip the first
+fsync and a crash can leave the new name pointing at an empty or
+half-written file: the rename reached the disk before the data did.
+
+SSDs add their own layer: flash is erased in large blocks, so the
+drive's firmware constantly remaps and rewrites data (write
+amplification), and a drive that lies about having flushed its cache
+can still lose data that fsync reported safe.`,
+				UnderTheHood: `A C program appended 1,000 records of 100 bytes to a file, on ext4 on a
+virtual disk:
+
+  write only                  about 0.7 µs per append
+  write + fsync               about 200 µs per append
+  write + fdatasync           about 190 µs per append
+  temp file, fsync, rename,
+  fsync the directory         about 700 µs per replacement
+
+A durable write is about 300 times slower than one that only reaches the
+page cache, and the whole atomic-replace recipe, with its two fsyncs,
+costs most of a millisecond. That ratio is why databases work so hard
+to need fewer fsyncs. strace showed SQLite, in its default rollback-
+journal mode, calling fdatasync 404 times for 101 small commits: four
+per commit.`,
 				MentalModel: "Durable means it survived a power cut, not that the call returned.",
 				TryIt:       "Read atomicWriteJSON in this program's main.go and explain why each step exists.",
+			},
+			{
+				Name:    "Pages, Records & the Buffer Pool",
+				Summary: "Databases store everything in fixed-size pages, and keep the hot ones in a cache they manage themselves.",
+				Body: `A database file is an array of pages of one fixed size: 4 KiB in SQLite
+by default, 8 KiB in PostgreSQL, 16 KiB in MySQL's InnoDB. Counting
+from 0, page n starts at byte n × page size, so a page number is all you
+need to find it. Every structure in the database (tables, indexes, free lists) is
+made of pages that point to each other by number.
+
+Rows of different lengths are packed into a page as a slotted page: a
+small header, then an array of slots growing from the front, each giving
+one record's offset; the records themselves grow from the back. Records
+can move inside the page (when it is compacted) without anyone outside
+noticing, because everyone refers to them by slot number.
+
+The buffer pool is the database's own cache of pages in RAM. To use a
+page, the engine pins it (fetching it from the file on a miss), reads or
+changes it, marks it dirty if it changed, and unpins it. When the pool
+is full, an unpinned page is evicted, written back first if dirty. LRU
+(least recently used) or its cheap approximation, the clock algorithm,
+chooses the victim. A big table scan would flush every hot page out of
+an LRU pool, so real engines protect the pool against scans.`,
+				Diagram: `one 4 KiB page
+┌────────┬────┬────┬────┬────────────┬──────┬──────┬──────┐
+│ header │ s0 │ s1 │ s2 │ free space │ rec2 │ rec1 │ rec0 │
+└────────┴────┴────┴────┴────────────┴──────┴──────┴──────┘
+   slots grow ──▶                        ◀── records grow
+   slot i holds the offset of record i inside the page`,
+				UnderTheHood: `Python's sqlite3 module (SQLite 3.45.1) created a table and inserted a
+million rows of (integer, 13-character text):
+
+  PRAGMA page_size     4096
+  PRAGMA page_count    5,418 pages
+  file size            22,192,128 bytes = 5,418 × 4,096 exactly
+
+The file's first 16 bytes are the text "SQLite format 3" and a zero
+byte; bytes 16 and 17 hold the page size, 0x1000 = 4,096.
+
+strace counted the pread64 calls for 100,000 random lookups by key:
+
+  page cache of 10 pages        278,551 reads   about 2.8 per lookup
+  page cache of 10,000 pages    105,421 reads   about 1.05 per lookup
+
+With 10 pages almost every page on the path from root to leaf was a
+miss. With 10,000 (more than the whole file) only the first touch of
+each page missed; the other read per lookup is SQLite checking the file
+header, at the start of each transaction, for changes by other
+processes. The lookups took about 8 µs either way, because the kernel's
+page cache served every miss from RAM: two caches, one on top of the
+other.`,
+				MentalModel: "Everything is a page; the buffer pool decides which pages are in memory.",
+				TryIt:       "Create a SQLite database, then dump its first 100 bytes with od -A d -t x1 and find the magic string and the page size.",
+				Analogy: `A library's stacks and its reading-room desk. Every book has a shelf
+number (the page number), so any one can be fetched. The desk holds a
+few dozen books at a time (the buffer pool): to fetch another when the
+desk is full, the librarian reshelves the one nobody has opened for the
+longest, after recording any notes written in it.`,
+				Example: `PostgreSQL's shared_buffers setting is the size of its buffer pool, and
+tuning it is one of the first things administrators do. A page that is
+partly written when the power fails (a "torn page") is why PostgreSQL
+writes full page images to its WAL after each checkpoint, and why
+SQLite and InnoDB checksum or journal whole pages.`,
+				Exercises: trio(
+					"A database uses 8 KiB pages. At what byte offset does page 1,000 start, if pages are numbered from 0? How many pages does a 1 GiB table need?",
+					"1,000 × 8,192 = 8,192,000. 1 GiB / 8 KiB = 131,072 pages.",
+					"In C, write a buffer pool over a file of 4 KiB pages: an array of frames, page_get(id) that returns a frame (reading the page on a miss and evicting the least recently used unpinned frame), page_put(id, dirty), and a flush that writes the dirty frames back. Count hits and misses for a sequential and a random access pattern.",
+					"Keep, per frame, the page ID, a pin count, a dirty flag and the time of last use; a miss scans for the unpinned frame with the oldest time.",
+					"Implement a slotted page in C: insert(record) returns a slot number, get(slot) returns the record, delete(slot) frees it, and compact() moves the records together without changing any slot number. Fill a page with records of random lengths, delete half, compact, and fill it again.",
+					"Records grow down from the end of the page; the free space is between the end of the slot array and the lowest record.",
+				),
 			},
 			{
 				Name:    "B-Trees",
 				Summary: "Wide, shallow, page-sized trees: the default index for decades.",
 				Body: `A B-tree node is a whole disk page (4 to 16 KiB) holding hundreds of
 sorted keys, so the fan-out is huge and a billion keys need only about
-3 to 4 levels, which means 3 to 4 page reads per lookup. Inserts go into
-a leaf and split it when full, pushing a separator key up.
+3 to 4 levels, which means 3 to 4 page reads per lookup. In practice the
+top levels are always in the buffer pool, so a lookup costs about one
+real read.
+
+Inserts go into a leaf and split it when full, pushing a separator key up
+to the parent; a full parent splits in turn, and only a split of the
+root makes the tree taller, so all leaves stay at the same depth.
+Deletes merge or rebalance underfull nodes.
 
 In a B+tree, values live only in the leaves and the leaves are linked, so
-range scans are sequential. B-trees update in place and are read-optimised.
-Postgres, SQLite and InnoDB use them.`,
+range scans are sequential. B-trees update in place and are
+read-optimised. Postgres, SQLite and InnoDB use them, for tables and for
+indexes alike.`,
 				Diagram: `                 [ 40 | 80 ]
           ┌──────────┼──────────┐
    [10|20|30]   [50|60|70]   [90|95]      ◀ leaves hold values,
        ↔            ↔            ↔           linked for range scans`,
+				UnderTheHood: `SQLite's dbstat table reports every page of a B-tree. For the
+million-row table from the previous lesson:
+
+  15 internal pages   about 360 keys each
+  5,402 leaf pages    about 185 rows each
+  depth               3 levels: root, one internal level, leaves
+
+A lookup reads three pages to find one row among a million. The 360
+fan-out comes from internal pages that hold only keys and page numbers.
+
+The order of inserts matters too. A million keys inserted into an
+indexed column, in one transaction:
+
+  in ascending order    1.21 s
+  in random order       3.04 s
+
+Ascending keys always land in the rightmost leaf, which stays in the
+cache. Random keys land in any leaf, so each insert touches a
+different path through the tree: this is why random UUIDs make slow
+primary keys and why time-ordered IDs (such as UUIDv7) exist.`,
 				MentalModel: "Make the tree as wide as a disk page so it never gets deep.",
 				TryIt:       "Insert keys 1..10,000 into a B+tree with fan-out 4 and print its height after each split.",
 			},
@@ -1155,16 +1278,40 @@ an immutable, sorted SSTable file. Background compaction merges SSTables
 and drops overwritten or deleted keys (tombstones).
 
 A read checks the memtable, then SSTables from newest to oldest. Bloom
-filters let it skip files that definitely do not hold the key.
+filters let it skip files that definitely do not hold the key: a Bloom
+filter is a bit array with k hash functions; adding a key sets k bits,
+and a lookup that finds any of its k bits clear is a definite "no". A
+"maybe" is sometimes wrong (a false positive) but a "no" never is.
+
 LSM-trees are write-optimised; RocksDB, LevelDB and Cassandra use them.
 Each design trades off read, write and space amplification (the RUM
-conjecture).`,
+conjecture): leveled compaction keeps reads and space low but rewrites
+each byte about ten times per level.`,
 				Diagram: `write ─▶ WAL (append)  +  memtable (sorted, in RAM)
                               │ flush when full
                               ▼
   L0   [sst] [sst] [sst]                 newest, may overlap
   L1   [ sst  sst  sst  sst ]            compacted, disjoint
   L2   [ sst sst sst sst sst sst sst … ] 10× larger per level`,
+				UnderTheHood: `A Bloom filter with 10 bits per key and 7 hash functions, filled with
+100,000 keys, was asked about 100,000 keys it had never seen:
+
+  false positives      849 of 100,000   0.85%
+  theory               (1 − e^(−kn/m))^k = (1 − e^(−0.7))^7 ≈ 0.82%
+  false negatives      none, by construction
+
+1.25 bytes per key let a read skip more than 99% of the files that do
+not hold its key, without touching the disk.
+
+The same idea appears far from LSM-trees. Asked to join two
+unindexed tables of 20,000 rows, SQLite's EXPLAIN QUERY PLAN printed:
+
+  SCAN a
+  BLOOM FILTER ON b (y=?)
+  SEARCH b USING AUTOMATIC COVERING INDEX (y=?)
+
+It built a Bloom filter over b's join column to reject rows of a that
+cannot match before searching for them.`,
 				MentalModel: "Write now in order, sort out the mess later in the background.",
 				TryIt:       "Work out the write amplification of leveled compaction with a size ratio of 10 and 4 levels.",
 			},
@@ -1174,12 +1321,38 @@ conjecture).`,
 				Body: `The WAL rule: before a modified page reaches disk, the log record that
 describes the change must already be durable. After a crash, recovery
 replays the log to redo committed work and undo uncommitted work (ARIES
-is the canonical algorithm).
+is the canonical algorithm). Each log record carries a checksum, so
+recovery can tell a complete record from one torn by the crash, and
+stops at the first bad one.
 
-Checkpoints bound how much log must be replayed. Group commit batches
-many transactions into one fsync, which is the main reason databases can
-commit thousands of transactions per second on hardware that manages only
-hundreds of fsyncs per second.`,
+A commit is durable once its log records are, so a commit costs one
+sequential append and one fsync, while the changed pages can be written
+later, in any order. Checkpoints write the dirty pages and bound how
+much log must be replayed.
+
+Group commit batches many transactions into one fsync, which is the
+main reason databases can commit thousands of transactions per second on
+hardware that manages only hundreds of fsyncs per second.`,
+				Diagram: `commit T1 ─▶ log: [T1 set x=5][T1 commit] ─fsync─▶ "committed"
+                                           (data pages: later)
+crash ─▶ recovery: read the log from the last checkpoint,
+         redo every committed change, skip the uncommitted ones`,
+				UnderTheHood: `Inserting 1,000 rows into SQLite, each as its own transaction, then all
+in one, on a virtual disk:
+
+  rollback journal, synchronous=FULL   1,133 µs per commit
+  WAL mode,         synchronous=FULL     431 µs per commit
+  WAL mode,         synchronous=NORMAL    18 µs per commit
+  1,000 rows in one transaction            2.7 µs per row
+  100,000 rows in one transaction          1.0 µs per row
+
+strace counted the flushes: the rollback journal made 4 fdatasync calls
+per commit (the journal and the database file are each flushed, the
+journal more than once), WAL mode about one (109 for 101 commits). synchronous=NORMAL in WAL mode skips
+the flush at commit and syncs only at checkpoints: a power cut can lose
+the last few commits, but never corrupts the database. And batching
+rows into one transaction is a thousand times faster than committing
+each one: that is group commit, done by hand.`,
 				MentalModel: "The log is the truth; the data files are a cache of it.",
 				TryIt:       "Kill -9 your KV store in the middle of a write loop 100 times and verify that recovery never loses an acknowledged write.",
 			},
@@ -1192,9 +1365,35 @@ certain anomalies: dirty reads, non-repeatable reads, phantoms and write
 skew.
 
 MVCC keeps several versions of each row, stamped with transaction IDs, so
-readers see a consistent snapshot without blocking writers. Snapshot
-isolation still permits write skew. True serializability needs extra
-checks (SSI) or locking (2PL).`,
+readers see a consistent snapshot without blocking writers. A row
+version is visible to a transaction if it was committed before the
+transaction's snapshot was taken and not yet replaced then. Old
+versions are garbage-collected once no snapshot can see them (VACUUM in
+PostgreSQL).
+
+Snapshot isolation still permits write skew: two transactions each read
+the same rows, decide based on what they saw, and write different rows,
+together breaking a rule neither broke alone. True serializability needs
+extra checks (SSI) or locking (2PL).`,
+				Diagram: `time ─────────────────────────────────────────────▶
+reader:  BEGIN ── read: 100 ─────── read: 100 ── COMMIT   (its snapshot)
+writer:          UPDATE balance = 50, COMMIT
+new reader:                                     read: 50`,
+				UnderTheHood: `Two connections to one SQLite database in WAL mode:
+
+  reader   BEGIN; SELECT balance          → 100
+  writer   UPDATE … SET balance = 50; committed
+  reader   SELECT balance (same transaction) → 100
+  reader   COMMIT; SELECT balance          → 50
+
+The reader's transaction kept its snapshot: SQLite's WAL holds the new
+page versions, and a reader ignores those written after it started.
+Neither connection waited for the other. In SQLite's default rollback
+mode, the writer could not have committed until the reader finished.
+
+SQLite allows only one writer at a time, so it is always serializable;
+PostgreSQL and MySQL allow many concurrent writers, and that is where
+isolation levels, and write skew, start to matter.`,
 				MentalModel: "Every transaction reads a photo of the past and argues about the future at commit.",
 				TryIt:       "Reproduce write skew (the on-call doctors example) in Postgres at REPEATABLE READ, then fix it with SERIALIZABLE.",
 			},
@@ -1220,6 +1419,19 @@ and EXPLAIN shows the plan the database chose.`,
 └────┴──────┘              └────┴─────────────┴───────┘
 SELECT c.name, SUM(o.total) FROM customers c
 JOIN orders o ON o.customer_id = c.id GROUP BY c.name;`,
+				UnderTheHood: `A SQLite table of a million orders, and one question about them:
+
+  SELECT total FROM orders WHERE customer_id = 4242;
+
+  without an index   SCAN orders                            40 ms
+  CREATE INDEX orders_customer ON orders(customer_id);
+  with the index     SEARCH orders USING INDEX
+                     orders_customer (customer_id=?)       0.013 ms
+
+The same 12 rows, about 3,000 times faster. SCAN means every row was
+read; SEARCH means a B-tree descent straight to the matching keys.
+The price is paid elsewhere: every insert, update and delete must now
+update the index as well, and the index takes its own pages on disk.`,
 				MentalModel: "Store each fact once, and answer questions with joins.",
 				TryIt:       "Create the two tables above in SQLite and run the query.",
 				Analogy: `A well-organised spreadsheet workbook where each sheet holds one kind of
@@ -1236,6 +1448,72 @@ and is still among the most widely used languages in developer surveys.`,
 					`"Never borrowed" needs a LEFT JOIN … WHERE loans.id IS NULL.`,
 					"Import a public CSV dataset (city bike trips, films, weather) into SQLite or PostgreSQL, answer five questions you care about with SQL, then add an index for your slowest query and compare EXPLAIN output and timing before and after.",
 					".import in the sqlite3 shell loads a CSV file directly.",
+				),
+			},
+			{
+				Name:    "Query Planning & Join Algorithms",
+				Summary: "The planner turns one SQL statement into loops over pages and indexes, and picking the wrong loops costs a thousandfold.",
+				Body: `A query plan is a tree of operators: scans and index searches at the
+leaves, then filters, joins, sorts and aggregates, each pulling rows
+from the ones below it. The planner considers many equivalent plans and
+estimates the cost of each from statistics about the tables (row counts,
+how many distinct values a column has), gathered by ANALYZE.
+
+A join of A and B can be computed in several ways:
+- nested loop: for each row of A, scan all of B: |A| × |B| comparisons;
+- index nested loop: for each row of A, search an index on B: |A| × log |B|;
+- hash join: build a hash table of the smaller side, probe it with each
+  row of the other: about |A| + |B|, if the table fits in memory;
+- sort-merge join: sort both sides on the join key and walk them
+  together, which is cheap when they are already sorted (by an index).
+
+Join order matters as much as the algorithm: start from the table the
+WHERE clause filters hardest, so every later step handles fewer rows.
+When a query is slow, read its plan before anything else: EXPLAIN
+(EXPLAIN QUERY PLAN in SQLite, EXPLAIN ANALYZE in PostgreSQL).`,
+				Diagram: `nested loop         for a in A: for b in B        |A| × |B|
+index nested loop   for a in A: search index(B)   |A| × log |B|
+hash join           build hash(B); probe with A   |A| + |B|
+sort-merge join     sort A and B; walk together   sorts + |A| + |B|`,
+				UnderTheHood: `Customers (100,000) joined with orders (1,000,000), for one city's
+customers only, in SQLite:
+
+  no useful index    SCAN o; SEARCH c USING INTEGER PRIMARY KEY   521 ms
+  indexes on customers(city) and orders(customer_id), then ANALYZE:
+                     SEARCH c USING INDEX customers_city (city=?)
+                     SEARCH o USING INDEX orders_customer         5 ms
+
+With the indexes the planner reversed the join order: it found the 200
+customers of that city first, then only their orders, instead of
+reading all million orders.
+
+Two unindexed tables of 20,000 rows joined on a column:
+
+  default            builds an AUTOMATIC COVERING INDEX on b    12 ms
+  automatic_index=OFF   SCAN a; SCAN b: a plain nested loop     14,096 ms
+
+400 million comparisons against 20,000 index searches. SQLite has no
+hash join; building a temporary index for the one query is its
+equivalent, and the planner judged it worth it.`,
+				MentalModel: "SQL says what; the plan says how; and how is where the time goes.",
+				TryIt:       "In SQLite, join two tables of 10,000 rows on an unindexed column, run EXPLAIN QUERY PLAN, then PRAGMA automatic_index=OFF and time the query again.",
+				Analogy: `Matching wedding guests to their table cards. Nested loop: for each
+guest, read through every card. Index: the cards are in alphabetical
+order, so each guest flips straight to theirs. Hash join: sort the cards
+into 26 boxes by first letter once, and each guest checks just one box.`,
+				Example: `"The query was fast in testing and slow in production" is usually a
+plan problem: with a few test rows a nested loop is the cheapest plan,
+and with millions it is not, or the statistics are stale and the
+planner chooses the wrong join order. PostgreSQL's EXPLAIN ANALYZE,
+showing estimated against actual rows for each step, is the standard
+tool for finding out which.`,
+				Exercises: trio(
+					"A has 1,000 rows and B 1,000,000. Roughly how many comparisons does a nested-loop join need, and how many steps does a hash join need?",
+					"1,000 × 1,000,000 = a billion comparisons; the hash join builds a table of A (1,000) and probes it with each row of B: about a million steps.",
+					"In C, read two lists of (key, value) pairs and print every pair of rows with the same key, first with a nested loop and then with a hash join (a hash table on the smaller list). Time both for 1,000, 10,000 and 100,000 rows each.",
+					"Several rows can share a key: chain them in each bucket, and print one line per matching pair.",
+					"Take the slowest query of an application you know (or one you write against a sample database), read its EXPLAIN ANALYZE output in PostgreSQL, find the step whose estimated and actual row counts differ most, and fix it with an index, ANALYZE or a rewrite.",
+					"The step where the actual rows dwarf the estimate is usually where the planner went wrong.",
 				),
 			},
 		},
@@ -1261,6 +1539,13 @@ and is still among the most widely used languages in developer surveys.`,
 			{"Why is write() plus close() not enough for durability?", "The data can sit in the page cache. You must fsync the file, and the directory too after creating or renaming a file."},
 			{"What is write amplification?", "Bytes physically written to storage divided by bytes the application wrote. Compaction, page rewrites and SSD garbage collection all increase it."},
 			{"How does group commit improve throughput?", "Many transactions share one fsync of the log, so the fixed cost of a flush is spread across all of them."},
+			{"Why does a slotted page give out slot numbers instead of byte offsets?", "Records can then move inside the page, when it is compacted, without changing how anything outside refers to them: only the slot's offset changes."},
+			{"What does a buffer pool do when it needs a frame and every frame is in use?", "It evicts an unpinned page, chosen by LRU or the clock algorithm, writing it back to the file first if it is dirty. Pinned pages are never evicted."},
+			{"Why does a B-tree with a million rows need only three levels?", "Each node is a page holding hundreds of keys, so the fan-out is in the hundreds: 360 × 360 × 185 is already more than 20 million rows."},
+			{"Why are random keys slower to insert into a B-tree than ascending ones?", "Ascending keys all go into the rightmost leaf, which stays cached; random keys touch a different root-to-leaf path each time, causing cache misses and splits all over the tree."},
+			{"Can a Bloom filter give a false negative?", "No. Every key added set its bits, so a lookup of that key always finds them set. It can give false positives, at a rate set by the bits per key and the number of hash functions."},
+			{"What do a nested-loop join and a hash join cost, for tables of size A and B?", "A nested loop compares every pair, |A| × |B|. A hash join builds a hash table of one side and probes it with the other, about |A| + |B|."},
+			{"A query is fast on a test database and slow in production. What do you look at first?", "Its plan, with EXPLAIN (ANALYZE): with real data sizes or stale statistics, the planner may choose a scan or nested loop, or the wrong join order."},
 		},
 	},
 

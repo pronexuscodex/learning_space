@@ -496,6 +496,8 @@ var extras = map[int]stageExtras{
 			"Explain how databases find one row among billions in milliseconds",
 			"Explain how data survives crashes and power cuts",
 			"Build your own crash-safe key-value database",
+			"Read a query plan and tell a full scan from an index search",
+			"Measure what an fsync and a commit really cost",
 		},
 		Glossary: []Term{
 			{"Database", "A program that stores data safely and lets you find it quickly."},
@@ -509,6 +511,12 @@ var extras = map[int]stageExtras{
 			{"SQL", "Structured Query Language: the standard language for asking relational databases questions."},
 			{"Primary key", "A column (or columns) that uniquely identifies each row in a table."},
 			{"JOIN", "A SQL operation that combines rows from two tables that share a matching value."},
+			{"Page", "The fixed-size block (often 4 to 16 KiB) a database reads and writes; every table and index is made of pages."},
+			{"Buffer pool", "The database's own cache of pages in memory, which evicts the least recently used ones when full."},
+			{"Bloom filter", "A small bit array that answers \"definitely not here\" or \"maybe here\" for a key, without storing the keys."},
+			{"Query plan", "The steps the database chose to answer a query: which tables to scan, which indexes to use, in what order."},
+			{"Hash join", "Joining two tables by putting one in a hash table and looking up each row of the other in it."},
+			{"Snapshot", "The consistent view of the data a transaction reads under MVCC, as it was when the transaction began."},
 		},
 	},
 	8: {

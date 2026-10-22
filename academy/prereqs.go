@@ -92,11 +92,13 @@ var conceptPrereqs = map[string][]string{
 
 	// ---- Stage 7
 	"Durability: Page Cache, fsync & Atomic Rename": {"System Calls & Privilege", "Files & Streams: Reading and Writing Data"},
-	"B-Trees":                        {"Trees, Heaps & Sorting", "The Memory Hierarchy & Locality"},
-	"LSM-Trees":                      {"B-Trees", "Durability: Page Cache, fsync & Atomic Rename"},
-	"Write-Ahead Logging & Recovery": {"Durability: Page Cache, fsync & Atomic Rename"},
-	"Transactions, Isolation & MVCC": {"Write-Ahead Logging & Recovery", "Synchronisation & Memory Ordering"},
-	"SQL & the Relational Model":     {"Sets, Functions & Relations", "B-Trees"},
+	"Pages, Records & the Buffer Pool":              {"Durability: Page Cache, fsync & Atomic Rename", "The Memory Hierarchy & Locality", "Virtual Memory & Paging"},
+	"B-Trees":                                       {"Trees, Heaps & Sorting", "The Memory Hierarchy & Locality"},
+	"LSM-Trees":                                     {"B-Trees", "Durability: Page Cache, fsync & Atomic Rename"},
+	"Write-Ahead Logging & Recovery":                {"Durability: Page Cache, fsync & Atomic Rename"},
+	"Transactions, Isolation & MVCC":                {"Write-Ahead Logging & Recovery", "Synchronisation & Memory Ordering"},
+	"SQL & the Relational Model":                    {"Sets, Functions & Relations", "B-Trees"},
+	"Query Planning & Join Algorithms":              {"SQL & the Relational Model", "B-Trees", "Hash Tables", "Big-O: Measuring Growth"},
 
 	// ---- Stage 8
 	"The Layered Stack & Encapsulation":         {"Networks: How Computers Talk"},
