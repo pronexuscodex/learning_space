@@ -23,6 +23,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -300,7 +301,11 @@ func runCheck(ch Check, src string) (CheckRun, error) {
 			return run, err
 		}
 		for name, content := range c.Files {
-			if err := os.WriteFile(filepath.Join(caseDir, name), []byte(content), 0o600); err != nil {
+			f := filepath.Join(caseDir, filepath.FromSlash(name))
+			if err := os.MkdirAll(filepath.Dir(f), 0o700); err != nil {
+				return run, err
+			}
+			if err := os.WriteFile(f, []byte(content), 0o600); err != nil {
 				return run, err
 			}
 		}
@@ -362,9 +367,35 @@ func runCase(prog, dir string, c CheckCase, timeout time.Duration, leaks bool) C
 		if res.Problem == "" && c.Stderr && strings.TrimSpace(res.Stderr) == "" {
 			res.Problem = "printed nothing to standard error: an error message belongs there"
 		}
+		if res.Problem == "" {
+			res.Problem = filesDiff(dir, c.WantFiles)
+		}
 	}
 	res.Pass = res.Problem == ""
 	return res
+}
+
+// filesDiff checks the files a case must leave behind, in name order, and
+// describes the first difference ("" when they all match).
+func filesDiff(dir string, want map[string]string) string {
+	names := make([]string, 0, len(want))
+	for name := range want {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	for _, name := range names {
+		got, err := os.ReadFile(filepath.Join(dir, filepath.FromSlash(name)))
+		if err != nil {
+			return fmt.Sprintf("the file %s should exist afterwards, but does not", name)
+		}
+		if string(got) != want[name] {
+			if d := outputDiff(want[name], string(got)); d != "" {
+				return "in the file " + name + ": " + d
+			}
+			return fmt.Sprintf("the file %s should hold %d bytes, but holds %d", name, len(want[name]), len(got))
+		}
+	}
+	return ""
 }
 
 // sanitizerReport sums up an AddressSanitizer or UndefinedBehaviorSanitizer

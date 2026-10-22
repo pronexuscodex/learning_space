@@ -11,6 +11,7 @@ package main
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 )
@@ -59,14 +60,15 @@ type BuildHint struct {
 // CheckCase is one test: run the program with Args and Stdin, then compare
 // standard output (trailing spaces and blank lines aside) and the exit code.
 type CheckCase struct {
-	Name     string
-	Args     []string
-	Stdin    string
-	Want     string
-	WantExit int
-	Stderr   bool              // the program must also print a message to standard error
-	Files    map[string]string // files in the folder the program runs in
-	Explain  string            // shown when this case fails: the likely cause
+	Name      string
+	Args      []string
+	Stdin     string
+	Want      string
+	WantExit  int
+	Stderr    bool              // the program must also print a message to standard error
+	Files     map[string]string // files in the folder the program runs in (paths may have folders)
+	WantFiles map[string]string // files that must hold exactly this afterwards
+	Explain   string            // shown when this case fails: the likely cause
 }
 
 // checks are all checked exercises, in teaching order.
@@ -650,6 +652,14 @@ func manyWords() string {
 		}
 	}
 	return b.String()
+}
+
+// The checks of every file, in teaching order: by stage, and within a
+// stage in the order they are written.
+func init() {
+	checks = append(checks, coreChecks...)
+	checks = append(checks, systemsChecks...)
+	sort.SliceStable(checks, func(i, j int) bool { return checks[i].Stage < checks[j].Stage })
 }
 
 // checkByID finds a check.

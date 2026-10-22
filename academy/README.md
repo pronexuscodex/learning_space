@@ -320,16 +320,24 @@ Ticking an exercise off says you did it; a checked exercise shows it. Stage 1 ha
 - It runs the program on each test case. For every failure it says what was wrong ("line 15 should be "FizzBuzz", but was "Fizz"", "main returned 0, expected 1", "did not finish within 2s") and the usual cause.
 - Hints are revealed one at a time. None contains the solution.
 
-The systems stages have checked exercises too, written with C and POSIX only, so they behave the same on Linux, macOS and the BSDs:
+The later stages have checked exercises too, written with C and POSIX only, so they behave the same on Linux, macOS and the BSDs:
 
 | Check | Stage and concept | What the tests catch |
 |-------|-------------------|----------------------|
+| `linkedlist` | 2: Linked lists | push, reverse by relinking (a recursive reverse runs out of stack on a million nodes), empty lists, and every node freed |
+| `hashmap` | 2: Hash tables | string keys copied, replacing, removing, colliding keys, a table that must grow for 100,000 keys, and no leaks |
+| `heap_sort` | 2: Heaps & sorting | an in-place heap sort: edge cases, sorted and reversed input, and a million numbers in the time limit (a quadratic sort cannot) |
+| `bfs` | 2: Graphs | the shortest path through a maze of up to 1000 × 1000: steps not cells, no path, the shortest rather than the first found |
 | `bits` | 5: Integers & floating point in bits | popcount, rotating by 0 (a shift by 32 is undefined), powers of two, and the raw IEEE 754 fields of 1.0, -2.5, 0.1 and -0.0 |
 | `calc` | 5: Parsing | a recursive-descent calculator: precedence, left-to-right order (10 - 4 - 3 is 3), unary minus, truncating division, malformed lines, division by zero, 500 levels of parentheses |
 | `run` | 6: Processes | fork, execvp and waitpid: exit codes, death by a signal, arguments passed on, a program that does not exist (127) |
 | `rawcopy` | 6: System calls | a copy with `read` and `write` only: short writes, and half a megabyte of every byte value |
 | `counter` | 6: Synchronisation | threads sharing a counter: without a mutex, increments are lost |
+| `atomic_save` | 7: Durability | a temporary file in the same folder, fsync, rename, fsync the folder: exact bytes, nothing left behind, failure leaves nothing |
+| `wal_kv` | 7: Write-ahead logging | a key-value store that appends every change to `data.log` before answering, replays it at start, and cuts off a record torn by a crash (the checker reads the log afterwards) |
 | `upper_server` | 8: Sockets | a TCP server on a real 127.0.0.1 socket: partial reads of 300 KB, a client that sends nothing, bytes above 127 |
+| `safe_join` | 17: Untrusted input | canonicalise, then check: `a/./b//c.txt` is fine, `a/../../etc/passwd` and `/etc/passwd` are refused, and the output buffer is never overrun |
+| `copy_string` | 17: Memory-safe code | an strlcpy of your own: always terminated, never past the buffer, size 0, and the full length returned |
 | `http_request` | 8: HTTP | parsing a request head: header names in any case, trimmed values, bare newlines, a 7,000-byte path, a missing Host, wrong versions, a head that never ends |
 
 **What's next** suggests a check as soon as you mark its concept as understood: you've read it, now make it work. It suggests the project once the whole stage is understood.
@@ -763,7 +771,7 @@ The tests check:
 - **The v1 → v2 migration and stage merging.**
 - **Retention:** the scheduler's intervals grow and reset on a lapse; deck unlocking and due cards; each step of the mastery ladder.
 - **Classic Mode:** every stage has a complete classic corner with HTTPS links; the struggle clock's thresholds and early unlock; notebook and type-in progress survive a save round trip.
-- **Checked exercises:** each check's reference solution passes every case, with gcc and with clang (20 checks, including a real loopback TCP server and forked processes). Mastery waits for a concept's check to pass. Typical mistakes fail with the right explanation:
+- **Checked exercises:** each check's reference solution passes every case, with gcc and with clang (28 checks, including a real loopback TCP server, forked processes and a write-ahead log the checker reads back). Mastery waits for a concept's check to pass. Typical mistakes fail with the right explanation:
   - the XOR swap;
   - `9 / 5` in integers;
   - an endless loop;
@@ -823,6 +831,7 @@ One package, one build target:
 | `goalsui.go` | goals, roadmap and achievements screens |
 | `library.go` | PDF catalogue, safe HTTPS downloader, system viewer, `-fetch-library` |
 | `checks.go` | checked exercises: tasks, test cases, hints, harnesses |
+| `checks_core.go` | checked exercises for Stages 2, 7 and 17: lists, hash maps, heaps, graphs, durable files, a write-ahead log, safe paths and strings |
 | `checks_systems.go` | checked exercises for Stages 5, 6 and 8: bits, a parser, processes, system calls, threads, sockets, HTTP |
 | `runner.go`, `runner_*.go` | compile with the learner's C compiler, run each case with limits, explain failures |
 | `checklog.go` | the labs folder, starter files, and the append-only log of runs and hints |

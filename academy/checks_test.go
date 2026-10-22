@@ -44,7 +44,7 @@ func TestChecksAreWellFormed(t *testing.T) {
 		}
 	}
 	total := 0
-	for _, id := range []int{1, 5, 6, 8} {
+	for _, id := range []int{1, 2, 5, 6, 7, 8, 17} {
 		if len(checksFor(id)) == 0 {
 			t.Errorf("Stage %d has no checked exercises", id)
 		}
@@ -138,6 +138,416 @@ func TestLabsDir(t *testing.T) {
 
 // referenceSolutions pass every case of their check.
 var referenceSolutions = map[string]string{
+	"linkedlist": `#include <stddef.h>
+#include <stdlib.h>
+
+struct node {
+    int value;
+    struct node *next;
+};
+
+struct node *push_front(struct node *head, int value) {
+    struct node *n = malloc(sizeof *n);
+    if (n == NULL) return NULL;
+    n->value = value;
+    n->next = head;
+    return n;
+}
+
+struct node *reverse(struct node *head) {
+    struct node *prev = NULL;
+    while (head != NULL) {
+        struct node *next = head->next;
+        head->next = prev;
+        prev = head;
+        head = next;
+    }
+    return prev;
+}
+
+size_t list_length(const struct node *head) {
+    size_t n = 0;
+    for (; head != NULL; head = head->next) n++;
+    return n;
+}
+
+void free_list(struct node *head) {
+    while (head != NULL) {
+        struct node *next = head->next;
+        free(head);
+        head = next;
+    }
+}
+`,
+	"hashmap": `#include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
+
+struct entry {
+    char *key;
+    int value;
+    struct entry *next;
+};
+
+struct map {
+    struct entry **buckets;
+    size_t nbuckets, size;
+};
+
+static uint32_t hash(const char *s) {
+    uint32_t h = 2166136261u;
+    for (; *s; s++) {
+        h ^= (unsigned char)*s;
+        h *= 16777619u;
+    }
+    return h;
+}
+
+struct map *map_new(void) {
+    struct map *m = malloc(sizeof *m);
+    if (m == NULL) return NULL;
+    m->nbuckets = 16;
+    m->size = 0;
+    m->buckets = calloc(m->nbuckets, sizeof *m->buckets);
+    if (m->buckets == NULL) {
+        free(m);
+        return NULL;
+    }
+    return m;
+}
+
+static struct entry **find(const struct map *m, const char *key) {
+    struct entry **e = &m->buckets[hash(key) % m->nbuckets];
+    while (*e != NULL && strcmp((*e)->key, key) != 0) e = &(*e)->next;
+    return e;
+}
+
+static int grow(struct map *m) {
+    size_t n = m->nbuckets * 2;
+    struct entry **b = calloc(n, sizeof *b);
+    if (b == NULL) return -1;
+    for (size_t i = 0; i < m->nbuckets; i++) {
+        struct entry *e = m->buckets[i];
+        while (e != NULL) {
+            struct entry *next = e->next;
+            size_t j = hash(e->key) % n;
+            e->next = b[j];
+            b[j] = e;
+            e = next;
+        }
+    }
+    free(m->buckets);
+    m->buckets = b;
+    m->nbuckets = n;
+    return 0;
+}
+
+int map_put(struct map *m, const char *key, int value) {
+    struct entry **e = find(m, key);
+    if (*e != NULL) {
+        (*e)->value = value;
+        return 0;
+    }
+    if ((m->size + 1) * 4 > m->nbuckets * 3) {
+        if (grow(m) != 0) return -1;
+        e = find(m, key);
+    }
+    struct entry *n = malloc(sizeof *n);
+    size_t len = strlen(key) + 1;
+    char *k = malloc(len);
+    if (n == NULL || k == NULL) {
+        free(n);
+        free(k);
+        return -1;
+    }
+    memcpy(k, key, len);
+    n->key = k;
+    n->value = value;
+    n->next = NULL;
+    *e = n;
+    m->size++;
+    return 0;
+}
+
+int map_get(const struct map *m, const char *key, int *value) {
+    struct entry **e = find(m, key);
+    if (*e == NULL) return 0;
+    *value = (*e)->value;
+    return 1;
+}
+
+int map_remove(struct map *m, const char *key) {
+    struct entry **e = find(m, key);
+    if (*e == NULL) return 0;
+    struct entry *dead = *e;
+    *e = dead->next;
+    free(dead->key);
+    free(dead);
+    m->size--;
+    return 1;
+}
+
+size_t map_size(const struct map *m) { return m->size; }
+
+void map_free(struct map *m) {
+    for (size_t i = 0; i < m->nbuckets; i++) {
+        struct entry *e = m->buckets[i];
+        while (e != NULL) {
+            struct entry *next = e->next;
+            free(e->key);
+            free(e);
+            e = next;
+        }
+    }
+    free(m->buckets);
+    free(m);
+}
+`,
+	"heap_sort": `#include <stddef.h>
+
+static void sift_down(int *a, size_t n, size_t i) {
+    for (;;) {
+        size_t largest = i, l = 2 * i + 1, r = 2 * i + 2;
+        if (l < n && a[l] > a[largest]) largest = l;
+        if (r < n && a[r] > a[largest]) largest = r;
+        if (largest == i) return;
+        int t = a[i];
+        a[i] = a[largest];
+        a[largest] = t;
+        i = largest;
+    }
+}
+
+void heap_sort(int *a, size_t n) {
+    if (n < 2) return;
+    for (size_t i = n / 2; i-- > 0;) sift_down(a, n, i);
+    for (size_t end = n - 1; end > 0; end--) {
+        int t = a[0];
+        a[0] = a[end];
+        a[end] = t;
+        sift_down(a, end, 0);
+    }
+}
+`,
+	"bfs": `#include <stdio.h>
+#include <string.h>
+
+static char grid[1000][1002];
+static int dist[1000 * 1000];
+static int queue[1000 * 1000];
+
+int main(void) {
+    int rows = 0, cols = 0, start = -1, goal = -1;
+    while (rows < 1000 && fgets(grid[rows], sizeof grid[rows], stdin) != NULL) {
+        size_t len = strcspn(grid[rows], "\n");
+        grid[rows][len] = '\0';
+        if (len == 0) break;
+        cols = (int)len;
+        rows++;
+    }
+    for (int r = 0; r < rows; r++) {
+        for (int c = 0; c < cols; c++) {
+            if (grid[r][c] == 'S') start = r * cols + c;
+            if (grid[r][c] == 'E') goal = r * cols + c;
+        }
+    }
+    if (start < 0 || goal < 0) {
+        printf("-1\n");
+        return 0;
+    }
+    memset(dist, -1, sizeof(int) * (size_t)(rows * cols));
+    int head = 0, tail = 0;
+    dist[start] = 0;
+    queue[tail++] = start;
+    static const int dr[] = {1, -1, 0, 0}, dc[] = {0, 0, 1, -1};
+    while (head < tail) {
+        int cur = queue[head++];
+        if (cur == goal) {
+            printf("%d\n", dist[cur]);
+            return 0;
+        }
+        int r = cur / cols, c = cur % cols;
+        for (int k = 0; k < 4; k++) {
+            int nr = r + dr[k], nc = c + dc[k];
+            if (nr < 0 || nc < 0 || nr >= rows || nc >= cols) continue;
+            if (grid[nr][nc] == '#' || dist[nr * cols + nc] >= 0) continue;
+            dist[nr * cols + nc] = dist[cur] + 1;
+            queue[tail++] = nr * cols + nc;
+        }
+    }
+    printf("-1\n");
+    return 0;
+}
+`,
+	"atomic_save": `#define _POSIX_C_SOURCE 200809L
+#include <fcntl.h>
+#include <stdio.h>
+#include <string.h>
+#include <unistd.h>
+
+int save_file(const char *path, const char *data, size_t len) {
+    char tmp[4096], dir[4096];
+    if (snprintf(tmp, sizeof tmp, "%s.tmp", path) >= (int)sizeof tmp) return -1;
+    const char *slash = strrchr(path, '/');
+    if (slash == NULL) {
+        snprintf(dir, sizeof dir, ".");
+    } else {
+        snprintf(dir, sizeof dir, "%.*s", (int)(slash - path), path);
+    }
+    int fd = open(tmp, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+    if (fd < 0) return -1;
+    size_t off = 0;
+    while (off < len) {
+        ssize_t w = write(fd, data + off, len - off);
+        if (w < 0) {
+            close(fd);
+            unlink(tmp);
+            return -1;
+        }
+        off += (size_t)w;
+    }
+    if (fsync(fd) != 0 || close(fd) != 0) {
+        unlink(tmp);
+        return -1;
+    }
+    if (rename(tmp, path) != 0) {
+        unlink(tmp);
+        return -1;
+    }
+    int dfd = open(dir, O_RDONLY);
+    if (dfd < 0) return -1;
+    int r = fsync(dfd);
+    close(dfd);
+    return r == 0 ? 0 : -1;
+}
+`,
+	"wal_kv": `#define _POSIX_C_SOURCE 200809L
+#include <stdio.h>
+#include <string.h>
+#include <unistd.h>
+
+#define MAXKEYS 1000
+
+static char keys[MAXKEYS][64], vals[MAXKEYS][64];
+static int used[MAXKEYS], n;
+
+static int find(const char *k) {
+    for (int i = 0; i < n; i++)
+        if (used[i] && strcmp(keys[i], k) == 0) return i;
+    return -1;
+}
+
+static void put(const char *k, const char *v) {
+    int i = find(k);
+    if (i < 0) {
+        if (n == MAXKEYS) return;
+        i = n++;
+        snprintf(keys[i], sizeof keys[i], "%s", k);
+        used[i] = 1;
+    }
+    snprintf(vals[i], sizeof vals[i], "%s", v);
+}
+
+static void del(const char *k) {
+    int i = find(k);
+    if (i >= 0) used[i] = 0;
+}
+
+static int append(FILE *log, const char *line) {
+    if (fputs(line, log) == EOF || fflush(log) != 0) return -1;
+    return fsync(fileno(log));
+}
+
+int main(void) {
+    FILE *log = fopen("data.log", "a+");
+    if (log == NULL) {
+        perror("data.log");
+        return 1;
+    }
+    rewind(log);
+    char line[256], cmd[64], k[64], v[64], extra;
+    long good = 0;
+    while (fgets(line, sizeof line, log) != NULL) {
+        if (strchr(line, '\n') == NULL) break; /* torn */
+        good = ftell(log);
+        int f = sscanf(line, "%63s %63s %63s", cmd, k, v);
+        if (f == 3 && strcmp(cmd, "set") == 0) put(k, v);
+        else if (f == 2 && strcmp(cmd, "del") == 0) del(k);
+    }
+    if (ftruncate(fileno(log), good) != 0) {
+        perror("ftruncate");
+        return 1;
+    }
+    fseek(log, 0, SEEK_END);
+    while (fgets(line, sizeof line, stdin) != NULL) {
+        int f = sscanf(line, "%63s %63s %63s %c", cmd, k, v, &extra);
+        char rec[200];
+        if (f == 3 && strcmp(cmd, "set") == 0) {
+            snprintf(rec, sizeof rec, "set %s %s\n", k, v);
+            if (append(log, rec) != 0) { perror("data.log"); return 1; }
+            put(k, v);
+            printf("ok\n");
+        } else if (f == 2 && strcmp(cmd, "get") == 0) {
+            int i = find(k);
+            printf("%s\n", i < 0 ? "(nil)" : vals[i]);
+        } else if (f == 2 && strcmp(cmd, "del") == 0) {
+            snprintf(rec, sizeof rec, "del %s\n", k);
+            if (append(log, rec) != 0) { perror("data.log"); return 1; }
+            del(k);
+            printf("ok\n");
+        } else {
+            printf("error\n");
+        }
+    }
+    fclose(log);
+    return 0;
+}
+`,
+	"safe_join": `#include <stddef.h>
+#include <string.h>
+
+int safe_join(const char *base, const char *name, char *out, size_t size) {
+    size_t blen = strlen(base), len = blen;
+    size_t starts[4096];
+    int depth = 0;
+    if (name[0] == '/' || size == 0 || blen + 1 > size) return -1;
+    memcpy(out, base, blen);
+    const char *p = name;
+    while (*p != '\0') {
+        const char *end = strchr(p, '/');
+        size_t clen = end ? (size_t)(end - p) : strlen(p);
+        if (clen == 0 || (clen == 1 && p[0] == '.')) {
+            /* empty or ".": skip */
+        } else if (clen == 2 && p[0] == '.' && p[1] == '.') {
+            if (depth == 0) return -1;
+            len = starts[--depth];
+        } else {
+            if (depth == 4096 || len + 1 + clen + 1 > size) return -1;
+            starts[depth++] = len;
+            out[len] = '/';
+            memcpy(out + len + 1, p, clen);
+            len += 1 + clen;
+        }
+        p += clen;
+        if (*p == '/') p++;
+    }
+    if (depth == 0) return -1;
+    out[len] = '\0';
+    return 0;
+}
+`,
+	"copy_string": `#include <stddef.h>
+
+size_t copy_string(char *dst, size_t size, const char *src) {
+    size_t n = 0;
+    while (src[n] != '\0') {
+        if (n + 1 < size) dst[n] = src[n];
+        n++;
+    }
+    if (size > 0) dst[n < size ? n : size - 1] = '\0';
+    return n;
+}
+`,
 	"bits": `#include <stdint.h>
 #include <string.h>
 
@@ -1219,4 +1629,88 @@ func TestSystemsChecksCatchTypicalMistakes(t *testing.T) {
 			}
 		}
 	}
+}
+
+// The Stage 2, 7 and 17 checks catch the mistakes they were written for.
+func TestCoreChecksCatchTypicalMistakes(t *testing.T) {
+	needCompiler(t)
+	ref := referenceSolutions
+	mutate := func(id, from, to string) string {
+		t.Helper()
+		out := strings.Replace(ref[id], from, to, 1)
+		if out == ref[id] {
+			t.Fatalf("%s: the mutation %q did not apply", id, from)
+		}
+		return out
+	}
+
+	// A recursive reverse a million calls deep runs out of stack.
+	recursive := mutate("linkedlist", "struct node *reverse(struct node *head) {\n    struct node *prev = NULL;\n    while (head != NULL) {\n        struct node *next = head->next;\n        head->next = prev;\n        prev = head;\n        head = next;\n    }\n    return prev;\n}",
+		"struct node *reverse(struct node *head) {\n    if (head == NULL || head->next == NULL) return head;\n    struct node *rest = reverse(head->next);\n    head->next->next = head;\n    head->next = NULL;\n    return rest;\n}")
+	failsWith(t, "linkedlist", recursive, "a million nodes", "")
+
+	// A table that never grows is far too slow for 100,000 keys.
+	old := checkCaseTimeout
+	checkCaseTimeout = time.Second
+	defer func() { checkCaseTimeout = old }()
+	failsWith(t, "hashmap", mutate("hashmap", "if ((m->size + 1) * 4 > m->nbuckets * 3) {", "if (0) {"), "a hundred thousand keys", "did not finish")
+
+	// Keeping the caller's pointer instead of a copy of the key.
+	noCopy := mutate("hashmap", "    memcpy(k, key, len);\n    n->key = k;", "    free(k);\n    n->key = (char *)key;")
+	noCopy = strings.Replace(noCopy, "            free(e->key);\n", "", 1)
+	noCopy = strings.Replace(noCopy, "    free(dead->key);\n", "", 1)
+	failsWith(t, "hashmap", noCopy, "keys are copied", "")
+
+	// Insertion sort cannot sort a million numbers in time.
+	insertion := `#include <stddef.h>
+
+void heap_sort(int *a, size_t n) {
+    for (size_t i = 1; i < n; i++) {
+        int x = a[i];
+        size_t j = i;
+        while (j > 0 && a[j - 1] > x) {
+            a[j] = a[j - 1];
+            j--;
+        }
+        a[j] = x;
+    }
+}
+`
+	failsWith(t, "heap_sort", insertion, "a million random numbers", "did not finish")
+
+	// Counting cells instead of steps.
+	failsWith(t, "bfs", mutate("bfs", "    dist[start] = 0;", "    dist[start] = 1;"), "around a wall", `"5", but was "6"`)
+
+	// link instead of rename leaves the temporary file behind.
+	failsWith(t, "atomic_save", mutate("atomic_save", "if (rename(tmp, path) != 0) {", "if (link(tmp, path) != 0) {"), "creates the file", "2 entries")
+
+	// Opening the log with "w" forgets everything at start.
+	failsWith(t, "wal_kv", mutate("wal_kv", `fopen("data.log", "a+")`, `fopen("data.log", "w+")`), "recovery replays the log", `"3", but was "(nil)"`)
+
+	// Not cutting off the torn record glues the next one onto it.
+	failsWith(t, "wal_kv", mutate("wal_kv", "    if (ftruncate(fileno(log), good) != 0) {", "    if (0 && ftruncate(fileno(log), good) != 0) {"), "a torn last record", "in the file data.log")
+
+	// Checking only for a leading "../" misses the rest.
+	naive := `#include <stdio.h>
+#include <string.h>
+
+int safe_join(const char *base, const char *name, char *out, size_t size) {
+    if (name[0] == '/' || strncmp(name, "../", 3) == 0) return -1;
+    if ((size_t)snprintf(out, size, "%s/%s", base, name) >= size) return -1;
+    return 0;
+}
+`
+	failsWith(t, "safe_join", naive, "escapes are refused", "")
+	failsWith(t, "safe_join", naive, "canonicalised first", "")
+
+	// strncpy does not terminate a string it cuts short.
+	strncpyCopy := `#include <stddef.h>
+#include <string.h>
+
+size_t copy_string(char *dst, size_t size, const char *src) {
+    strncpy(dst, src, size);
+    return strlen(src);
+}
+`
+	failsWith(t, "copy_string", strncpyCopy, "cut short", "NOT TERMINATED")
 }

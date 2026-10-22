@@ -381,5 +381,3 @@ func allBytes(n int) string {
 	}
 	return string(b)
 }
-
-func init() { checks = append(checks, systemsChecks...) }
