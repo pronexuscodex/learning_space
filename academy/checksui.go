@@ -134,7 +134,10 @@ func (a *App) checkScreen(ch Check) error {
 		st := a.loadCheckStatuses()[ch.ID]
 		w := a.cols()
 		a.println("")
-		a.printf("  %s %s\n", sty.Bold(sty.Green(ch.Title)), sty.Gray(fmt.Sprintf("· Stage %d · %s", ch.Stage, truncate(checkSubject(ch), max(10, w-30-len(ch.Title))))))
+		a.printf("  %s\n", sty.Bold(sty.Green(truncate(ch.Title, w-4))))
+		for _, l := range wrap(fmt.Sprintf("Stage %d · %s", ch.Stage, checkSubject(ch)), w-4, "  ") {
+			a.println(sty.Gray(l))
+		}
 		for _, l := range wrap(ch.Task, w-4, "  ") {
 			a.println(l)
 		}
