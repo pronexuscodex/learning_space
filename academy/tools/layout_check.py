@@ -32,6 +32,7 @@ KEYS = [
   "5\r", "n\r",             # blueprints
   "8\r", "1\r", "\r", "n\r", "3\r",  # classic corner → type-in lab listing → skip prediction → not run → back
   "q\r",                    # back to main
+  "6\r", "1\r", "10\r", "7\r", "1\r", WAIT, "2\r", "3\r", "8\r", "q\r",  # Stage 1 checked exercises: fix_average → run it for real (wait) → a hint → back
   "n\r", "q\r",             # what's next, then cancel
   "/\r", "memory cache\r", "1\r", "\r"*3, "n\r",  # search → open first hit (a concept) → don't mark
   "f\r", "\r", "1\r", "a goal that is rather long for a narrow terminal\r", "p", "p", "s", # focus timer, stop at once
@@ -65,11 +66,11 @@ KEYS = [
 PAGER = re.compile(r"── (“[^”]*” \d+/\d+ · )?(\d+%|end) · Enter[^─]*──|── Enter · q ──")
 
 def run(cols, rows=60):
-    reg = os.path.join(tempfile.gettempdir(), f"academy-layout-{cols}.json")
-    if os.path.exists(reg): os.remove(reg)
+    reg = os.path.join(tempfile.mkdtemp(prefix=f"academy-layout-{cols}-"), "registry.json")  # the check log sits beside it: fresh each run
     pid, fd = pty.fork()
     if pid == 0:
         os.environ["ACADEMY_LIBRARY"] = tempfile.mkdtemp(prefix="academy-library-")  # never the real Documents
+        os.environ["ACADEMY_LABS"] = tempfile.mkdtemp(prefix="academy-labs-")
         os.environ["ACADEMY_PAGER"] = "inline"  # every line of a long screen is printed, so all of it is measured
         os.execv(os.environ.get("ACADEMY_BIN", os.path.join(D, "..", "academy")), ["academy", "-registry", reg])
     fcntl.ioctl(fd, termios.TIOCSWINSZ, struct.pack("HHHH", rows, cols, 0, 0))

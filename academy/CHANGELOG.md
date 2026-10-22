@@ -24,6 +24,14 @@ After a walk through the app as a new learner, at 40, 80 and 160 columns:
   - Development builds show a short `dev-<commit>` instead of a long Go pseudo-version.
 
 ### Added
+- **Checked exercises: your C, compiled and tested for real.** Stage 1 has seven, one per step of C from zero: `hello`, `fizzbuzz`, `temperature`, `swap`, `letters`, `safe_number` and `fix_average`. You write the program in your own editor, in `Documents/Academy Labs/Stage 01/`. The academy then compiles it with your C compiler (`-std=c17 -Wall -Wextra -Werror`, plus AddressSanitizer and UBSan where available), runs it against the test cases, and explains each failure with the line that differs, the exit code, the sanitizer's report, or the usual cause.
+  - **Where:** Study Hall → Checked exercises, or `academy -check ID` from another terminal (`academy -check list` shows them all).
+  - **Evidence, not a tick.** Each run is appended to `academy_checks.jsonl` with the time, the compiler and the cases passed. A check shows as passed on your own, passed with hints, or how many cases pass. Concept cards show the check for their concept. Hints come one at a time and never give the solution.
+  - **Limits:**
+    - each run uses a fresh temporary folder and none of your environment variables;
+    - each case has a 2-second limit, after which the whole process group is killed;
+    - output is capped at 1 MB.
+  - **Not a sandbox:** the academy only ever runs your own code. Checked exercises need Linux, macOS or a BSD (on Windows, use WSL).
 - **Concept prerequisites.** Concepts now list the earlier concepts it builds on (167 links across 113 concepts in all 21 stages), shown at the top of its card with a tick for each one you have marked as understood.
   - **What's next and Today's workout** use them. When the next concept builds on one you have not marked yet, they send you to the first missing step and say which concept it leads to. They do not stop you reading anything.
   - **Tests check the graph:** every name is a real concept, every prerequisite comes earlier and agrees with the stage prerequisites (so there can be no cycle), and every concept from Stage 1 on lists at least one.

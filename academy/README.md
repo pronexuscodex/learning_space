@@ -18,6 +18,7 @@ New here? Build it (below), run it, and press **`0`** for the *Start Here* guide
 - [C first: see what is under the hood](#c-first-see-what-is-under-the-hood)
 - [How each concept is taught](#how-each-concept-is-taught)
 - [Exercises](#exercises)
+- [Checked exercises: your C, compiled and tested for real](#checked-exercises-your-c-compiled-and-tested-for-real)
 - [Built to be remembered, not just read](#built-to-be-remembered-not-just-read)
 - [Think first: learning without leaning on AI](#think-first-learning-without-leaning-on-ai)
 - [Get hired: the career center](#get-hired-the-career-center)
@@ -161,7 +162,15 @@ Your progress is one file, `academy_campus_registry.json`. Backups and exports g
 
 Installers and package managers replace their install folder on every upgrade, which is why those installs keep your data elsewhere. If an older version left a registry beside an installed binary, it keeps being used. Run `academy -where` to see which folders are in use. To move from a downloaded copy to a package-manager install, move your registry and its folders into the new location, or set `ACADEMY_HOME` to the old folder.
 
-Other flags: `-no-color`, `-check-links` (verify every resource URL), `-backups` (list automatic backups), `-restore N` (restore one) and `-fetch-library` (download every PDF in the Library for offline study).
+Other flags:
+- `-no-color`;
+- `-check-links`: verify every resource URL;
+- `-backups`: list automatic backups;
+- `-restore N`: restore one;
+- `-fetch-library`: download every PDF in the Library for offline study;
+- `-check ID`: compile and test a checked exercise; `-check list` shows them all.
+
+Checked-exercise files live in `Documents/Academy Labs` (`$ACADEMY_LABS` chooses another folder; with `$ACADEMY_HOME` set, they sit inside it).
 
 **Upgrading from the 7-stage version:** your existing registry file is migrated automatically. The original stages move to their new numbers (1→5, 2→6, 3→7, 4→8, 5→13, 6→15, 7→16), your labs, hours, readings and concept progress are kept, and the nine new stages are added. The upgraded file is saved at once, after a backup of the old one.
 
@@ -272,6 +281,45 @@ Every concept has a ladder of three exercises, and each exercise has a hint:
 The **Exercise Gym** in each stage's Study Hall shows the exercises, reveals hints only when you ask, and lets you tick exercises off. Your progress is saved (`exercises_done`) and shown in the ledger, and it counts towards overall campus progress.
 
 ![Exercise gym](docs/exercise-gym.png)
+
+## Checked exercises: your C, compiled and tested for real
+
+Ticking an exercise off says you did it; a checked exercise shows it. Stage 1 has seven, one for each step of C from zero:
+
+| Check | Concept | What the tests catch |
+|-------|---------|----------------------|
+| `hello` | Your first C program | the exact greeting and a clean exit |
+| `fizzbuzz` | Control flow | the order of the tests, and loop bounds |
+| `temperature` | Functions | integer division (9 / 5 is 1), and that the two functions are inverses. The checker supplies `main` and calls your functions |
+| `swap` | Pointers | swapping copies instead of the originals, and the XOR trick that zeroes a variable swapped with itself |
+| `letters` | Arrays and strings | case, non-ASCII bytes, and 200,000 characters of input (no fixed-size buffer) |
+| `safe_number` | Safe input | `fgets` and `strtol` used properly: `12abc`, empty input, end of input, and numbers that overflow `int` or even `long` |
+| `fix_average` | Debugging | a program with two bugs: the sanitizer finds one, the wrong output the other |
+
+**How it works.**
+1. Open one from the Study Hall (**Checked exercises**). The academy creates your file in `Documents/Academy Labs/Stage 01/` with a short comment saying what to write. It never overwrites the file afterwards.
+2. Write the program in any editor and save it.
+3. Run the check from the same screen, or from another terminal with `academy -check fizzbuzz` (`academy -check list` shows them all).
+
+**What a run does.**
+- It compiles your file with the C compiler on your computer (`$CC`, `cc`, `gcc` or `clang`): `-std=c17 -Wall -Wextra -Werror`, so warnings are errors.
+- Where your compiler supports them, AddressSanitizer and UndefinedBehaviorSanitizer are switched on. A read past the end of an array is then reported as one, with the function and line.
+- It runs the program on each test case. For every failure it says what was wrong ("line 15 should be "FizzBuzz", but was "Fizz"", "main returned 0, expected 1", "did not finish within 2s") and the usual cause.
+- Hints are revealed one at a time. None contains the solution.
+
+**Evidence.** Every run and every hint is appended to `academy_checks.jsonl`, beside your progress. Each run line records the time, the compiler, the cases passed, whether the sanitizers were on, and how many hints you had seen. The academy shows a check as **passed on your own** (no hints), **passed, with hints**, or the cases passing in the latest run. Concept cards show the check for their concept.
+
+**Safety.**
+- Your program is your own code, run on your own computer.
+- Each run gets:
+  - a fresh temporary folder;
+  - an environment with none of your variables, so no tokens or keys;
+  - a 2-second limit per case, after which its whole process group is killed;
+  - a 1 MB output cap.
+- This is not a sandbox: like any program you compile yourself, it could still touch your files or the network.
+- The academy never runs code from anywhere else.
+
+**Platforms.** Checked exercises need Linux, macOS or a BSD. On Windows, install WSL and run the academy there.
 
 ## Built to be remembered, not just read
 
@@ -447,6 +495,7 @@ For every stage:
 - **Mastery check:** a 12-question interleaved exam, passed at 80%.
 - **Classic corner:** anchor book, classic text, real source code, the type-in lab and your lab notebook.
 - **PDF library:** this stage's downloadable books and papers (the same as the main Library, filtered).
+- **Checked exercises** (Stage 1): C programs you write and the academy compiles and tests for real (see [Checked exercises](#checked-exercises-your-c-compiled-and-tested-for-real)).
 
 Concepts link across stages. For example, logic gates (Stage 4) become the CPU; the memory hierarchy (Stage 5) returns as the roofline model (Stage 16); and paging (Stage 6) returns as PagedAttention.
 
@@ -627,6 +676,7 @@ Colour is turned on automatically when output goes to a terminal. It is turned o
 - **Automatic saving:** your progress is written to disk after every action, and when you exit, press Ctrl+C or close the window. Nothing to remember, nothing to lose.
 - **Automatic backups:** the first time something changes in a session, the registry as it was is copied to `academy_backups/` beside it, so the newest 10 backups cover your last 10 sessions (identical copies are skipped). `./academy -backups` lists them; `./academy -restore 2` (or `-restore path/to/file.json`) restores one after checking that it loads cleanly, and backs up the file it replaces first, so a restore can be undone the same way. Restore while the academy is closed.
 - **Corrupt-file guard:** if the registry won't parse or fails validation, the program refuses to start rather than overwrite it.
+- **Check log:** checked-exercise runs are appended to their own file, `academy_checks.jsonl`, never rewritten. So `academy -check` in another terminal cannot collide with the app saving your progress. A line torn by a crash is skipped when reading. Your C files are never overwritten.
 - **Input rigor:** the program removes control characters, trims whitespace, and rejects input that is too long instead of cutting it off. It re-prompts when a number can't be parsed. Hours must be finite, non-negative, and at most 24 per log entry. Duplicate lab names within a stage are rejected, and so are unknown menu options.
 
 ## Schema (abridged)
@@ -686,6 +736,22 @@ The tests check:
 - **The v1 → v2 migration and stage merging.**
 - **Retention:** the scheduler's intervals grow and reset on a lapse; deck unlocking and due cards; each step of the mastery ladder.
 - **Classic Mode:** every stage has a complete classic corner with HTTPS links; the struggle clock's thresholds and early unlock; notebook and type-in progress survive a save round trip.
+- **Checked exercises:** each check's reference solution passes every case, with gcc and with clang. Typical mistakes fail with the right explanation:
+  - the XOR swap;
+  - `9 / 5` in integers;
+  - an endless loop;
+  - a NULL dereference;
+  - the unfixed `fix_average` (an AddressSanitizer report with the line);
+  - an error printed to stdout;
+  - a warning;
+  - a `main` where the checker supplies one.
+
+  The tests also check that:
+  - a forked child cannot outlive the time limit;
+  - the program sees none of your environment variables;
+  - checks still run where the sanitizers are missing;
+  - starter files are never overwritten;
+  - a torn log line is skipped.
 - **Connections:** globally unique concept names; every concept has valid cross-links and a go-deeper pointer; stage and concept prerequisites only point backwards (so they cannot form a cycle), name real concepts, and agree with each other; every resource uses HTTPS.
 - **Layout:** display widths (emoji, CJK and combining marks), wrap and flow never exceed the width, and long prompts wrap.
 - **Guidance:** What's next ordering and its four-step limit, prerequisites, search AND semantics and ranking, snippets, daily minutes and the weekly comparison, focus sessions in stats, and the Markdown export.
@@ -729,6 +795,10 @@ One package, one build target:
 | `goals.go` | weekly goals, roadmap stage states, achievements, rotating backups and restore |
 | `goalsui.go` | goals, roadmap and achievements screens |
 | `library.go` | PDF catalogue, safe HTTPS downloader, system viewer, `-fetch-library` |
+| `checks.go` | checked exercises: tasks, test cases, hints, harnesses |
+| `runner.go`, `runner_*.go` | compile with the learner's C compiler, run each case with limits, explain failures |
+| `checklog.go` | the labs folder, starter files, and the append-only log of runs and hints |
+| `checksui.go` | checked-exercise screens and `-check` |
 | `libraryui.go` | Library screen: download, open, re-download, delete, your own links |
 | `vocab.go`, `vocab_*.go` | the programmer's dictionary and its entries |
 | `vocabui.go` | dictionary screens, word of the day, word cards |
