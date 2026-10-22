@@ -53,8 +53,7 @@ def frame(chrome, demo, n, caption, keys, first, last, out_dir):
             if re.search(last, shots.plain(lines[i])):
                 end = min(i + 1, start + ROWS)
                 break
-    chosen = [l for l in lines[start:end]
-              if not re.search(r"── (“[^”]*” \d+/\d+ · )?(\d+%|end) · Enter[^─]*──|── Enter · q ──", shots.plain(l))]
+    chosen = lines[start:end]
     chosen += [""] * (ROWS - len(chosen))  # every frame the same size
     body = "\n".join(shots.to_html(l) for l in chosen)
     page = os.path.join(tmp, "frame.html")

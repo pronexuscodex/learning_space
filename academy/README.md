@@ -502,7 +502,7 @@ Pages you open from the main menu (Start Here, All screens & keys, the ledger, t
 
 Leave a concept card before the end and the academy does not ask whether you understand it: it shows the key idea and how far you read, and offers to read the rest from where you stopped, to mark it understood, or to come back later.
 
-Full-screen paging needs a terminal that delivers single keys: Linux, macOS and the BSDs. On Windows, and with `ACADEMY_PAGER=inline`, long screens are paged in the normal scrollback: a prompt under each page takes the same keys followed by Enter, and is erased once answered. Paging switches on only when you are typing at a real terminal; piped or scripted input is unaffected.
+Full-screen paging needs a terminal that delivers single keys: Linux, macOS and the BSDs. On Windows, and with `ACADEMY_PAGER=inline`, long screens are paged in the normal scrollback: the text stops after each page with no prompt under it, and **Enter** shows the next page. The same keys still work there if you type them and press Enter (`b`, `<`, `>`, `/word`, `q`, or a number or menu key to answer what comes next). Paging switches on only when you are typing at a real terminal; piped or scripted input is unaffected.
 
 To cancel a prompt, type `q` at number prompts or `:q` at text prompts. Ctrl-D, Ctrl-C and closing the window (SIGTERM, SIGHUP) save before exiting.
 

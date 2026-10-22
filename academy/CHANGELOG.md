@@ -22,6 +22,7 @@ After a walk through the app as a new learner, at 40, 80 and 160 columns:
   - The Study Hall stage list uses a compact `concepts · exercises` column, so full stage titles fit at 80 columns.
   - Plainer wording: "in progress" instead of "ACTIVE RESEARCH", hours shown as "8.5 h" instead of "8.50h", real plurals instead of "lab(s)" and "match(es)", and the banner reads "Systems & AI Academy".
   - Development builds show a short `dev-<commit>` instead of a long Go pseudo-version.
+- **No more "Enter more · b back · /word find · q stop · or type your choice" line under each page** on Windows and with `ACADEMY_PAGER=inline`. A long lesson now just stops at the end of a page, and Enter shows the next one. The pager's keys still work when typed, and questions after a lesson (a choice, y/n, your explanation) are asked as before. The full-screen pager on Linux and macOS is unchanged.
 - **A refreshed logo.** The same chip and prompt, redrawn flat and bolder, with two pins a side, so it stays clear from 16 px to the 1024 px app icon. Each part has its own colour from the app's theme: the chip, the prompt `>` and the cursor `_`. New in `assets/logo/`: the mark alone, side-by-side and stacked versions with the `academy` wordmark (for dark and light backgrounds), one-colour black and white, and a one-page usage guide. The app icon, `academy.ico`, `academy.exe`'s icon and the social preview are regenerated from it; the social preview now says 21 stages.
 
 ### Added

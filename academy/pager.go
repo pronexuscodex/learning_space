@@ -3,7 +3,8 @@ package main
 // A minimal pager. Long screens (the ledger, Start Here, glossaries,
 // concept cards) are far taller than a terminal, and the menu that follows
 // them would otherwise push them straight off the screen. When a person
-// is typing at a real terminal, such screens are shown one page at a time.
+// is typing at a real terminal, such screens are shown one page at a time,
+// and Enter shows the next page; no prompt is printed between pages.
 
 import (
 	"bytes"
@@ -38,13 +39,15 @@ func termHeight() int {
 	return 24
 }
 
-// paged renders a screen and shows it one page at a time, like man and
-// less: Enter for the next page, b to go back, < and > for the start and
-// end, /word to find a word (/ alone finds the next match, highlighted),
-// q to stop. Anything else typed at the prompt answers whatever comes
-// next (a number from the list, a menu key), so a long list need not be
-// paged to the end. With finalPause, it also waits after the last page,
-// so the screen stays visible until the learner is ready to go on.
+// paged renders a screen and shows it one page at a time: Enter shows the
+// next page. No prompt or key list is printed under a page; the reader
+// just presses Enter to read on. The same keys as before still work when
+// typed: b to go back, < and > for the start and end, /word to find a
+// word (/ alone finds the next match, highlighted), q to stop. Anything
+// else typed at a pause answers whatever comes next (a number from the
+// list, a menu key), so a long list need not be paged to the end. With
+// finalPause, it also waits after the last page, so the screen stays
+// visible until the learner presses Enter.
 func (a *App) paged(finalPause bool, render func()) {
 	a.pagedWith(pageOpts{finalPause: finalPause}, render)
 }
@@ -119,12 +122,14 @@ func (a *App) pagedWith(o pageOpts, render func()) pageResult {
 			return result(end, false)
 		}
 
-		s, err := a.con.readLine(a.pagerPrompt(top, end, len(lines), &find) + " ")
+		// Wait for the reader without printing any prompt: the page simply
+		// stops, and Enter shows the next one.
+		s, err := a.con.readLine("")
 		if err != nil {
 			return result(end, false)
 		}
-		// Like man and less: the prompt disappears once answered, so it
-		// never sits in the middle of the text.
+		// The line the reader answered on is erased, so the next page
+		// continues the text seamlessly.
 		a.con.eraseLastLine()
 		switch {
 		case isCancel(s):
@@ -150,7 +155,13 @@ func (a *App) pagedWith(o pageOpts, render func()) pageResult {
 				draw = false
 				continue
 			}
-			top, clear, after = max(0, at-2), true, note // the match, with a little context above
+			// The match, with a little context above, and where it is
+			// among the matches, since no status line shows that.
+			where := fmt.Sprintf("“%s” %d/%d", truncate(find.query, 16), find.current+1, len(find.matches))
+			if note != "" {
+				where += " · " + note
+			}
+			top, clear, after = max(0, at-2), true, where
 		default:
 			// Anything else is the answer to what comes next: no need to
 			// page to the end first.
@@ -217,48 +228,6 @@ func (f *pagerSearch) prev(from int) (int, string) {
 	}
 	f.current = len(f.matches) - 1
 	return f.matches[f.current], "Back to the last match."
-}
-
-// pagerPrompt is the status line: where you are, and the keys. It has a
-// long, a medium and a short form, for the width of the terminal.
-func (a *App) pagerPrompt(top, end, total int, find *pagerSearch) string {
-	k := func(key, what string) string { return sty.Bold(sty.Cyan(key)) + sty.Gray(what) }
-	line := func(items ...string) string {
-		return sty.Gray("  ── ") + strings.Join(items, sty.Gray(" · ")) + sty.Gray(" ──")
-	}
-	where := fmt.Sprintf("%d%%", end*100/max(1, total))
-	if end == total {
-		where = "end"
-	}
-	if find.current >= 0 && len(find.matches) > 0 {
-		where = fmt.Sprintf("“%s” %d/%d · %s", truncate(find.query, 16), find.current+1, len(find.matches), where)
-	}
-	at := sty.Gray(where)
-	search := k("/word", " find")
-	if find.current >= 0 && len(find.matches) > 1 {
-		search = k("/", " next match")
-	}
-	var forms []string
-	if end == total {
-		forms = []string{
-			line(at, k("Enter", " to continue"), k("b", " back"), search),
-			line(at, k("Enter", " continue"), k("b", " back")),
-			line(at, k("Enter", "")),
-		}
-	} else {
-		forms = []string{
-			line(at, k("Enter", " more"), k("b", " back"), search, k("q", " stop"), sty.Gray("or type your choice")),
-			line(at, k("Enter", " more"), k("b", " back"), search, k("q", " stop")),
-			line(at, k("Enter", " more"), k("q", " stop")),
-			line(k("Enter", ""), k("q", "")),
-		}
-	}
-	for _, f := range forms {
-		if visibleLen(f)+1 < a.cols() {
-			return f
-		}
-	}
-	return forms[len(forms)-1]
 }
 
 // matchSpans returns the rune ranges of plain where q (lower case) occurs,
