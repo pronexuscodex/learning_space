@@ -4,6 +4,16 @@ All notable changes to the Systems & AI Academy are listed here. The
 format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 versions follow [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+- **Checked exercises for data structures, storage and secure code.** Eight more:
+  - Stage 2: `linkedlist`, `hashmap` (it must grow), `heap_sort` (a million numbers in the time limit) and `bfs` (the shortest path through a maze of up to 1000 × 1000);
+  - Stage 7: `atomic_save` (temporary file, fsync, rename, fsync the folder) and `wal_kv` (a key-value store with a write-ahead log that survives a torn record);
+  - Stage 17: `safe_join` (canonicalise, then check) and `copy_string` (a bounded copy like strlcpy).
+
+  That makes 28 in all. Checks can now give the program files in subfolders and examine the files it leaves behind.
+
 ## [1.7.0] - 2026-10-22
 
 ### Changed
