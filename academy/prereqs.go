@@ -75,6 +75,9 @@ var conceptPrereqs = map[string][]string{
 	"Registers, the Stack & Calling Conventions": {"Functions & Decomposition", "The CPU: Datapath & Instruction Cycle"},
 	"Integers & Floating Point in Bits":          {"Binary & Number Representation", "Values, Types & Variables"},
 	"The Memory Hierarchy & Locality":            {"Memory & Storage: Where Data Lives", "Memory: Latches, Registers & RAM"},
+	"Linking, Loading & Shared Libraries":        {"The Compilation Pipeline", "Headers, the Preprocessor & make"},
+	"What the Optimizer Does":                    {"The Compilation Pipeline", "Integers & Floating Point in Bits", "Safe Input & Undefined Behavior"},
+	"Profiling & Measuring Performance":          {"The Memory Hierarchy & Locality", "Big-O: Measuring Growth"},
 	"Parsing: Recursive Descent & Pratt":         {"The Compilation Pipeline", "Trees, Heaps & Sorting"},
 
 	// ---- Stage 6

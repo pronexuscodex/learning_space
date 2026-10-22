@@ -137,50 +137,188 @@ var systemsAndAIGuides = map[int]StageGuide{
 	5: {
 		Overview: `Everything above this stage rests on how source code becomes machine
 instructions, and how those instructions move bytes between registers,
-caches and memory. You will build a working model of the machine a C
-compiler targets, and of the compiler itself.`,
+caches and memory. You will follow a C program through the compiler,
+the assembler, the linker and the loader; learn the calling convention
+every compiled function obeys; see where integer and floating-point
+arithmetic break; watch what the optimizer does to your code (and what
+undefined behaviour lets it do); learn to measure performance honestly;
+and write the parser at the front of every compiler. Each lesson is
+checked against the real tools: gcc, objdump, nm, valgrind.`,
 		Concepts: []Concept{
 			{
 				Name:    "The Compilation Pipeline",
 				Summary: "Source code is lowered step by step until it is bytes the CPU can run.",
-				Body: `A compiler is a chain of translations. The lexer turns characters into
-tokens. The parser turns tokens into an abstract syntax tree (AST).
-Semantic analysis resolves names and checks types. The AST is lowered to
-an intermediate representation (IR), which the optimizer rewrites, and
-the backend selects instructions and allocates registers to produce
+				Body: `A compiler is a chain of translations. The preprocessor pastes in every
+#include and expands macros. The lexer turns characters into tokens. The
+parser turns tokens into an abstract syntax tree (AST). Semantic
+analysis resolves names and checks types. The AST is lowered to an
+intermediate representation (IR), which the optimizer rewrites, and the
+backend selects instructions and allocates registers to produce
 assembly.
 
 The assembler turns assembly into an object file: machine code plus a
 symbol table and relocations (holes to patch). The linker merges object
 files, resolves symbols across them and fixes up addresses. At run time
 the loader maps the executable's segments into memory and jumps to the
-entry point.`,
+entry point.
+
+The command gcc is only a driver that runs these programs in turn. You
+can stop it after any step and look at the result:
+
+  gcc -E hello.c          preprocessed C, to the screen
+  gcc -S hello.c          assembly, in hello.s
+  gcc -c hello.c          an object file, hello.o
+  gcc hello.o -o hello    linked into a program`,
 				Diagram: `source.c ─▶ [lexer] ─▶ tokens ─▶ [parser] ─▶ AST ─▶ [IR gen] ─▶ IR
    ─▶ [optimizer] ─▶ [codegen] ─▶ .s ─▶ [assembler] ─▶ .o ─▶ [linker] ─▶ a.out`,
+				UnderTheHood: `Following a six-line hello.c through gcc 13 on Linux:
+
+  gcc -E hello.c | wc -l       819
+
+The preprocessed file is 819 lines: #include <stdio.h> pasted in the
+declarations of the whole standard I/O library before your six lines.
+gcc -v shows the programs the driver runs: cc1 (the compiler proper),
+as (the assembler) and collect2, which runs ld (the linker).
+
+gcc -O2 -S hello.c shows the compiler already rewriting your code:
+
+  lea   rdi, .LC0[rip]     ; the address of "hello, world"
+  call  puts@PLT
+  xor   eax, eax           ; return 0
+
+printf("hello, world\n") became puts("hello, world"): a format string
+with no % and a final newline means exactly what puts does, more
+cheaply. The compiler may make any change that the C standard says
+cannot be told apart from your program.`,
 				MentalModel: "Each stage translates to a language that is slightly closer to the metal.",
 				TryIt:       "Compile the same function with gcc -S -O0 and -O2 (or paste it into godbolt.org) and explain every instruction that disappeared.",
+			},
+			{
+				Name:    "Linking, Loading & Shared Libraries",
+				Summary: "The linker stitches object files into one program; the loader and the dynamic linker bring it to life.",
+				Body: `Every object file carries a symbol table: the names it defines (its
+functions and global variables) and the names it uses but does not
+define. The linker's job is to match every use to exactly one
+definition, then patch the addresses into the code (relocation).
+
+Two errors follow from that rule, and every C programmer meets both:
+- undefined reference to f: something calls f, but no object file or
+  library given to the linker defines it;
+- multiple definition of x: two object files both define a global x.
+
+The cure for the second is linkage. A global variable or function is
+visible to every file (external linkage) unless you mark it static,
+which makes it private to its file (internal linkage). Shared state that
+only one file needs should always be static.
+
+Libraries come in two kinds. A static library (libm.a) is an archive of
+object files; the linker copies the ones you need into your program. A
+shared library (libc.so.6 on Linux, .dylib on macOS, .dll on Windows) is
+loaded at run time by the dynamic linker (ld-linux.so on Linux), so many
+programs share one copy in memory, and fixing a bug in the library fixes
+every program that uses it. Calls to shared functions go through small
+stubs (the PLT) and a table of addresses (the GOT) that the dynamic
+linker fills in.`,
+				Diagram: `  main.o                 libc.so.6
+  ┌──────────────┐       ┌──────────────┐
+  │ T main       │       │ T puts       │
+  │ U puts ──────┼───────┼─▶            │   resolved when the program
+  └──────────────┘       └──────────────┘   starts, by ld-linux.so
+          │ ld (linker)
+          ▼
+        a.out: main's code, plus a PLT stub that jumps to puts`,
+				UnderTheHood: `nm lists an object file's symbols. For hello.c compiled with -O2:
+
+  nm hello.o
+  0000000000000000 T main         ; T: defined here, in the code (text)
+                   U puts         ; U: undefined, needed from elsewhere
+
+and readelf -r shows the hole the linker must fill:
+
+  000000000013  R_X86_64_PLT32   puts - 4
+
+"at byte 0x13 of the code, write the distance to puts". After linking,
+ldd lists the shared libraries the program will need:
+
+  libc.so.6 => /lib/x86_64-linux-gnu/libc.so.6
+  /lib64/ld-linux-x86-64.so.2
+
+linux-vdso.so.1 also appears: a tiny library the kernel maps into every
+process so that calls such as clock_gettime need no system call. Linked
+normally, the program is 15,960 bytes; linked with -static, which copies
+the C library in, it is 785,360 bytes.`,
+				MentalModel: "Every name must be defined exactly once: static keeps a name private to its file, and the linker connects the rest.",
+				TryIt:       "Compile hello.c with -c, run nm and readelf -r on hello.o, then link it and run ldd on the program. Then link it with -static and compare the sizes.",
+				Analogy: `A book written by several authors, each chapter saying "see the table
+in chapter 7". The linker is the editor who assembles the chapters and
+fills in the real page numbers. A shared library is the public library
+in town: instead of every household buying its own encyclopedia, everyone
+borrows the same copy, and when it is corrected, everyone sees the fix.`,
+				Example: `When the Heartbleed bug in OpenSSL was fixed in 2014, servers needed only
+an updated libssl shared library and a restart, not new builds of every
+program. "DLL hell" on Windows and missing .so errors on Linux are what
+happens when a program cannot find the exact library it was linked
+against. Tools such as Valgrind and faketime work by loading their own
+code into a program with the dynamic linker.`,
+				Exercises: trio(
+					"In nm's output, what do T, U, D and B mean? Which letter would you expect for main, for printf, for an initialised global int and for a global array of 100 ints with no initialiser?",
+					"T: code defined here; U: undefined, needed from elsewhere; D: initialised data; B: zeroed data (bss). main is T, printf is U, the initialised int is D, the array is B.",
+					"Create util.c (a function and a counter) and main.c that uses them. Build util.c into a static library (ar rcs libutil.a util.o), link with -L. -lutil, then build it as a shared library (gcc -shared -fPIC -o libutil.so util.c) and run the program with LD_LIBRARY_PATH=. set. Compare the two programs with nm and ldd.",
+					"With the static library, util's code is inside the program and ldd does not mention it; with the shared one, nm shows the function as U and ldd lists libutil.so.",
+					"Count the mallocs of a program you did not write: build a shared library whose malloc counts calls and forwards to the real one, found with dlsym(RTLD_NEXT, \"malloc\"), and run ls with LD_PRELOAD pointing at it (Linux).",
+					"Print the count from a function marked __attribute__((destructor)), which runs at exit. Careful: dlsym and printf may call malloc themselves, so guard against recursion with a flag.",
+				),
 			},
 			{
 				Name:    "Registers, the Stack & Calling Conventions",
 				Summary: "The ABI is the contract that lets separately compiled code call each other.",
 				Body: `The CPU computes on a small set of registers. The calling convention
-(on Linux x86-64, the System V AMD64 ABI) fixes where arguments and results go:
-- integer arguments in rdi, rsi, rdx, rcx, r8, r9, and the rest on the stack;
-- the return value in rax;
-- rbx, rbp and r12 to r15 are callee-saved, so a function must restore them;
+(on Linux and macOS x86-64, the System V AMD64 ABI) fixes where
+arguments and results go:
+- integer and pointer arguments in rdi, rsi, rdx, rcx, r8, r9, and the
+  rest on the stack;
+- floating-point arguments in xmm0 to xmm7;
+- the return value in rax (or xmm0 for floating point);
+- rbx, rbp and r12 to r15 are callee-saved, so a function must restore
+  them;
 - the stack must be 16-byte aligned at every call instruction.
+
+ARM64 (Apple silicon, phones, Raspberry Pi) has its own convention with
+the same ideas: arguments in x0 to x7, the result in x0. Windows x64
+uses yet another (rcx, rdx, r8, r9). That is why a library compiled for
+one platform cannot be called from another.
 
 The call instruction pushes the return address. A function prologue
 reserves a frame for locals and spilled registers. Local buffers and the
 return address share the stack, and that is exactly why buffer overflows
-can hijack control flow.`,
+can hijack control flow (Stage 10).`,
 				Diagram: `high addr ┌────────────────────┐
           │  caller's frame    │
+          │  7th, 8th … args   │ ◀─ the arguments past the sixth
           ├────────────────────┤
           │  return address    │ ◀─ pushed by call
           │  saved rbp         │ ◀─ rbp (frame base)
           │  locals / spills   │
 low addr  └────────────────────┘ ◀─ rsp   (stack grows down ↓)`,
+				UnderTheHood: `A function with seven long arguments, compiled with gcc -O2:
+
+  long seven(long a, long b, long c, long d, long e, long f, long g)
+  { return a + b + c + d + e + f + g; }
+
+  seven:
+      add   rdi, rsi             ; a + b
+      add   rdi, rdx             ; + c
+      add   rdi, rcx             ; + d
+      add   rdi, r8              ; + e
+      lea   rax, [rdi+r9]        ; + f, into the return register
+      add   rax, QWORD PTR 8[rsp] ; + g: the seventh comes from the stack
+      ret
+
+The first six arrive in registers exactly as the ABI lists them; the
+seventh sits just above the return address, at rsp + 8. And a caller
+compiled in the same file, long call7(void) { return seven(1, 2, 3, 4,
+5, 6, 7); }, compiled to just mov eax, 28: the optimizer inlined the
+call and added the constants itself (What the Optimizer Does).`,
 				MentalModel: "A function call is a push, a jump, and an agreement about who saves which register.",
 				TryIt:       "Write a function in x86-64 assembly that sums an int array, and call it from C.",
 			},
@@ -188,15 +326,40 @@ low addr  └────────────────────┘ ◀
 				Name:    "Integers & Floating Point in Bits",
 				Summary: "Numbers are fixed-width bit patterns, and that has consequences.",
 				Body: `Signed integers use two's complement: -x is ~x + 1, so the same adder
-handles signed and unsigned arithmetic. Unsigned overflow wraps. In C,
-signed overflow is undefined behaviour, and optimizers exploit that
-assumption.
+handles signed and unsigned arithmetic (Building an ALU, Stage 4).
+Unsigned overflow wraps. In C, signed overflow is undefined behaviour,
+and optimizers exploit that assumption.
 
-IEEE 754 floats store a sign, a biased exponent and a mantissa. Most
-decimals cannot be represented exactly (0.1 + 0.2 != 0.3), and float
-addition is not associative. That last fact returns in Stage 16: a
-parallel GPU reduction sums in a different order and can give slightly
-different results from a sequential loop.`,
+IEEE 754 floats store a sign bit, a biased exponent and a mantissa: a
+float has 1 + 8 + 23 bits, a double 1 + 11 + 52. The value is
+(−1)^sign × 1.mantissa × 2^(exponent − bias), with bias 127 for float
+and 1023 for double. So a float has about 7 significant decimal digits
+and a double about 16. Most decimals cannot be represented exactly
+(0.1 + 0.2 != 0.3), large floats cannot hold small changes, and float
+addition is not associative: (a + b) + c can differ from a + (b + c).
+
+Practical rules: never compare floats with ==; never store money in
+floats (use integer cents); and remember that the order of a sum
+matters, which returns in Stage 16, where a parallel GPU reduction sums
+in a different order and can give slightly different results.`,
+				Diagram: `float 0.1f = 0x3dcccccd
+ sign   exponent      mantissa
+  0     01111011      10011001100110011001101
+  +     123 − 127 = −4   1.6000000238… × 2⁻⁴ = 0.100000001490116…`,
+				UnderTheHood: `Printed from C on a test machine:
+
+  0.1f is stored as        3dcccccd  (sign 0, exponent 123, mantissa 4ccccd)
+  0.1 + 0.2                0.30000000000000004
+  0.1 + 0.2 == 0.3         0 (false)
+  (1e16 + -1e16) + 1.0     1
+  1e16 + (-1e16 + 1.0)     0      ; the 1.0 is lost next to 1e16
+  1e8f + 1.0f == 1e8f      1      ; a float cannot hold 100000001
+  0.10 added 1000 times    99.999999999998593
+
+The last line is why money is counted in integer cents: every 0.10 is
+a little off, and the errors add up. In the second sum, −1e16 + 1.0
+rounds back to −1e16, because a double has only about 16 significant
+digits, so the 1 vanishes before it can be added.`,
 				MentalModel: "Every number type is a finite code; learn where the code breaks.",
 				TryIt:       "Print the bit patterns of -1, INT_MIN, 0.1f and 1e30f + 1.0f - 1e30f, and explain each one.",
 			},
@@ -204,31 +367,241 @@ different results from a sequential loop.`,
 				Name:    "The Memory Hierarchy & Locality",
 				Summary: "Where your data lives often matters more than how many instructions you run.",
 				Body: `Rough latencies on a modern CPU: register ~1 cycle, L1 ~4 cycles,
-L2 ~12, L3 ~40, DRAM hundreds of cycles. Caches move data in 64-byte
-lines, so touching one byte brings in its 63 neighbours.
+L2 ~12, L3 ~40, DRAM hundreds of cycles (Stage 4 measured them: 1.6 ns
+in L1 against 207 ns in DRAM on one machine). Caches move data in
+64-byte lines, so touching one byte brings in its 63 neighbours.
 
 Programs are fast when they reuse data soon (temporal locality) and use
-neighbouring data (spatial locality). Walking a row-major 2D array
-column by column can be ten times slower than walking it row by row, with
-identical instruction counts. The same idea returns in Stage 16 as the
-roofline model and GPU memory coalescing.`,
+neighbouring data (spatial locality). C stores a 2D array row by row
+(row-major), so walking it column by column touches a new cache line on
+every access, with identical instruction counts. The same idea returns
+in Stage 16 as the roofline model and GPU memory coalescing.
+
+Designing for the cache:
+- loop over arrays in the order they are stored;
+- prefer arrays of values to linked structures of pointers;
+- keep the data a hot loop needs together ("struct of arrays" when a
+  loop uses only some fields of many records);
+- work on blocks that fit in cache (tiling), as fast matrix
+  multiplication does.`,
 				Diagram: `  CPU ─ regs ─ L1 (32K) ─ L2 (1M) ─ L3 (tens of MB) ─ DRAM (GBs) ─ SSD
   fast · tiny ◀──────────────────────────────────────────────▶ slow · huge`,
+				UnderTheHood: `Summing a 4096 × 4096 int matrix (64 MB) with gcc -O2 on a test
+machine, best of three runs:
+
+  row by row          7.8 ms
+  column by column  155   ms     20 times slower, same instructions
+
+Valgrind's cache simulator (valgrind --tool=cachegrind) counts why, on a
+1024 × 1024 matrix (4 MB):
+
+  row by row        66,915 L1 read misses      one per 64-byte line
+  column by column  1,049,955 L1 read misses   almost one per access
+
+Row order misses once per 16 ints, because a line holds 16 of them;
+column order jumps 4 KB between accesses and misses nearly every time.
+The instruction counts of the two loops are the same, about 5.2 million
+each: counting instructions would never have found this.`,
 				MentalModel: "Memory is a pyramid; performance is how rarely you fall down it.",
-				TryIt:       "Time row-major vs column-major traversal of a 4096×4096 int matrix.",
+				TryIt:       "Time row-major vs column-major traversal of a 4096×4096 int matrix, then run both under valgrind --tool=cachegrind on a smaller one and compare the D1 misses.",
+			},
+			{
+				Name:    "What the Optimizer Does",
+				Summary: "-O2 rewrites your program: it inlines, folds, deletes and vectorises, keeping only what the C standard promises.",
+				Body: `The C standard describes an abstract machine, and the compiler may
+produce any code that behaves the same as far as the standard can tell
+(the "as if" rule). With -O2, gcc and clang use that freedom fully:
+- inlining: a small function's body replaces the call;
+- constant folding and propagation: work on known values is done at
+  compile time;
+- dead code elimination: results nobody uses, and stores nobody reads,
+  disappear;
+- loop optimisations: invariant work moves out of the loop, loops are
+  unrolled, and at -O3 (or with the right flags) vectorised with SIMD;
+- strength reduction: a multiplication in a loop becomes an addition.
+
+Undefined behaviour is where this bites. The compiler assumes your
+program never does anything undefined: no signed overflow, no
+out-of-bounds access, no use of a pointer after free, no NULL
+dereference. It optimises on that assumption, so a check written after
+the undefined step, such as if (x + 1 < x) to detect overflow, can be
+deleted as impossible.
+
+Practical rules: debug at -O0 (or -Og), ship at -O2; turn on the
+sanitizers while testing; write overflow checks that cannot overflow
+(__builtin_add_overflow, or compare with INT_MAX - b first); and in a
+benchmark, use the result, or the work may vanish.`,
+				Diagram: `static int square(int x) { return x * x; }
+int fold(void) { return square(7) + 1; }
+
+   -O0:  call square ; add eax, 1 ; ret        (as written)
+   -O2:  mov eax, 50 ; ret                      (inlined, then folded)`,
+				UnderTheHood: `What gcc 13 -O2 made of a few small functions:
+
+  int fold(void) { return square(7) + 1; }      mov eax, 50
+  long call7(void) { return seven(1,…,7); }     mov eax, 28
+  int always(int x) { return x + 1 > x; }       mov eax, 1
+  int always_u(unsigned x) { return x + 1 > x; } cmp edi, -1 ; setne al
+
+For a signed int, x + 1 > x "cannot" be false, because the only case
+where it would be (x = INT_MAX) overflows, which is undefined. For an
+unsigned int, overflow is defined to wrap, so the compiler must test.
+
+A loop doubling an array of floats stayed one float at a time at -O2
+(gcc 13) and became movups / addps, four floats per instruction, at
+-O3. For a loop summing 1 to n, gcc unrolled it, and clang replaced the
+loop with the formula n(n + 1)/2: no loop at all.
+
+And a security trap: a function that clears a password with memset just
+before returning compiled at -O2 with no memset at all. The array is
+never read again, so the store is dead. explicit_bzero (glibc and the
+BSDs) is guaranteed to stay, and it does: the -O2 code calls
+__explicit_bzero_chk.`,
+				MentalModel: "The optimizer keeps what the standard promises, nothing more: write code whose meaning is defined, and measure what you think it does.",
+				TryIt:       "Paste fold, always and always_u into Compiler Explorer (godbolt.org), compare -O0 with -O2, then add -fsanitize=undefined and call always(INT_MAX).",
+				Analogy: `An editor who rewrites your essay to be half as long, promising it says
+exactly the same thing. They keep that promise, as long as you did not
+rely on anything the rules of grammar forbid; if you did, they may cut
+the paragraph you were counting on.`,
+				Example: `In 2009 a Linux kernel driver (the tun driver) read a field through a
+pointer and only then checked the pointer for NULL. gcc reasoned that a
+pointer already dereferenced cannot be NULL and deleted the check, which
+turned a crash into an exploitable hole (CVE-2009-1897). The kernel now
+builds with -fno-delete-null-pointer-checks. Benchmarks whose result is
+never used are another classic: the optimizer deletes the work, and the
+program appears infinitely fast.`,
+				Exercises: trio(
+					"Predict what gcc -O2 makes of int f(void) { int x = 6; return x * 7; }, and of a loop that adds 1 to a local variable a million times and never uses it.",
+					"mov eax, 42 (constant folding). The loop disappears entirely: its result is never used, so it is dead code.",
+					"Write a function that sums an array of floats. Compare its assembly at -O2 and -O3 (look for addps or vaddps), then add -ffast-math and explain why the compiler needed permission before it would vectorise the sum.",
+					"Vectorising adds the floats in a different order, and float addition is not associative, so the result could change. -ffast-math (or -fassociative-math) gives the compiler permission to reorder.",
+					"A security review says a function clears a password with memset before returning, but the compiled program contains no memset. Reproduce it with gcc -O2 -S, then fix it with explicit_bzero (or memset_s where available) and confirm the clearing is still there at -O2.",
+					"The buffer is never read after the memset, so dead-store elimination removes it. explicit_bzero is defined so that it cannot be removed.",
+				),
+			},
+			{
+				Name:    "Profiling & Measuring Performance",
+				Summary: "Measure before you optimise, and know exactly what your measurement measured.",
+				Body: `Optimising without measuring is guessing. The first step is always to
+find where the time goes, because it is rarely where you think, and by
+Amdahl's law (Stage 4) speeding up anything else barely helps.
+
+What to measure:
+- wall-clock time (what a user waits) against CPU time (user and system),
+  which time ./program prints as real, user and sys; a big gap means
+  waiting: disk, network, locks or other programs;
+- the steady state against the first run: the first run pays for page
+  faults, cold caches and file reads;
+- the spread: repeat, and report the minimum or the median, not one run.
+
+Tools:
+- a timer around the code: clock_gettime(CLOCK_MONOTONIC), never the
+  wall-calendar clock, which can jump;
+- sampling profilers (perf on Linux, Instruments on macOS) interrupt the
+  program thousands of times a second and record where it was: cheap,
+  and good for "which function is hot";
+- instrumenting profilers and simulators (gprof, valgrind's callgrind
+  and cachegrind) count every call, instruction or cache miss: exact,
+  but 20 to 100 times slower;
+- flame graphs show sampled call stacks, so you can see at a glance
+  which paths through the program take the time.
+
+Benchmark pitfalls: the optimizer deleting unused work, CPU frequency
+changing under load, other programs on the machine, and inputs too small
+to show the real growth.`,
+				Diagram: `  time ./program
+  real   2.00s   ← wall clock: what the user waited
+  user   0.50s   ← CPU time running your code
+  sys    0.10s   ← CPU time in the kernel for you
+         ─────
+         1.40s waiting: disk, network, locks, sleep`,
+				UnderTheHood: `The first run lies. A C program that read and incremented one byte in
+every 64 of a freshly malloc'd 256 MB array, three times over, measured
+on a test machine (a virtual machine, where page faults are especially
+expensive):
+
+  pass 1   1,528.9 ms    131,070 page faults
+  pass 2      27.2 ms          0 page faults
+  pass 3      26.9 ms          0 page faults
+
+malloc only reserved the addresses; the first touch of each 4 KiB page
+faulted into the kernel twice (the read mapped a shared page of zeros,
+the write then gave the page its own memory). Timing only the first pass
+would have blamed the loop for the kernel's work.
+
+Instruction counts lie too. callgrind counted about 5.2 million
+instructions for both the row-order and the column-order matrix sums of
+the last lesson, which differ 20 times in speed: only cachegrind's
+cache-miss counts explain it. clock_getres reported a 1 ns resolution
+for CLOCK_MONOTONIC there, but each call itself took about 20 ns:
+time whole loops, never single operations.`,
+				MentalModel: "Profile first, change one thing, measure again, and trust the steady state, not the first run.",
+				TryIt:       "Run time on one of your programs with a large input, then valgrind --tool=callgrind and callgrind_annotate on the same program with a smaller one, and find the function with the most instructions.",
+				Analogy: `A doctor runs tests before operating: you do not remove the organ you
+guess is sick. And a stopwatch at a race measures the runners, not how
+long the crowd took to sit down: decide what you are timing before you
+press start.`,
+				Example: `Donald Knuth's line "premature optimization is the root of all evil"
+(1974) continues: "yet we should not pass up our opportunities in that
+critical 3%", and finding that 3% is what profilers are for. Brendan
+Gregg invented flame graphs in 2011 while working on performance
+problems at Joyent, and later used them at Netflix; the same picture,
+under names such as flame chart, is now in tools from Linux perf to
+browser developer tools.`,
+				Exercises: trio(
+					"time ./program prints real 2.0s, user 0.5s and sys 0.1s. What was the program doing for the other 1.4 seconds, and would a faster CPU help?",
+					"Waiting: for the disk, the network, a lock or a sleep (or for other programs to give it the CPU). A faster CPU would hardly help; the waiting is the problem.",
+					"Write a small benchmark harness in C: run a function once to warm up, then five times, timing each with clock_gettime(CLOCK_MONOTONIC), and print the minimum and the median. Make sure the compiler cannot delete the work, then use it on the row-order and column-order matrix sums.",
+					"Sort the five times to find the median. Use the result: accumulate it into a global, or assign it to a volatile variable, so the work is not dead code.",
+					"Profile a real program: run valgrind --tool=callgrind on your wordfreq (Stage 1) or edit_distance (Stage 2) solution with a large input, open the result with callgrind_annotate, speed up the function with the most instructions, and measure again with your harness.",
+					"Compile with -g so callgrind_annotate can show source lines, and keep -O2, so you profile the code that will actually run.",
+				),
 			},
 			{
 				Name:    "Parsing: Recursive Descent & Pratt",
 				Summary: "Turning a flat token stream into a tree that respects precedence.",
 				Body: `A recursive-descent parser has one function per grammar rule, and each
-function consumes tokens and returns an AST node. Operator precedence
-is the hard part. Pratt parsing (precedence climbing) solves it neatly:
-each token gets a binding power, and a loop keeps extending the left
-expression while the next operator binds more tightly than the current
-level.
+function consumes tokens and returns an AST node. For arithmetic:
+
+  expr   = term   (('+' | '-') term)*
+  term   = factor (('*' | '/') factor)*
+  factor = NUMBER | '(' expr ')' | '-' factor
+
+expr calls term, term calls factor, and factor calls expr again for a
+parenthesised expression: the recursion in the code mirrors the nesting
+in the input. Looping (rather than recursing) for the repeated part
+makes - and / group from the left, so 10 - 4 - 3 is (10 - 4) - 3.
+
+Operator precedence is the hard part when there are many levels. Pratt
+parsing (precedence climbing) solves it neatly: each token gets a
+binding power, and a loop keeps extending the left expression while the
+next operator binds more tightly than the current level.
 
 Once you have an AST, everything else (type checking, interpretation,
 code generation) is a tree walk.`,
+				Diagram: `  2 + 3 * 4 - 1             expr
+                           ┌──┴──┐
+                         expr  '-'  1
+                        ┌──┴──┐
+                        2 '+' term
+                             ┌─┴─┐
+                             3 '*' 4`,
+				UnderTheHood: `gcc and clang both parse C with hand-written recursive-descent parsers,
+so nesting really does cost stack. Feeding each compiler
+int f(void) { return ((…(1)…)); } with more and more parentheses:
+
+  depth       gcc 13                        clang
+  200         compiles                      compiles
+  1,000       compiles                      error: bracket nesting level
+                                            exceeded maximum of 256
+  100,000     internal compiler error:      (same error)
+              Segmentation fault
+
+Clang protects itself with a limit (raise it with -fbracket-depth=N).
+gcc has none, and its recursion overflowed cc1's own stack: run with
+ulimit -s unlimited, the same gcc compiled the 100,000-deep file without
+complaint. Your parser faces the same choice: the calc check feeds yours 500 levels of parentheses,
+deep enough to matter, but well within an 8 MiB stack.`,
 				MentalModel: "Grammar rules become functions; precedence becomes a number.",
 				TryIt:       "Write a Pratt parser for + - * / ^ and unary minus, and print the fully parenthesised tree.",
 			},
@@ -255,6 +628,13 @@ code generation) is a tree walk.`,
 			{"What does the linker do that the compiler cannot?", "It resolves symbols across separately compiled object files and patches addresses (relocations) into one final layout."},
 			{"Under System V AMD64, where is the first integer argument and where is the return value?", "The first argument is in rdi; the return value is in rax."},
 			{"Why can an optimizer assume that x + 1 > x for a signed int in C?", "Signed overflow is undefined behaviour, so the compiler may assume it never happens."},
+			{"What do the linker errors \"undefined reference\" and \"multiple definition\" mean?", "Undefined reference: something uses a name that no object file or library defines. Multiple definition: two object files both define the same global name; making one of them static (private to its file) fixes it."},
+			{"What is the difference between a static and a shared library?", "A static library's code is copied into the program at link time. A shared library is loaded at run time by the dynamic linker and shared by every program that uses it, so an update to it reaches all of them."},
+			{"Where does the seventh integer argument of a function go on x86-64 Linux?", "On the stack: the first six go in rdi, rsi, rdx, rcx, r8 and r9, and the rest are pushed by the caller, just above the return address."},
+			{"Why does 0.1 + 0.2 not equal 0.3 in floating point?", "None of the three has an exact binary representation, so each is rounded, and the rounded sum of two of them is not the rounded third."},
+			{"Why can a memset that clears a password disappear at -O2?", "The buffer is never read afterwards, so the store is dead and the optimizer removes it. explicit_bzero is guaranteed to stay."},
+			{"Why should a benchmark warm up before timing?", "The first run pays one-off costs, such as page faults, cold caches and loading files, that the steady state does not."},
+			{"Why can two loops with the same instruction count differ 20 times in speed?", "They touch memory in different orders: one uses each cache line fully, the other misses the cache on almost every access."},
 		},
 	},
 

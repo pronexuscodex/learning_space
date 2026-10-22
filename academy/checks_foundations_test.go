@@ -554,6 +554,29 @@ int main(void) {
     return 0;
 }
 `,
+	"linkage": `static int count;
+
+static void bump(int by) { count += by; }
+
+void tick(void) { bump(1); }
+int ticks(void) { return count; }
+void reset(void) { count = 0; }
+`,
+	"checked_add": `#include <limits.h>
+
+int checked_add(int a, int b, int *sum) {
+    if (b > 0 ? a > INT_MAX - b : a < INT_MIN - b) return 0;
+    *sum = a + b;
+    return 1;
+}
+
+int checked_mul(int a, int b, int *product) {
+    long long p = (long long)a * b;
+    if (p > INT_MAX || p < INT_MIN) return 0;
+    *product = (int)p;
+    return 1;
+}
+`,
 }
 
 // Each Foundations check fails the typical wrong answer, for the reason
@@ -721,6 +744,26 @@ int main(void) {
 	failsWith(t, "cpu", mutate("cpu", "        if (++steps > 1000000) {", "        if (++steps < 0) {"), "an endless loop", "did not finish")
 	// int registers overflow.
 	failsWith(t, "cpu", strings.NewReplacer("long long r[4]", "int r[4]", `printf("%lld\n", r[in.a])`, `printf("%d\n", r[in.a])`, "r[in.a] = in.b;", "r[in.a] = (int)in.b;").Replace(ref["cpu"]), "big numbers", "")
+
+	// A global counter clashes with the checker's own count at link time.
+	run := runSource(t, "linkage", strings.Replace(ref["linkage"], "static int count;", "int count;", 1))
+	if run.Built || !strings.Contains(run.BuildLog, "Make yours static") {
+		t.Errorf("linkage: a global count must fail to link with the static hint (built=%v)\n%s", run.Built, run.BuildLog)
+	}
+
+	// Checking after the addition is undefined behaviour, which the sanitizer stops.
+	late := mutate("checked_add", "    if (b > 0 ? a > INT_MAX - b : a < INT_MIN - b) return 0;\n    *sum = a + b;\n    return 1;",
+		"    int s = a + b;\n    if ((a > 0 && b > 0 && s < 0) || (a < 0 && b < 0 && s >= 0)) return 0;\n    *sum = s;\n    return 1;")
+	if run := runSource(t, "checked_add", late); run.Sanitizers {
+		for _, c := range run.Cases {
+			if c.Case.Name == "additions at the edges" && (c.Pass || !strings.Contains(c.Problem, "overflow")) {
+				t.Errorf("checked_add: an addition before the check must be reported as overflow: pass=%v problem=%q", c.Pass, c.Problem)
+			}
+		}
+	}
+	// Forgetting that INT_MIN * -1 overflows.
+	failsWith(t, "checked_add", mutate("checked_add", "    long long p = (long long)a * b;\n    if (p > INT_MAX || p < INT_MIN) return 0;\n    *product = (int)p;\n    return 1;",
+		"    if (a != 0 && (b > INT_MAX / a || b < INT_MIN / a) && a > 0) return 0;\n    *product = a * b;\n    return 1;"), "multiplications at the edges", "")
 
 	// The immediate read without sign extension.
 	failsWith(t, "rv_decode", mutate("rv_decode", "int32_t imm = (int32_t)w >> 20;", "int32_t imm = (int32_t)(w >> 20);"), "assembled by LLVM", `"addi x2, x1, 4095"`)

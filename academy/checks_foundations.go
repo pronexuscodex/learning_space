@@ -748,6 +748,150 @@ int main(int argc, char **argv) {
 			"Decide by opcode first, then funct3, then (for R-type) funct7; every combination you do not handle falls through to unknown.",
 		},
 	},
+	{
+		ID: "linkage", Stage: 5, Concept: "Linking, Loading & Shared Libraries",
+		Title: "Keep your names to yourself",
+		Task:  "Write a tick counter: void tick(void) adds one, int ticks(void) returns the count, void reset(void) sets it back to 0. The checker links your file with its own, which already has a global variable named count and a function named total, so every other name in your file must be private to it. No main.",
+		File:  "linkage.c",
+		Starter: `/* Checked exercise: linkage
+ * Write these three functions; no main:
+ *   void tick(void);    add one to the counter
+ *   int  ticks(void);   the counter's value
+ *   void reset(void);   back to 0
+ * The checker's own file, linked with yours, already defines
+ *   int count;          and          int total(void);
+ * A global name defined in two files is a link error ("multiple
+ * definition"). Anything the outside world does not need to see should
+ * be static: private to this file.
+ */
+`,
+		Harness: `#include <stdio.h>
+#include <string.h>
+
+int count = 100;               /* the checker's own count */
+int total(void) { return 7; }  /* and its own total */
+
+void tick(void);
+int ticks(void);
+void reset(void);
+
+int main(int argc, char **argv) {
+    if (argc < 2) return 2;
+    if (strcmp(argv[1], "three") == 0) {
+        tick(); tick(); tick();
+        printf("%d\n", ticks());
+    } else if (strcmp(argv[1], "reset") == 0) {
+        tick(); tick(); reset(); tick();
+        printf("%d\n", ticks());
+    } else if (strcmp(argv[1], "theirs") == 0) {
+        tick();
+        printf("%d %d %d\n", ticks(), count, total());
+    } else return 2;
+    return 0;
+}
+`,
+		BuildHints: []BuildHint{
+			{"multiple definition of", "Your file and the checker's both define the same global name. Make yours static (static int count;): it becomes private to your file, and the clash disappears."},
+			{"duplicate symbol", "Your file and the checker's both define the same global name. Make yours static (static int count;): it becomes private to your file, and the clash disappears."},
+			{"undefined reference", "The linker found no definition: define tick, ticks and reset, spelled exactly like that, and do not make those three static."},
+			{"Undefined symbols", "The linker found no definition: define tick, ticks and reset, spelled exactly like that, and do not make those three static."},
+		},
+		Cases: []CheckCase{
+			{Name: "three ticks", Args: []string{"three"}, Want: "3\n"},
+			{Name: "reset", Args: []string{"reset"}, Want: "1\n"},
+			{Name: "the checker's names are untouched", Args: []string{"theirs"}, Want: "1 100 7\n",
+				Explain: "The checker's own count must still be 100: your counter is a different variable, private to your file."},
+		},
+		Hints: []string{
+			"static int count; at the top of your file is a variable only your file can see; the checker's count is a different variable.",
+			"Helper functions can be static too: static void bump(int by) { … }. Only tick, ticks and reset must be visible to the checker.",
+		},
+	},
+	{
+		ID: "checked_add", Stage: 5, Concept: "What the Optimizer Does",
+		Title: "Overflow checks that cannot overflow",
+		Task:  "Write int checked_add(int a, int b, int *sum) and int checked_mul(int a, int b, int *product): each returns 1 and stores the result when it fits in an int, or returns 0 and leaves the output alone when it would overflow. The check itself must not overflow: signed overflow is undefined behaviour, the undefined-behaviour sanitizer stops the program the moment it happens, and the optimizer is allowed to delete a check written after it. No main.",
+		File:  "checked_add.c",
+		Starter: `/* Checked exercise: checked_add
+ *   int checked_add(int a, int b, int *sum);
+ *   int checked_mul(int a, int b, int *product);
+ * Return 1 and store the result if it fits in an int; return 0 and
+ * leave *sum or *product unchanged if it would overflow.
+ * Test BEFORE computing:  a + b overflows when b > 0 && a > INT_MAX - b,
+ * or when b < 0 && a < INT_MIN - b. Computing a + b first and looking at
+ * the result is too late: the overflow itself is undefined behaviour.
+ * (__builtin_add_overflow and __builtin_mul_overflow, in gcc and clang,
+ * are allowed too.)
+ */
+#include <limits.h>
+`,
+		Harness: `#include <limits.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <string.h>
+
+int checked_add(int a, int b, int *sum);
+int checked_mul(int a, int b, int *product);
+
+static void add(int a, int b) {
+    int r = 12345;
+    int ok = checked_add(a, b, &r);
+    printf("%d + %d: %s %d\n", a, b, ok ? "ok" : "overflow", r);
+}
+
+static void mul(int a, int b) {
+    int r = 12345;
+    int ok = checked_mul(a, b, &r);
+    printf("%d * %d: %s %d\n", a, b, ok ? "ok" : "overflow", r);
+}
+
+int main(int argc, char **argv) {
+    if (argc < 2) return 2;
+    if (strcmp(argv[1], "add") == 0) {
+        add(1, 2); add(INT_MAX, 1); add(INT_MIN, -1); add(INT_MAX, INT_MIN);
+        add(-5, 5); add(INT_MAX, 0); add(INT_MIN, INT_MIN);
+    } else if (strcmp(argv[1], "mul") == 0) {
+        mul(6, 7); mul(INT_MAX, 2); mul(46340, 46340); mul(46341, 46341);
+        mul(INT_MIN, -1); mul(-1, INT_MIN); mul(-1, INT_MAX); mul(0, INT_MIN); mul(INT_MIN, 1);
+    } else if (strcmp(argv[1], "random") == 0) {
+        uint64_t x = 88172645463325252u;
+        for (int i = 0; i < 1000000; i++) {
+            x ^= x << 13; x ^= x >> 7; x ^= x << 17;
+            int a = (int)(uint32_t)x, b = (int)(uint32_t)(x >> 32);
+            if (i % 3 == 0) b = (int)((uint32_t)b >> (i % 31));   /* smaller values too */
+            int r1 = 12345, r2 = 12345;
+            int64_t s = (int64_t)a + b, p = (int64_t)a * b;
+            int okadd = s >= INT_MIN && s <= INT_MAX, okmul = p >= INT_MIN && p <= INT_MAX;
+            int gotadd = checked_add(a, b, &r1), gotmul = checked_mul(a, b, &r2);
+            if (gotadd != okadd || (okadd && r1 != (int)s) || (!okadd && r1 != 12345)) {
+                printf("checked_add(%d, %d) is wrong\n", a, b);
+                return 0;
+            }
+            if (gotmul != okmul || (okmul && r2 != (int)p) || (!okmul && r2 != 12345)) {
+                printf("checked_mul(%d, %d) is wrong\n", a, b);
+                return 0;
+            }
+        }
+        printf("1000000 pairs correct\n");
+    } else return 2;
+    return 0;
+}
+`,
+		Cases: []CheckCase{
+			{Name: "additions at the edges", Args: []string{"add"},
+				Want:    "1 + 2: ok 3\n2147483647 + 1: overflow 12345\n-2147483648 + -1: overflow 12345\n2147483647 + -2147483648: ok -1\n-5 + 5: ok 0\n2147483647 + 0: ok 2147483647\n-2147483648 + -2147483648: overflow 12345\n",
+				Explain: "Both directions overflow: INT_MAX + 1 and INT_MIN − 1. On overflow, leave the output untouched (the checker set it to 12345)."},
+			{Name: "multiplications at the edges", Args: []string{"mul"},
+				Want:    "6 * 7: ok 42\n2147483647 * 2: overflow 12345\n46340 * 46340: ok 2147395600\n46341 * 46341: overflow 12345\n-2147483648 * -1: overflow 12345\n-1 * -2147483648: overflow 12345\n-1 * 2147483647: ok -2147483647\n0 * -2147483648: ok 0\n-2147483648 * 1: ok -2147483648\n",
+				Explain: "INT_MIN × −1 is the trap: −INT_MIN is one more than INT_MAX. Dividing to test (a > INT_MAX / b) needs care with negative numbers and with 0."},
+			{Name: "a million random pairs", Args: []string{"random"}, Want: "1000000 pairs correct\n"},
+		},
+		Hints: []string{
+			"Addition: if (b > 0 ? a > INT_MAX - b : a < INT_MIN - b) return 0; INT_MAX - b cannot overflow when b > 0, nor INT_MIN - b when b < 0.",
+			"Multiplication without division: compute the product in a long long, which holds any product of two ints exactly, then check the range before storing.",
+			"Or use the compiler's builtins: if (__builtin_mul_overflow(a, b, &r)) return 0;",
+		},
+	},
 }
 
 // duplicatesValue is the number at position i of duplicatesInput.

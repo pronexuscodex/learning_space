@@ -133,6 +133,12 @@ var conceptLinks = map[string]links{
 		"CS:APP chapter 2 (Representing and Manipulating Information)."},
 	"The Memory Hierarchy & Locality": {[]string{"The Roofline Model: Compute- vs Memory-Bound", "GPU Memory Hierarchy & Coalescing", "Memory: Latches, Registers & RAM"},
 		"CS:APP chapter 6 (The Memory Hierarchy) and its cache lab. Drepper's memory paper for the full depth."},
+	"Linking, Loading & Shared Libraries": {[]string{"Headers, the Preprocessor & make", "Processes & the Address Space", "The Compilation Pipeline"},
+		"CS:APP, chapter 7 (linking). Ian Lance Taylor's twenty-part blog series on linkers. Run nm, readelf -r and ldd on your own programs."},
+	"What the Optimizer Does": {[]string{"Safe Input & Undefined Behavior", "Integers & Floating Point in Bits", "Pipelining, Branch Prediction & Parallelism"},
+		"Compiler Explorer (godbolt.org), on your own functions. Chris Lattner's three-part \"What Every C Programmer Should Know About Undefined Behavior\" on the LLVM blog (2011)."},
+	"Profiling & Measuring Performance": {[]string{"The Memory Hierarchy & Locality", "Big-O: Measuring Growth", "Pipelining, Branch Prediction & Parallelism"},
+		"Brendan Gregg's Systems Performance and his pages on flame graphs (brendangregg.com). The Valgrind manual, the chapters on Callgrind and Cachegrind."},
 	"Parsing: Recursive Descent & Pratt": {[]string{"Grammars & Pushdown Automata", "The Compilation Pipeline"},
 		"Crafting Interpreters: the chapters Representing Code and Parsing Expressions."},
 

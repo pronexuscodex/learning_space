@@ -439,6 +439,9 @@ var extras = map[int]stageExtras{
 			"Explain what really happens between typing code and the CPU running it",
 			"Read simple assembly output and see why one version of a function is faster",
 			"Build an interpreter for your own small programming language",
+			"Fix undefined-reference and multiple-definition errors, and use static and shared libraries",
+			"Predict what the optimizer will do to your code, and write code whose meaning is defined",
+			"Measure performance honestly: the steady state, the right clock, a profiler",
 		},
 		Glossary: []Term{
 			{"CPU", "The chip that executes instructions, one tiny step at a time, billions of times per second."},
@@ -451,6 +454,12 @@ var extras = map[int]stageExtras{
 			{"Byte", "8 bits. A bit is a single 0 or 1, and a byte can hold a number from 0 to 255."},
 			{"ABI", "Application Binary Interface: the agreed rules for how compiled functions call each other."},
 			{"AST", "Abstract Syntax Tree: code turned into a tree that shows its structure."},
+			{"Object file", "The output of compiling one source file: machine code, a symbol table, and relocations still to be filled in."},
+			{"Symbol", "A name (a function or a global variable) that an object file defines or needs."},
+			{"Shared library", "A library loaded at run time and shared between programs: .so on Linux, .dylib on macOS, .dll on Windows."},
+			{"Inlining", "Replacing a function call with a copy of the function's body, so the call disappears."},
+			{"Undefined behaviour", "Something the C standard gives no meaning to, such as signed overflow; the compiler may assume it never happens."},
+			{"Profiler", "A tool that measures where a program spends its time, by sampling or by counting."},
 		},
 	},
 	6: {
