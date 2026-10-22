@@ -994,6 +994,7 @@ func main() {
 	restoreFlag := flag.String("restore", "", "restore the registry from a backup (a number from -backups, or a file path), then exit")
 	showVersion := flag.Bool("version", false, "print the version, then exit")
 	showCard := flag.Bool("card", false, "print your progress as a card to screenshot and share, then exit")
+	checkFlag := flag.String("check", "", "compile and test a checked exercise (its ID, or list to see them all), then exit")
 	showWhere := flag.Bool("where", false, "print where the program, your progress, backups and PDFs are, then exit")
 	flag.Usage = usage(os.Stderr, flag.CommandLine)
 	flag.Parse()
@@ -1044,6 +1045,9 @@ func main() {
 			fmt.Println(l)
 		}
 		return
+	}
+	if *checkFlag != "" {
+		os.Exit(checkCommand(path, *checkFlag, os.Stdout, termWidth()))
 	}
 	if *fetchLibraryFlag {
 		os.Exit(fetchLibrary(path, os.Stdout))

@@ -45,6 +45,7 @@ def session(rng, keys, reg):
         for k in ("NO_PROXY", "no_proxy"):
             os.environ.pop(k, None)
         os.environ["ACADEMY_LIBRARY"] = os.path.join(os.path.dirname(reg), "library")  # never the real Documents
+        os.environ["ACADEMY_LABS"] = os.path.join(os.path.dirname(reg), "labs")
         os.execv(BIN, ["academy", "-registry", reg])
     set_size(fd, rng.choice([24, 40, 60]), rng.choice([40, 60, 80, 120]))
     out = bytearray()

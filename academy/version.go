@@ -102,6 +102,7 @@ func whereText(exe, regPath string) string {
 		{"Progress", regPath},
 		{"Backups", backupDir(regPath)},
 		{"PDFs", libraryDir(regPath)},
+		{"Labs", labsDir(regPath)},
 	}
 	var b strings.Builder
 	for _, r := range rows {

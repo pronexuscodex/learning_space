@@ -79,6 +79,7 @@ def run_session(cols, keys, registry, from_key=-1, rows=200):
         os.environ["TERM"] = "xterm-256color"
         os.environ.pop("NO_COLOR", None)
         os.environ["ACADEMY_LIBRARY"] = tempfile.mkdtemp(prefix="academy-library-")  # never the real Documents
+        os.environ["ACADEMY_LABS"] = tempfile.mkdtemp(prefix="academy-labs-")
         os.environ["ACADEMY_PAGER"] = "inline"  # long screens in the scrollback, so a shot can show all of one
         os.execv(BIN, ["academy", "-registry", registry])
     fcntl.ioctl(fd, termios.TIOCSWINSZ, struct.pack("HHHH", rows, cols, 0, 0))

@@ -37,7 +37,7 @@ func (a *App) studyHallFor(stageID int) error {
 		_, st := a.reg.findStage(stageID)
 		exDone, exTotal := exerciseProgress(st)
 		a.mu.Unlock()
-		choice, err := a.con.promptChoice("Study Hall", []string{
+		options := []string{
 			"Study a concept",
 			fmt.Sprintf("%s %s", sty.Bold("Exercise gym"), sty.Gray(fmt.Sprintf("(%d/%d done · warm-up → practice → real-world)", exDone, exTotal))),
 			fmt.Sprintf("Glossary %s", sty.Gray(fmt.Sprintf("(%d words explained simply)", len(guide.Glossary)))),
@@ -47,7 +47,17 @@ func (a *App) studyHallFor(stageID int) error {
 			fmt.Sprintf("%s %s", sty.Bold("Mastery check"), sty.Gray(fmt.Sprintf("(mixed exam, %d%% to pass)", int(masteryPassMark*100)))),
 			fmt.Sprintf("%s %s", sty.Bold("Classic corner"), sty.Gray("(anchor book, classic text, real source, type-in lab)")),
 			fmt.Sprintf("%s %s", sty.Bold("PDF library"), sty.Gray(fmt.Sprintf("(%d free books and papers to download)", len(a.libraryEntries(stageID))))),
-		})
+		}
+		if cs := checksFor(stageID); len(cs) > 0 {
+			st, passed := a.loadCheckStatuses(), 0
+			for _, ch := range cs {
+				if st[ch.ID].Passed {
+					passed++
+				}
+			}
+			options = append(options, fmt.Sprintf("%s %s", sty.Bold("Checked exercises"), sty.Gray(fmt.Sprintf("(%d/%d passed · your code, compiled and tested for real)", passed, len(cs)))))
+		}
+		choice, err := a.con.promptChoice("Study Hall", options)
 		if errors.Is(err, errCancel) {
 			return nil // q: back to the main menu
 		}
@@ -80,6 +90,8 @@ func (a *App) studyHallFor(stageID int) error {
 			err = a.classicCorner(stageID)
 		case 8:
 			err = a.library(stageID)
+		case 9:
+			err = a.checkedExercises(stageID)
 		default:
 			return nil
 		}
@@ -222,7 +234,15 @@ func (a *App) studyConceptAt(stageID int, g StageGuide, idx int) error {
 		done[i] = s.hasDone(c.Name, i)
 	}
 	a.mu.Unlock()
-	render := func() { a.renderConcept(c, idx+1, len(g.Concepts), g.Glossary, done, note, level, builds) }
+	var proofs []string
+	if cs := checksForConcept(c.Name); len(cs) > 0 {
+		st := a.loadCheckStatuses()
+		for _, ch := range cs {
+			mark, words := checkMark(st[ch.ID])
+			proofs = append(proofs, fmt.Sprintf("%s %s (%s)", mark, ch.Title, words))
+		}
+	}
+	render := func() { a.renderConcept(c, idx+1, len(g.Concepts), g.Glossary, done, note, level, builds, proofs) }
 	res := a.pagedWith(pageOpts{recap: true}, render)
 	understood := false // said so after leaving the card early
 	for res.early && !res.typed {
@@ -312,7 +332,7 @@ func (a *App) studyConceptAt(stageID int, g StageGuide, idx int) error {
 
 // renderConcept prints a concept as a heavy-bordered reading card, going
 // from intuition (analogy, real life) to precision (details, diagram).
-func (a *App) renderConcept(c Concept, n, total int, glossary []Term, done []bool, note string, level int, builds []Prereq) {
+func (a *App) renderConcept(c Concept, n, total int, glossary []Term, done []bool, note string, level int, builds []Prereq, proofs []string) {
 	w := a.cols()
 	edge := sty.Blue("┃")
 	blank := func() { a.printf("  %s\n", edge) }
@@ -414,6 +434,13 @@ func (a *App) renderConcept(c Concept, n, total int, glossary []Term, done []boo
 		}
 		blank()
 		paragraph("Hints and check-off: Study Hall → Exercise gym.", sty.Gray)
+	}
+	if len(proofs) > 0 {
+		section("🔬 Prove it with real code", sty.Green)
+		for _, p := range proofs {
+			paragraph(p, plainText)
+		}
+		paragraph("Study Hall → Checked exercises: the academy compiles your program and runs the tests.", sty.Gray)
 	}
 	if l, ok := conceptLinks[c.Name]; ok {
 		if len(l.Related) > 0 {
