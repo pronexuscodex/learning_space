@@ -470,6 +470,9 @@ int main(int argc, char **argv) {
 		Title: "A key-value store with a write-ahead log",
 		Task:  "Write a program that reads commands from standard input: set KEY VALUE, get KEY and del KEY (keys and values are single words of at most 63 characters). Before answering ok to a set or del, append the command as a line to data.log and flush it to disk (fflush, then fsync). At start, replay data.log to rebuild the store; a last line without a newline was torn by a crash: ignore it, and cut it off before appending. get prints the value or (nil); a malformed command prints error.",
 		File:  "wal_kv.c",
+		// Every set and del waits for the disk (fsync): correct, and slow on
+		// slow disks, so the limit is generous.
+		Timeout: 20 * time.Second,
 		Starter: posixDefine + `/* Checked exercise: wal_kv
  * Commands on stdin, one per line:
  *   set KEY VALUE   append "set KEY VALUE\n" to data.log, fflush, fsync,
@@ -496,7 +499,8 @@ int main(int argc, char **argv) {
 				Explain: "\"set b 2\" has no newline: the crash happened while writing it, so it never happened. Truncate the file to the end of \"set a 1\\n\" (ftruncate) before appending, or the next record joins it on one line."},
 			{Name: "deletes are logged too", Stdin: "del a\nget a\n", Files: map[string]string{"data.log": "set a 1\n"}, Want: "ok\n(nil)\n", WantFiles: map[string]string{"data.log": "set a 1\ndel a\n"}},
 			{Name: "bad commands", Stdin: "fly away\nset onlykey\nget\nset a b c\n", Want: "error\nerror\nerror\nerror\n"},
-			{Name: "five hundred keys", Stdin: manyKVCommands(), Want: strings.Repeat("ok\n", 500) + "v250\n(nil)\n"},
+			{Name: "two hundred keys", Stdin: manyKVCommands(), Want: strings.Repeat("ok\n", 200) + "v150\n(nil)\n",
+				Explain: "Each set waits for the disk, so this case takes a moment; keep the store in memory and only append to the log, never rewrite it."},
 		},
 		Hints: []string{
 			"sscanf(line, \"%63s %63s %63s %c\", cmd, key, value, &extra) returns how many fields it filled: use the count to spot malformed commands.",
@@ -741,12 +745,12 @@ func serpentineSteps() int {
 	return -1
 }
 
-// manyKVCommands sets k0…k499, then gets k250 and a missing key.
+// manyKVCommands sets k0…k199, then gets k150 and a missing key.
 func manyKVCommands() string {
 	var b strings.Builder
-	for i := 0; i < 500; i++ {
+	for i := 0; i < 200; i++ {
 		fmt.Fprintf(&b, "set k%d v%d\n", i, i)
 	}
-	b.WriteString("get k250\nget k500\n")
+	b.WriteString("get k150\nget k200\n")
 	return b.String()
 }
