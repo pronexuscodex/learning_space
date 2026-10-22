@@ -51,11 +51,14 @@ var conceptPrereqs = map[string][]string{
 	"Dynamic Programming":                   {"Recursion & Divide and Conquer", "Greedy Algorithms"},
 
 	// ---- Stage 3
-	"Logic & Boolean Algebra":     {"Control Flow: Decisions & Loops"},
-	"Sets, Functions & Relations": {"Logic & Boolean Algebra"},
-	"Proof & Induction":           {"Logic & Boolean Algebra", "Control Flow: Decisions & Loops"},
-	"Counting & Combinatorics":    {"Sets, Functions & Relations"},
-	"Probability for Programmers": {"Counting & Combinatorics"},
+	"Logic & Boolean Algebra":              {"Control Flow: Decisions & Loops"},
+	"Sets, Functions & Relations":          {"Logic & Boolean Algebra"},
+	"Proof & Induction":                    {"Logic & Boolean Algebra", "Control Flow: Decisions & Loops"},
+	"Counting & Combinatorics":             {"Sets, Functions & Relations"},
+	"Modular Arithmetic & Number Theory":   {"Proof & Induction", "Values, Types & Variables"},
+	"Recurrences: The Cost of Recursion":   {"Proof & Induction", "Counting & Combinatorics", "Functions & Decomposition"},
+	"Graph Theory: Degrees, Trees & Paths": {"Sets, Functions & Relations", "Proof & Induction"},
+	"Probability for Programmers":          {"Counting & Combinatorics"},
 
 	// ---- Stage 4
 	"Binary & Number Representation":              {"Bits & Bytes: Everything Is a Number"},

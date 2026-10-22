@@ -1570,11 +1570,17 @@ planners and speech recognisers fill tables of best partial answers.`,
 	3: {
 		Overview: `Discrete mathematics is the maths of separate, countable things, which
 is exactly what computers work with. It teaches you to reason precisely,
-to prove that code is correct, to count possibilities and to think
-clearly about chance. You do not need calculus for this stage.`,
+to prove that code is correct, to count possibilities, to compute with
+remainders (the arithmetic of hashing and cryptography), to work out
+what a recursive algorithm costs, to reason about networks, and to think
+clearly about chance. You do not need calculus for this stage, and
+every idea comes with a C program that puts it to work.`,
 		Outcomes: []string{
-			"Reason precisely with logic, sets and proofs",
-			"Count possibilities to judge whether brute force is feasible",
+			"Reason precisely with logic, sets and proofs, and state a loop invariant",
+			"Count possibilities to judge whether brute force is feasible, without overflowing",
+			"Compute with remainders: gcd, modular powers and inverses, as hashing and cryptography do",
+			"Turn a recursive algorithm into a recurrence and solve it",
+			"Prove simple facts about graphs and use them to check data",
 			"Think correctly about probability, and spot when intuition is wrong",
 		},
 		Glossary: []Term{
@@ -1586,6 +1592,12 @@ clearly about chance. You do not need calculus for this stage.`,
 			{"Permutation", "An ordered arrangement of items."},
 			{"Combination", "A selection of items where order does not matter."},
 			{"Probability", "A number from 0 to 1 measuring how likely something is."},
+			{"Modulo", "The remainder after division: 17 mod 5 = 2. Arithmetic mod n wraps around like a clock."},
+			{"Greatest common divisor", "The largest number dividing two numbers exactly; Euclid's algorithm finds it quickly."},
+			{"Prime", "A whole number above 1 whose only divisors are 1 and itself."},
+			{"Recurrence", "An equation that defines a sequence, or a cost, in terms of smaller cases, such as T(n) = 2T(n/2) + n."},
+			{"Degree", "The number of edges touching a node in a graph."},
+			{"Expected value", "The long-run average outcome of a random process."},
 		},
 		Concepts: []Concept{
 			{
@@ -1597,16 +1609,48 @@ table lists every case. De Morgan's laws are the key identities:
 ¬(A ∧ B) = ¬A ∨ ¬B, and ¬(A ∨ B) = ¬A ∧ ¬B.
 
 "A → B" is only false when A is true and B is false, and it is not the
-same as "B → A", a very common reasoning error. Quantifiers say "for all"
-(∀) and "there exists" (∃). Every if statement you write is logic, and
-Stage 4 builds these operations out of transistors.`,
+same as "B → A", a very common reasoning error. Its contrapositive,
+"¬B → ¬A", is the same statement in disguise. Quantifiers say "for all"
+(∀) and "there exists" (∃), and negating one flips it: "not every test
+passed" means "some test failed".
+
+In C, && and || are logic with one twist: they short-circuit. In
+a && b, b is only evaluated if a is true, so
+
+  if (p != NULL && p->count > 0)
+
+is safe, and swapping the two sides would crash on NULL. A formula over
+n variables has 2ⁿ rows in its truth table: checking every row is easy
+for 10 variables (1,024 rows) and hopeless for 100. Deciding whether
+some row makes a formula true is the famous SAT problem, which Stage 11
+shows is as hard as a whole class of problems. Stage 4 builds these
+operations out of transistors.`,
 				Diagram: `A  B │ A AND B │ A OR B │ A → B
 0  0 │    0    │   0    │   1
 0  1 │    0    │   1    │   1
 1  0 │    0    │   1    │   0
 1  1 │    1    │   1    │   1`,
+				UnderTheHood: `Compilers apply De Morgan's laws for you. These two functions compile
+to exactly the same instructions with gcc -O2:
+
+  int can_enter(int age, int member)  { return !(age < 18 || !member); }
+  int can_enter2(int age, int member) { return age >= 18 && member; }
+
+      cmp    edi, 17
+      setg   dl          ; dl = (age > 17)
+      xor    eax, eax
+      test   esi, esi
+      setne  al          ; al = (member != 0)
+      and    eax, edx    ; both
+      ret
+
+No jumps: both sides are cheap and safe to evaluate, so the compiler
+computes them and ANDs the bits. But for p != NULL && *p > 0 it keeps
+the jump (test rdi, rdi; je), because evaluating *p when p is NULL would
+crash: the short-circuit is part of the program's meaning, not an
+optimisation.`,
 				MentalModel: "Every condition in code is a small logical formula, so simplify it on paper first.",
-				TryIt:       `Simplify "not (age < 18 or not member)" with De Morgan's laws, then check it with a truth table.`,
+				TryIt:       `Simplify "not (age < 18 or not member)" with De Morgan's laws, then check it with a truth table, and compile both versions with gcc -O2 -S to compare.`,
 				Analogy: `A security door opens only if you have a badge AND know the PIN. A café
 gives a discount if you are a student OR a senior. And "if it rains, the
 ground is wet" does not mean that a wet ground proves it rained: someone
@@ -1614,14 +1658,15 @@ may have watered the lawn.`,
 				Example: `Advanced search (cats AND NOT dogs), spreadsheet filters and database
 WHERE clauses are Boolean logic. Tools called SAT solvers check logical
 formulas with millions of variables to verify that chips and software
-behave correctly.`,
+behave correctly, and package managers use them to find versions of
+every dependency that fit together.`,
 				Exercises: trio(
 					`Build the truth table for "(A OR B) AND NOT (A AND B)". Which everyday phrase describes it?`,
-					`It is true when exactly one input is true: "either, but not both" (exclusive or).`,
-					"Write a program that prints the truth table of any formula over A, B and C, given as a Python function, and use it to verify both De Morgan laws.",
-					"itertools.product([False, True], repeat=3) gives every row.",
-					`A cinema's rule: "Children under 12 need an adult, unless the film is rated U, and nobody under 18 may see an 18-rated film." Write it as one Boolean expression, then as a function, and test it on 8 cases.`,
-					"Write the table of cases first, then derive the expression from it.",
+					`It is true when exactly one input is true: "either, but not both" (exclusive or, which C writes for bits as ^).`,
+					"In C, write int f(int a, int b, int c) for any formula, and a loop over the 8 rows (bits of the numbers 0 to 7) that prints its truth table. Use it to verify both De Morgan laws, by checking that the two sides agree on every row.",
+					"Row r gives a = (r >> 2) & 1, b = (r >> 1) & 1, c = r & 1. Two formulas are equivalent if they agree on all 8 rows.",
+					`A cinema's rule: "Children under 12 need an adult, unless the film is rated U, and nobody under 18 may see an 18-rated film." Write it as one Boolean expression, then as a C function, and test it on every case.`,
+					"Name the inputs first (age band, with adult, rating), write the table of cases, then derive the expression from it.",
 				),
 			},
 			{
@@ -1629,7 +1674,7 @@ behave correctly.`,
 				Summary: "The vocabulary for describing collections and connections precisely.",
 				Body: `A set is a collection of distinct items, such as {1, 2, 3}. The
 operations are union (A ∪ B: in either), intersection (A ∩ B: in both),
-difference (A − B) and complement.
+difference (A − B) and complement. A set of n items has 2ⁿ subsets.
 
 A relation connects items from sets, such as "is enrolled in" between
 students and courses. A function is a relation where each input has
@@ -1637,27 +1682,53 @@ exactly one output. Functions can be one-to-one (injective), onto
 (surjective) or both (bijective, which means perfectly reversible).
 Equivalence relations group items into classes (for example, the same
 remainder mod 3), and orders rank them (≤). SQL databases are built on
-exactly this relational mathematics.`,
+exactly this relational mathematics.
+
+In C, a set of small numbers (0 to 63) fits in one 64-bit integer: bit
+i is 1 when i is in the set. Then every set operation is one
+instruction:
+
+  uint64_t a = (1ULL << 3) | (1ULL << 5);   // {3, 5}
+  a | b       union             a & b    intersection
+  a & ~b      difference        a ^ b    symmetric difference
+  (a & b) == a                  a is a subset of b
+
+Bigger sets of numbers use an array of such words (a bitset) or a
+sorted array; sets of strings use a hash table (Stage 2).`,
 				Diagram: `┌──────── A ────────┐
 │  A only   ┌───────┼──────── B ───────┐
 │           │ A ∩ B │  B only          │
 └───────────┼───────┘                  │
             └──────────────────────────┘`,
+				UnderTheHood: `With sets as bits, a whole set operation is one CPU instruction on 64
+members at once. gcc -O2 compiles a | b to a single or, a & ~b to and
+with not (or one andn instruction on CPUs that have it), and the size of
+a set, __builtin_popcountll(a), to one popcnt instruction when built
+with -mpopcnt or -march=native (without it, gcc calls a small library
+function, __popcountdi2, since older x86-64 CPUs lack the instruction).
+
+That is why bitsets are everywhere in systems code: the Linux kernel
+tracks which CPUs a process may run on as a bitmask (taskset prints it
+in hex), file permissions are bits (rwx = 4 + 2 + 1, so 0755 is three
+small sets), and select() describes the files it waits on as a set of
+bits, fd_set.`,
 				MentalModel: "Name the sets and the relations, and the problem usually becomes clear.",
-				TryIt:       "Using Python sets, find which friends follow both of two accounts, and which follow only one.",
+				TryIt:       "Represent the sets {1, 3, 5, 7} and {3, 4, 5} as uint64_t bitmasks in C, and print their union, intersection and both differences as lists of numbers.",
 				Analogy: `Guest lists for two parties: the union is everyone invited to either,
 and the intersection is the people invited to both. A function is like
 the codes on a vending machine: each code gives exactly one snack.`,
 				Example: `"People you may know" and "customers who bought this also bought" are
 built on set intersections. A SQL JOIN combines relations. Sync tools use
-set difference to work out which files are new or missing.`,
+set difference to work out which files are new or missing, and
+permission systems check whether the permissions you have are a superset
+of those you need.`,
 				Exercises: trio(
-					"With A = {1, 2, 3, 4} and B = {3, 4, 5}, compute A ∪ B, A ∩ B, A − B and B − A.",
-					"A difference keeps only what is in the first set.",
-					"Write functions that check whether a dictionary-based function is injective, surjective (onto a given set) or bijective.",
-					"Injective means no two keys share a value.",
-					"You have two CSV exports of newsletter subscribers from different years. Produce three lists (unsubscribed, new and loyal), comparing emails without regard to case.",
-					"Normalise the emails into sets, then use difference and intersection.",
+					"With A = {1, 2, 3, 4} and B = {3, 4, 5}, compute A ∪ B, A ∩ B, A − B and B − A. How many subsets does A have?",
+					"A ∪ B = {1, 2, 3, 4, 5}, A ∩ B = {3, 4}, A − B = {1, 2}, B − A = {5}. A has 2⁴ = 16 subsets, counting {} and A itself.",
+					"In C, a function is a table: int f[10] maps 0–9 to 0–9. Write functions that report whether f is injective, surjective and bijective, and for a bijection, build its inverse table and check that applying both gives back every input.",
+					"Injective: no two inputs share an output (mark the outputs seen in a second array). Surjective onto 0–9: every value is some output. On a finite set of equal size, one implies the other.",
+					"You have two exports of newsletter subscribers from different years, one email per line. In C, produce three lists (unsubscribed, new and loyal), comparing emails without regard to case.",
+					"Lowercase every email, sort both lists with qsort and strcmp, and walk them together like a merge: equal means loyal, otherwise the smaller one is only in its own list.",
 				),
 			},
 			{
@@ -1666,19 +1737,43 @@ set difference to work out which files are new or missing.`,
 				Body: `A proof is an argument that leaves no case unchecked. A direct proof
 starts from what you know and derives the claim. A proof by
 contradiction assumes the opposite and reaches an impossibility (this is
-how you show that √2 is irrational).
+how you show that √2 is irrational). A single counterexample disproves
+a "for all" claim, however many examples support it.
 
 Mathematical induction proves a claim for every n. Show that it holds in
 the base case, then show that if it holds for n, it holds for n + 1,
-like falling dominoes. A loop invariant is induction applied to code: a
-statement that is true before and after every iteration, which proves
-the loop correct. Recursion and induction are mirror images of each
-other.`,
+like falling dominoes. Recursion and induction are mirror images: a
+recursive function is correct if its base case is right and each call is
+right whenever the smaller calls are.
+
+A loop invariant is induction applied to code: a statement that is true
+before the loop, stays true after every iteration, and, together with
+the exit condition, gives the result. For a sum:
+
+  long total = 0;
+  for (int i = 0; i < n; i++)
+      total += a[i];      // invariant: total = a[0] + … + a[i]
+  // on exit, i == n, so total = a[0] + … + a[n − 1]
+
+Tests check some inputs; a proof covers all of them.`,
 				Diagram: `base case         step: if domino n falls, domino n + 1 falls
 ▌ ▌ ▌ ▌ ▌ ▌  ▶  ╱ ╱ ╱ ╱ ╱ ╱   …so every domino falls
 1 2 3 4 5 6`,
+				UnderTheHood: `For a function of one 32-bit int you can actually test every input. A
+C program checked whether "x < 0 ? -x : x" is never negative, for all
+4,294,967,296 values of x, in 2.2 seconds on a test machine, and found
+exactly one counterexample: x = -2,147,483,648 (INT_MIN), whose negation
+does not fit in an int. For the same reason, abs(INT_MIN) is undefined
+behaviour in C.
+
+For two 32-bit inputs the same exhaustive test would take 2.2 s × 2³²,
+about 300 years; for a 64-bit input, far longer than the age of the
+universe. Beyond the smallest inputs, only proof covers every case,
+which is why tools such as Frama-C and CBMC prove C code correct, and
+why the seL4 kernel's correctness is a machine-checked proof rather than
+a test suite.`,
 				MentalModel: "Prove the first case, prove each case gives the next, and every case is done.",
-				TryIt:       "Prove by induction that 1 + 2 + … + n = n(n + 1)/2, then check it in code for n up to 1,000.",
+				TryIt:       "Prove by induction that 1 + 2 + … + n = n(n + 1)/2, then check it in C for every n up to 100,000 with long long, and find the first n where it overflows a 32-bit int.",
 				Analogy: `Climbing a ladder: if you can get onto the first rung, and from any rung
 you can reach the next one, you can climb as high as you like.`,
 				Example: `Amazon Web Services has used the formal specification language TLA+ to
@@ -1687,11 +1782,11 @@ bugs that testing had missed. The seL4 operating-system kernel is
 mathematically proven correct and is used in safety-critical systems.`,
 				Exercises: trio(
 					`Find the flaw: "All horses are the same colour. One horse is trivially one colour. If any n horses share a colour, so do n + 1, because the first n and the last n overlap."`,
-					"Check the step from n = 1 to n = 2. Do the two groups overlap?",
-					"Write binary search, state its loop invariant in a comment, and add an assert that checks the invariant on every iteration.",
-					`The invariant: "if the target is in the list, it lies between low and high".`,
+					"Check the step from n = 1 to n = 2: the first horse and the last horse are two groups of one that do not overlap, so nothing links their colours.",
+					"Write binary search in C, state its loop invariant in a comment, and add an assert that checks the invariant on every iteration. Run it on 10,000 random sorted arrays.",
+					`The invariant: "if the target is in the array, it lies between low and high". The assert can scan a[0..low-1] and a[high+1..n-1] to confirm the target is not there (slow, but only while testing).`,
 					"Your bank app rounds each of 3 interest payments to the cent. Prove, or disprove with a counterexample, that rounding each payment gives the same total as rounding their sum.",
-					"Try three payments of 0.005 each.",
+					"Try three payments of 0.4 cents each: each rounds to 0, totalling 0, but their sum is 1.2 cents, which rounds to 1. One counterexample is enough to disprove it.",
 				),
 			},
 			{
@@ -1699,16 +1794,47 @@ mathematically proven correct and is used in safety-critical systems.`,
 				Summary: "How many ways? The maths behind passwords, probabilities and brute force.",
 				Body: `The product rule: if one choice can be made in a ways and another in b
 ways, there are a × b combinations. Permutations count ordered
-arrangements: n! ways to order n items. Combinations count unordered
-selections: C(n, k) = n! / (k!(n − k)!).
+arrangements: n! ways to order n items, and n!/(n − k)! ways to order k
+of them. Combinations count unordered selections: C(n, k) = n! / (k!(n −
+k)!). Each row of Pascal's triangle holds the C(n, k), and each number
+is the sum of the two above it: C(n, k) = C(n − 1, k − 1) + C(n − 1, k).
 
 The pigeonhole principle: put more than n items into n boxes, and some
 box holds two. That is why hash collisions must exist, and why no
 lossless compressor can shrink every file. Counting tells you whether
 "try every possibility" takes seconds or longer than the age of the
-universe.`,
-				MentalModel: "Count before you brute-force.",
-				TryIt:       "Count the 4-digit PINs with no repeated digit, first with a formula and then with a program.",
+universe.
+
+In code, counts grow faster than integer types. 20!, about 2.4 × 10¹⁸,
+is the largest factorial that fits in an unsigned 64-bit integer, so
+computing C(n, k) as n! / (k!(n − k)!) silently goes wrong from n = 21. Compute it multiplicatively instead, dividing as you go:
+
+  unsigned long long c = 1;
+  for (int i = 1; i <= k; i++)
+      c = c * (n - k + i) / i;   // exact: c is C(n - k + i, i) here
+
+which stays exact as long as the intermediate product fits.`,
+				Diagram: `Pascal's triangle: each number is the sum of the two above it
+row 0:            1
+row 1:          1   1
+row 2:        1   2   1
+row 3:      1   3   3   1
+row 4:    1   4   6   4   1        C(4, 2) = 6`,
+				UnderTheHood: `Unsigned arithmetic in C does not fail when it overflows: it wraps
+around modulo 2⁶⁴, silently. A loop multiplying factorials into an
+unsigned long long printed:
+
+  20! = 2432902008176640000
+  21! = 14197454024290336768     (the true value is 51090942171709440000)
+
+The second number is 21! minus 2 × 2⁶⁴: wrong, and nothing warns you.
+For signed ints, overflow is undefined behaviour instead, which
+-fsanitize=undefined catches. gcc and clang also offer
+__builtin_mul_overflow(a, b, &result), which returns true when the
+product does not fit, usually at the cost of one extra instruction that
+tests the CPU's overflow flag: cheap insurance for counting code.`,
+				MentalModel: "Count before you brute-force, and check the count fits its type.",
+				TryIt:       "Count the 4-digit PINs with no repeated digit, first with a formula and then with a C program that loops over all 10,000 PINs.",
 				Analogy: `Outfits: 3 shirts × 4 pairs of trousers × 2 pairs of shoes gives 24
 outfits. Picking 3 pizza toppings from 10 does not care about order
 (combinations); awarding gold, silver and bronze does (permutations).`,
@@ -1718,12 +1844,229 @@ about 6 × 10¹⁵ options, but people pick words, so attackers use
 dictionaries instead. The chance of winning a 6-from-49 lottery is 1 in
 C(49, 6) = 13,983,816.`,
 				Exercises: trio(
-					"How many 3-letter codes can you make from A to Z if letters may repeat? And if they may not?",
-					"26 × 26 × 26 versus 26 × 25 × 24.",
-					"Write functions for n!, P(n, k) and C(n, k), and verify C(n, k) by generating every subset with itertools for small n.",
-					"Use integers, not floats, so large results stay exact.",
-					"A website requires 8-character passwords of lowercase letters. An attacker can try 10 billion guesses per second offline. How long to try them all? And for 12 characters mixing upper case, lower case and digits? Write the calculation as a small program.",
-					"26⁸ ≈ 2 × 10¹¹ takes about 20 seconds; 62¹² ≈ 3.2 × 10²¹ takes about 10,000 years.",
+					"How many 3-letter codes can you make from A to Z if letters may repeat? And if they may not? How many ways to choose 3 letters, order ignored?",
+					"26 × 26 × 26 = 17,576; 26 × 25 × 24 = 15,600; and 15,600 / 3! = 2,600 = C(26, 3).",
+					"In C, write unsigned long long choose(int n, int k) the multiplicative way, check it against Pascal's triangle for every n up to 60, and find the first n where the factorial formula gives a wrong answer.",
+					"Fill a 61 × 61 table with C(n, k) = C(n − 1, k − 1) + C(n − 1, k). The factorial formula breaks at n = 21, when 21! no longer fits in 64 bits.",
+					"A website requires 8-character passwords of lowercase letters. An attacker can try 10 billion guesses per second offline. How long to try them all? And for 12 characters mixing upper case, lower case and digits? Write the calculation as a small C program, using double for the counts.",
+					"26⁸ ≈ 2.1 × 10¹¹ takes about 20 seconds; 62¹² ≈ 3.2 × 10²¹ takes about 10,000 years.",
+				),
+			},
+			{
+				Name:    "Modular Arithmetic & Number Theory",
+				Summary: "Arithmetic that wraps around like a clock: the maths of hashing, checksums and cryptography.",
+				Body: `a mod n is the remainder when a is divided by n: 17 mod 5 = 2. Two
+numbers are congruent mod n when they have the same remainder, and you
+can add, subtract and multiply first and take the remainder at the end,
+or take it at every step and get the same answer:
+
+  (a + b) mod n = ((a mod n) + (b mod n)) mod n
+  (a × b) mod n = ((a mod n) × (b mod n)) mod n
+
+That is what keeps numbers small. To compute 7^1000000 mod 13, square
+and multiply, reducing mod 13 each time (fast power, from Stage 2):
+about 40 multiplications, and no number ever exceeds 13 × 13.
+
+The greatest common divisor comes from Euclid's algorithm, over 2,000
+years old and still the fastest simple way: gcd(a, b) = gcd(b, a mod b),
+and gcd(a, 0) = a. When gcd(a, n) = 1, a has an inverse mod n (a number
+x with a × x ≡ 1), found by the extended version of the same algorithm;
+that is how RSA computes its private key. A prime has no divisors but 1
+and itself, and the sieve of Eratosthenes finds every prime below n by
+crossing out multiples.
+
+C's % is not quite mod: it follows the sign of the left side, so
+-7 % 3 is -1, not 2. For a true mod of a possibly negative a, use
+((a % n) + n) % n.`,
+				Diagram: `a clock is arithmetic mod 12
+            12
+       11        1         9 o'clock + 5 hours = 2 o'clock
+    10              2      (9 + 5) mod 12 = 2
+     9      •       3
+     8              4      gcd(48, 18):  48 mod 18 = 12
+       7         5                       18 mod 12 = 6
+            6                            12 mod 6  = 0   → 6`,
+				UnderTheHood: `Your computer already does modular arithmetic on every unsigned
+operation. C defines unsigned ints to wrap around modulo 2³² (or 2⁶⁴):
+4294967295u + 1u is 0, and the CPU's add instruction simply drops the
+carry out of the top bit. That is why hash functions such as FNV-1a are
+written with unsigned types: the multiply is meant to wrap.
+
+Euclid's algorithm is fast because the numbers shrink at least as fast
+as the Fibonacci numbers grow (Lamé's theorem), and consecutive
+Fibonacci numbers are its worst case. A test program computing
+gcd(1836311903, 1134903170), the 46th and 45th Fibonacci numbers, took
+44 steps, the most for any pair below 2³¹. Its cost grows with the
+number of digits, not with the numbers themselves.
+
+When numbers get close to the limit, the product needs a wider type:
+for a, b < n below 2³², (a × b) mod n is exact in uint64_t, but for n
+near 2⁶³ the product would overflow, and cryptography libraries use
+128-bit products or special multiplication tricks.`,
+				MentalModel: "Reduce early and often: the remainder carries everything you need.",
+				TryIt:       "In C, print -7 % 3, 7 % -3 and ((-7 % 3) + 3) % 3, then write gcd and test it on 48 and 18, on consecutive Fibonacci numbers, and on a number and 0.",
+				Analogy: `A clock: 9 o'clock plus 5 hours is 2 o'clock, not 14 o'clock. Days of
+the week work mod 7: 100 days after a Monday is a Wednesday, because
+100 = 14 × 7 + 2, and the 14 whole weeks change nothing.`,
+				Example: `ISBN check digits, the Luhn check on credit-card numbers and IBAN bank
+codes are all mod-n checksums that catch typos. Hash tables pick a
+bucket with h mod size. RSA and Diffie–Hellman, which protect HTTPS
+connections, are modular exponentiation with numbers of hundreds of
+digits, and the security of RSA rests on how hard it is to factor a
+product of two large primes.`,
+				Exercises: trio(
+					"Compute by hand: 17 mod 5, 3¹⁰ mod 7 (reduce as you go), gcd(48, 18) with Euclid's algorithm, and the day of the week 100 days after a Monday.",
+					"2; 3² = 9 ≡ 2, so 3¹⁰ = (3²)⁵ ≡ 2⁵ = 32 ≡ 4; gcd is 6 (48 → 18 → 12 → 6 → 0); 100 = 14 × 7 + 2, so two days later: Wednesday.",
+					"In C, write uint64_t mod_pow(uint64_t a, uint64_t e, uint64_t n) by repeated squaring, check it against a slow loop for small e, then compute 2^(10^18) mod 1,000,000,007. Write the sieve of Eratosthenes and count the primes below 10 million.",
+					"Keep every intermediate below n, so the product of two of them fits in 64 bits when n < 2³². There are 664,579 primes below 10 million; the sieve is a char array of 10 million flags.",
+					"Validate credit-card numbers with the Luhn algorithm in C: from the right, double every second digit (subtracting 9 when the result exceeds 9), add everything, and the number is valid when the total mod 10 is 0. Test it on the published test numbers, such as 4539 1488 0343 6467.",
+					"Read the number as a string, skip spaces, and walk it from the last digit to the first with a flag that alternates.",
+				),
+			},
+			{
+				Name:    "Recurrences: The Cost of Recursion",
+				Summary: "Write down what a recursive algorithm costs in terms of itself, then solve the equation.",
+				Body: `The running time of a recursive algorithm is naturally recursive too.
+Merge sort sorts two halves and merges them in linear time, so its cost
+T(n) satisfies T(n) = 2T(n/2) + n, with T(1) = 1. A recurrence like this
+says what the cost is in terms of smaller costs; solving it gives the
+Big-O.
+
+Three ways to solve one:
+- unroll it: T(n) = n + 2(n/2) + 4(n/4) + … has log₂ n levels of n
+  work each, so T(n) is about n log₂ n;
+- draw the recursion tree: each node is one call, labelled with the work
+  it does outside its children, and the total is the sum over all nodes;
+- guess the answer and prove it by induction (Proof & Induction).
+
+A few patterns cover most code:
+
+  T(n) = T(n − 1) + 1        O(n)        a loop written as recursion
+  T(n) = T(n − 1) + n        O(n²)       selection sort
+  T(n) = T(n/2) + 1          O(log n)    binary search
+  T(n) = 2T(n/2) + n         O(n log n)  merge sort
+  T(n) = 2T(n − 1) + 1       O(2ⁿ)       Towers of Hanoi
+  T(n) = T(n − 1) + T(n − 2) O(1.62ⁿ)    plain recursive Fibonacci
+
+The master theorem handles T(n) = aT(n/b) + f(n) in general, by
+comparing f(n) with n^(log_b a): whichever grows faster dominates, and
+when they match, a log factor appears.`,
+				Diagram: `recursion tree for T(n) = 2T(n/2) + n
+
+level 0              n                   work n
+level 1        n/2       n/2             work n
+level 2     n/4  n/4  n/4  n/4           work n
+  …                  …                     …
+level log₂ n  1 1 1 1 … 1 1 1 1          work n
+                                  total: n × log₂ n`,
+				UnderTheHood: `The recurrence predicts real counts closely. A merge sort in C that
+counted its comparisons on random arrays gave:
+
+  n            comparisons     n log₂ n
+  1,024              8,965        10,240
+  32,768           450,080       491,520
+  1,048,576     19,645,391    20,971,520
+
+The count stays just below n log₂ n (a merge of two runs never needs
+more comparisons than items, and often stops early), and grows by a
+factor of about 43.6 from the second row to the third, where n grew 32
+times: the extra log factor, exactly as T(n) = 2T(n/2) + n says.
+
+Recurrences also predict stack depth. The depth of merge sort's
+recursion is log₂ n, about 20 calls for a million items, so it never
+overflows the stack. Quicksort's depth is log n on average but n in the
+worst case, which is why careful implementations recurse into the
+smaller part first and loop over the larger one: that caps the depth at
+log₂ n.`,
+				MentalModel: "Cost of a call = work done here + cost of the calls it makes; sum it level by level.",
+				TryIt:       "Add a comparison counter to a merge sort in C and print the count for n = 1,000, 10,000 and 100,000 next to n × log₂(n). Then count the calls of the plain recursive fib for n = 20 to 30 and watch each one grow by about 1.6 times.",
+				Analogy: `A company where every manager splits a job in two and hands each half
+to a junior, then spends an hour combining their results. To find the
+total hours, you do not follow one person; you add up the hours level
+by level down the organisation chart: the recursion tree.`,
+				Example: `Every divide-and-conquer algorithm you will meet has a recurrence:
+binary search, merge sort, quicksort, fast Fourier transforms (used in
+audio, image compression and fast multiplication), and Karatsuba
+multiplication, which multiplies huge numbers in about n^1.58 steps
+instead of n², as big-number libraries such as GMP do.`,
+				Exercises: trio(
+					"Solve by unrolling: T(n) = T(n − 1) + 2 with T(0) = 0, and T(n) = T(n/2) + 1 with T(1) = 0 (n a power of 2). What does each describe?",
+					"T(n) = 2n: a loop doing constant work per step. T(n) = log₂ n: halving, as in binary search.",
+					"In C, write merge sort with a global comparison counter, and the plain recursive fib with a call counter. Tabulate both against the formulas n log₂ n and fib's own recurrence C(n) = C(n − 1) + C(n − 2) + 1.",
+					"The calls of fib(n) satisfy C(0) = C(1) = 1 and C(n) = C(n − 1) + C(n − 2) + 1, which works out to 2 fib(n + 1) − 1: 331,160,281 for n = 40.",
+					"Count the inversions of a list (pairs that are out of order, a measure of how unsorted it is, used to compare rankings) in O(n log n) by adapting merge sort, and check it against the O(n²) count on random lists. Write its recurrence.",
+					"While merging, when an item from the right half is taken before the remaining items of the left half, it forms an inversion with each of them: add the number of items left in the left half. T(n) = 2T(n/2) + n.",
+				),
+			},
+			{
+				Name:    "Graph Theory: Degrees, Trees & Paths",
+				Summary: "The mathematics of networks: simple counting facts that let you check, bound and route.",
+				Body: `A graph is a set of vertices and a set of edges between pairs of them
+(Stage 2 shows how to store and search one; this lesson is about what
+you can prove). The degree of a vertex is the number of edges touching
+it. The handshake lemma: the degrees add up to twice the number of
+edges, because every edge has two ends. So the number of odd-degree
+vertices is always even.
+
+A tree is a connected graph with no cycles. Every tree with n vertices
+has exactly n − 1 edges, between any two vertices there is exactly one
+path, and adding any edge creates exactly one cycle. A spanning tree of
+a connected graph keeps every vertex and just enough edges to stay
+connected.
+
+An Euler path uses every edge exactly once. Euler showed in 1736, with
+the bridges of Königsberg, that a connected graph has an Euler circuit
+(one that returns to its start) exactly when every vertex has even
+degree, and an Euler path that is not a circuit exactly when two
+vertices have odd degree, which are then its two ends. A bipartite graph
+splits its vertices into two sides with every edge crossing between
+them; that is possible exactly when the graph has no cycle of odd
+length. A directed acyclic graph (DAG) is one with no directed cycle,
+which is what any set of dependencies must be.`,
+				Diagram: `Königsberg in 1736: four land masses and seven bridges
+
+  A ═ B   two bridges        degrees:  A (the island) 5
+  A ═ C   two bridges                  B 3,  C 3,  D 3
+  A ─ D   one bridge
+  B ─ D   one bridge         four odd-degree vertices, more than two,
+  C ─ D   one bridge         so no walk crosses every bridge exactly once`,
+				UnderTheHood: `Programs use these facts to check data and detect impossible requests.
+GNU make treats a Makefile as a dependency graph that must be a DAG. A
+Makefile where a needs b and b needs a gets this answer from GNU Make
+4.3:
+
+  make: Circular b <- a dependency dropped.
+
+It finds the cycle the way a depth-first search does: it reaches a
+target that is still being worked on further up its own path.
+Git's commit history is a DAG too: a commit can have two parents (a
+merge), but never itself as an ancestor.
+
+Graph colouring, giving adjacent vertices different colours, is how
+compilers assign registers: variables that are alive at the same time
+are joined by an edge and must get different registers, and a register
+allocator colours that interference graph. The four-colour theorem (any
+map needs at most four colours) was first proved in 1976 by Appel and
+Haken with a computer checking nearly 2,000 configurations: the first
+major theorem whose proof was too long to check by hand.`,
+				MentalModel: "Count the ends of the edges: degrees, parity and n − 1 tell you what is possible before you search.",
+				TryIt:       "In C, read a list of edges, count each vertex's degree, check that the degrees sum to twice the number of edges, and print the odd-degree vertices: can you draw this graph without lifting your pen?",
+				Analogy: `Drawing a house shape without lifting your pen: it works only if you
+start at one of the two corners where an odd number of lines meet. A
+family tree is a tree: everyone has exactly one path back to a common
+ancestor, and adding a marriage between cousins creates a cycle.`,
+				Example: `Ethernet switches run the Spanning Tree Protocol so that a network with
+redundant cables forwards frames along a tree and never in loops. Road
+gritters and postal routes are planned as Euler paths (the Chinese
+postman problem), build systems and package managers depend on DAGs, and
+scheduling exams so that no student has two at once is graph colouring.`,
+				Exercises: trio(
+					"A graph has 6 vertices with degrees 3, 3, 2, 2, 1 and 1. How many edges does it have? Could a graph have degrees 3, 3, 3, 2 and 2?",
+					"The degrees sum to 12, so 6 edges. 3 + 3 + 3 + 2 + 2 = 13 is odd, and degrees always sum to an even number (twice the edges): impossible.",
+					"In C, read an undirected graph (n, then edges as pairs) and report whether it is a tree, by checking that it has exactly n − 1 edges and is connected (a BFS from vertex 0 reaches all n vertices).",
+					"Either check alone is not enough: n − 1 edges can hide a cycle plus a disconnected vertex, and a connected graph can have extra edges. Both together mean a tree.",
+					"Decide in C whether a set of exams can be scheduled in two time slots so that no student sits two exams at once: build the conflict graph and try to 2-colour it with BFS, printing the two slots or an odd cycle that makes it impossible.",
+					"Colour the start vertex 0 and each neighbour the opposite colour; a neighbour that already has the same colour as you means an odd cycle. Do it from every uncoloured vertex, for graphs in several pieces.",
 				),
 			},
 			{
@@ -1732,30 +2075,58 @@ C(49, 6) = 13,983,816.`,
 				Body: `Probability measures how likely an event is, from 0 (impossible) to 1
 (certain). For equally likely outcomes, P = favourable ÷ total.
 Independent events multiply: two heads in a row is ½ × ½. The expected
-value is the long-run average.
+value is the long-run average, and it adds up across events even when
+they are not independent (linearity of expectation).
 
 Conditional probability P(A|B) is the chance of A given that B happened,
 and Bayes' rule flips it: P(A|B) = P(B|A) · P(A) / P(B). Intuition fails
 often: in a room of just 23 people, there is about a 50% chance that two
-share a birthday. Programmers use probability for randomised
-algorithms, hashing, load balancing, A/B tests and machine learning
-(Stage 14).`,
+share a birthday. The complement is the trick: the chance that all 23
+birthdays differ is (365/365) × (364/365) × … × (343/365), about 0.493,
+so the chance of a shared one is about 0.507.
+
+Programmers use probability for randomised algorithms, hashing, load
+balancing, A/B tests, simulations and machine learning (Stage 14). When
+the formula is hard, simulate: run the experiment a million times with
+a random number generator and count. In C, rand() is weak and rand() % n
+is slightly biased; for simulations use a better generator, such as
+xorshift or PCG.`,
+				Diagram: `chance that at least two of k people share a birthday
+  k = 10    ██▍                  11.7%
+  k = 23    ██████████▏          50.7%
+  k = 41    ██████████████████   90.3%
+  k = 70    ████████████████████ 99.9%`,
+				UnderTheHood: `The formula and a simulation agree. In C, the exact probability for 23
+people is 1 − (365 × 364 × … × 343) / 365²³ = 0.507297. A simulation of
+a million rooms of 23 people with a xorshift random generator found a
+shared birthday in 50.7349% of them.
+
+Why rand() % n is biased: rand() returns one of RAND_MAX + 1 equally
+likely values, and unless n divides that count, the low remainders get
+one extra value each. glibc's RAND_MAX is 2,147,483,647, so the bias of
+rand() % 6 is tiny; but some C libraries (Microsoft's among them) have
+RAND_MAX = 32,767, and rand() % 1000 there gives each of 0 to 767 a
+chance of 33/32768 and each of 768 to 999 a chance of 32/32768: values
+below 768 come up about 3% more often. Rejecting the top, uneven part of
+the range removes the bias.`,
 				MentalModel: "When intuition and arithmetic disagree, simulate.",
-				TryIt:       "Simulate the birthday problem 10,000 times for 23 people and compare the result with the formula.",
+				TryIt:       "Compute the birthday probability for k = 1 to 70 exactly in C, then simulate k = 23 a million times with xorshift and compare.",
 				Analogy: `A forecast of "70% chance of rain" means that on days like this, it
 rained about 7 times out of 10. And a medical test that is "99%
 accurate" can still produce mostly false alarms when the disease is
 rare, because healthy people vastly outnumber sick ones.`,
 				Example: `Spam filters apply Bayes' rule to the words in an email. A/B tests
 decide whether a new design is really better or just lucky. The birthday
-paradox is why hash functions need long outputs to avoid collisions.`,
+paradox is why hash functions need long outputs to avoid collisions: a
+64-bit hash has a 50% chance of a collision after only about 5 billion
+items.`,
 				Exercises: trio(
-					"What is the chance of rolling a total of 7 with two dice? And a total of 12?",
-					"List all 36 outcomes: 6/36 for a 7 and 1/36 for a 12.",
-					`Simulate the Monty Hall problem 100,000 times and measure the win rate for "stay" and for "switch".`,
-					"Randomise the car's door and your first pick; the host opens a goat door that you did not pick.",
-					"A disease affects 1 in 1,000 people. A test catches 99% of cases but also flags 5% of healthy people. If you test positive, what is the chance you are sick? Work it out with Bayes' rule and with a simulation of 1 million people.",
-					"About 2%: false positives from the healthy majority swamp the true positives.",
+					"What is the chance of rolling a total of 7 with two dice? And a total of 12? What is the expected total?",
+					"List all 36 outcomes: 6/36 for a 7 and 1/36 for a 12. The expected total is 3.5 + 3.5 = 7, by linearity of expectation.",
+					`In C, simulate the Monty Hall problem 1,000,000 times with a xorshift random generator and measure the win rate for "stay" and for "switch".`,
+					"Randomise the car's door and your first pick; the host opens a goat door that you did not pick. Switching wins exactly when your first pick was wrong: 2/3 of the time.",
+					"A disease affects 1 in 1,000 people. A test catches 99% of cases but also flags 5% of healthy people. If you test positive, what is the chance you are sick? Work it out with Bayes' rule, then simulate 1 million people in C.",
+					"About 2%: 0.99 × 0.001 / (0.99 × 0.001 + 0.05 × 0.999) ≈ 0.0194. The false positives from the healthy majority swamp the true positives.",
 				),
 			},
 		},
@@ -1778,6 +2149,15 @@ paradox is why hash functions need long outputs to avoid collisions.`,
 			{"What are the two parts of a proof by induction?", "A base case (the claim holds for the first value) and an inductive step (if it holds for n, it holds for n + 1)."},
 			{"How many ways can you choose 2 people from 5, if order does not matter?", "C(5, 2) = 10."},
 			{"Why can a 99%-accurate test give mostly false positives?", "When the condition is rare, the small false-positive rate applied to the huge healthy group outnumbers the true positives."},
+			{"Why is p != NULL && p->x > 0 safe, but p->x > 0 && p != NULL is not?", "&& short-circuits: the right side is only evaluated when the left is true. In the second order, p->x is read before p is checked."},
+			{"What is a loop invariant?", "A statement that is true before a loop and stays true after every iteration; together with the exit condition, it proves what the loop computes."},
+			{"Why does computing C(n, k) as n! / (k!(n − k)!) fail in C from n = 21?", "21! no longer fits in 64 bits, and unsigned arithmetic wraps silently. Multiply and divide as you go instead."},
+			{"What is -7 % 3 in C, and how do you get the mathematical remainder?", "-1, because C's % takes the sign of the left side; ((a % n) + n) % n gives 2."},
+			{"What does Euclid's algorithm compute, and how?", "The greatest common divisor, using gcd(a, b) = gcd(b, a mod b) until the second number is 0."},
+			{"What does the recurrence T(n) = 2T(n/2) + n solve to, and which algorithm has it?", "O(n log n): log₂ n levels with n work each. Merge sort."},
+			{"How many edges does a tree with n vertices have?", "Exactly n − 1."},
+			{"When does a connected graph have an Euler circuit?", "Exactly when every vertex has even degree."},
+			{"In a room of 23 people, what is the chance that two share a birthday?", "About 50.7%: the chance that all differ, 365/365 × 364/365 × … × 343/365, is about 49.3%."},
 		},
 	},
 

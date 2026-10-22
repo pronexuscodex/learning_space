@@ -97,6 +97,12 @@ var conceptLinks = map[string]links{
 		"Book of Proof: the chapters on direct proof, proof by contradiction and mathematical induction."},
 	"Counting & Combinatorics": {[]string{"Big-O: Measuring Growth", "Hashing & Password Storage"},
 		"Book of Proof: the chapter on counting. MIT 6.042J's counting lectures."},
+	"Modular Arithmetic & Number Theory": {[]string{"Hash Tables", "Encryption: Symmetric & Public-Key", "Integers & Floating Point in Bits"},
+		"Book of Proof (free), the chapters on congruence and number theory. MIT 6.042J's notes, the number theory unit, which builds up to RSA."},
+	"Recurrences: The Cost of Recursion": {[]string{"Recursion & Divide and Conquer", "Proof & Induction", "Big-O: Measuring Growth"},
+		"Jeff Erickson's Algorithms (free), chapter 1 (recursion trees) and his appendix on solving recurrences. MIT 6.042J's notes on recurrences and the Akra–Bazzi method."},
+	"Graph Theory: Degrees, Trees & Paths": {[]string{"Graphs, BFS/DFS & Shortest Paths", "Proof & Induction", "Sets, Functions & Relations"},
+		"MIT 6.042J's notes, the graph theory chapters (degrees, trees, colouring, Euler tours). Book of Proof for the proof techniques they use."},
 	"Probability for Programmers": {[]string{"Statistical Inference & Experiments", "Probability, Softmax & Cross-Entropy"},
 		"Seeing Theory: Basic Probability and Compound Probability. Khan Academy's probability unit."},
 
