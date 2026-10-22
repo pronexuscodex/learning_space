@@ -70,14 +70,23 @@ var conceptLinks = map[string]links{
 	// ---- Stage 2
 	"Big-O: Measuring Growth": {[]string{"Counting & Combinatorics", "Complexity Classes: P, NP & Hard Problems"},
 		"MIT 6.006: the opening lectures on asymptotic analysis. Grokking Algorithms, chapter 1 (binary search and Big O)."},
+	"Recursion & Divide and Conquer": {[]string{"Proof & Induction", "Registers, the Stack & Calling Conventions", "Parsing: Recursive Descent & Pratt"},
+		"Jeff Erickson's Algorithms (free), chapter 1: recursion, merge sort, quicksort and the recursion-tree method. Run your recursive functions under -O0 and -O2 and compare the assembly."},
 	"Arrays, Linked Lists, Stacks & Queues": {[]string{"The Memory Hierarchy & Locality", "Registers, the Stack & Calling Conventions"},
 		"Sedgewick & Wayne's Algorithms: the section on bags, queues and stacks. Animate them on VisuAlgo."},
+	"Searching: Linear & Binary Search": {[]string{"Trees, Heaps & Sorting", "B-Trees", "Proof & Induction"},
+		"Jon Bentley's Programming Pearls, column 4 (writing correct programs, with binary search as the example). Joshua Bloch's 2006 post \"Extra, Extra - Read All About It: Nearly All Binary Searches and Mergesorts are Broken\"."},
 	"Hash Tables": {[]string{"Hashing & Password Storage", "B-Trees"},
 		"Sedgewick & Wayne's Algorithms: the section on hash tables. VisuAlgo's hash-table animation."},
 	"Trees, Heaps & Sorting": {[]string{"B-Trees", "Proof & Induction", "Trees, Ensembles & Clustering"},
 		"Sedgewick & Wayne's Algorithms: the sorting chapter and priority queues. VisuAlgo's sorting and heap animations."},
 	"Graphs, BFS/DFS & Shortest Paths": {[]string{"Sets, Functions & Relations", "Complexity Classes: P, NP & Hard Problems", "Computational Graphs & Reverse-Mode Autodiff"},
 		"Jeff Erickson's Algorithms: the chapters on graph search and shortest paths. VisuAlgo for BFS and DFS."},
+
+	"Greedy Algorithms": {[]string{"Graphs, BFS/DFS & Shortest Paths", "Trees, Heaps & Sorting", "Dynamic Programming"},
+		"Jeff Erickson's Algorithms (free), chapter 4 (greedy algorithms, with the exchange-argument proofs) and chapter 7 (minimum spanning trees)."},
+	"Dynamic Programming": {[]string{"Recursion & Divide and Conquer", "Greedy Algorithms", "Counting & Combinatorics"},
+		"Jeff Erickson's Algorithms (free), chapter 3 (dynamic programming). MIT 6.006 (2020), the four dynamic-programming lectures and their SRTBOT recipe."},
 
 	// ---- Stage 3
 	"Logic & Boolean Algebra": {[]string{"Logic Gates & Circuits", "Control Flow: Decisions & Loops"},

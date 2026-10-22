@@ -41,10 +41,14 @@ var conceptPrereqs = map[string][]string{
 
 	// ---- Stage 2
 	"Big-O: Measuring Growth":               {"Control Flow: Decisions & Loops"},
+	"Recursion & Divide and Conquer":        {"Big-O: Measuring Growth", "Functions & Decomposition"},
 	"Arrays, Linked Lists, Stacks & Queues": {"Big-O: Measuring Growth", "Collections: Lists, Dictionaries & Strings", "Dynamic Memory: malloc, free & Leaks"},
+	"Searching: Linear & Binary Search":     {"Arrays, Linked Lists, Stacks & Queues", "Recursion & Divide and Conquer"},
 	"Hash Tables":                           {"Arrays, Linked Lists, Stacks & Queues"},
-	"Trees, Heaps & Sorting":                {"Arrays, Linked Lists, Stacks & Queues", "Functions & Decomposition"},
+	"Trees, Heaps & Sorting":                {"Arrays, Linked Lists, Stacks & Queues", "Recursion & Divide and Conquer", "Searching: Linear & Binary Search"},
 	"Graphs, BFS/DFS & Shortest Paths":      {"Arrays, Linked Lists, Stacks & Queues", "Trees, Heaps & Sorting"},
+	"Greedy Algorithms":                     {"Trees, Heaps & Sorting", "Graphs, BFS/DFS & Shortest Paths"},
+	"Dynamic Programming":                   {"Recursion & Divide and Conquer", "Greedy Algorithms"},
 
 	// ---- Stage 3
 	"Logic & Boolean Algebra":     {"Control Flow: Decisions & Loops"},

@@ -67,7 +67,7 @@ func TestDeckUnlocksAndDueCards(t *testing.T) {
 	}
 
 	// Quiz cards unlock once half the stage's concepts are understood.
-	for _, c := range g.Concepts[:3] {
+	for _, c := range g.Concepts[:(len(g.Concepts)+1)/2] {
 		s.setStudied(c.Name, true)
 	}
 	quiz := 0
