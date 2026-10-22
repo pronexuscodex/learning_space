@@ -352,7 +352,7 @@ func (a *App) renderConcept(c Concept, n, total int, glossary []Term, done []boo
 		sty.Gray(fmt.Sprintf("Concept %d/%d ·", n, total)),
 		sty.Bold(sty.Blue(truncate(c.Name, w-8))),
 		masteryBadge(level) + " " + sty.Gray(masteryNames[level]),
-	}, " ", w-4, "") {
+	}, " ", w-5, "") { // "  ┏━ " takes 5 columns
 		lead := sty.Blue("┃")
 		if i == 0 {
 			lead = sty.Blue("┏━")
@@ -479,7 +479,13 @@ func (a *App) renderConcept(c Concept, n, total int, glossary []Term, done []boo
 		section("🔤 Programmer words here", sty.Cyan)
 		for _, pw := range words {
 			lead := sty.Bold(pw.Word) + " — "
-			a.printf("  %s   %s%s\n", edge, lead, sty.Gray(truncate(pw.Means, max(10, w-10-visibleLen(lead)))))
+			if room := w - 10 - visibleLen(lead); room >= 10 {
+				a.printf("  %s   %s%s\n", edge, lead, sty.Gray(truncate(pw.Means, room)))
+				continue
+			}
+			// A long word on a narrow screen: the meaning goes on its own line.
+			a.printf("  %s   %s\n", edge, sty.Bold(truncate(pw.Word, w-10)))
+			a.printf("  %s     %s\n", edge, sty.Gray(truncate(pw.Means, w-12)))
 		}
 		for _, l := range wrap("Full explanations with code: the dictionary [d] on the main menu.", w-8, "") {
 			a.printf("  %s   %s\n", edge, sty.Gray(l))

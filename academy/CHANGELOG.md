@@ -32,7 +32,7 @@ After a walk through the app as a new learner, at 40, 80 and 160 columns:
   - **Files & Streams:** modes, fgets, fgetc and fread, perror, buffering, fclose;
   - **Headers, the Preprocessor & make:** separate compilation, include guards, static, the linker's symbols, macros, Makefiles.
 
-  Stage 1 now has twelve concepts, and the academy 122.
+  Stage 1 now has twelve concepts.
 - **Checked exercises: your C, compiled and tested for real.** Stage 1 has twelve, one per concept: `hello`, `types`, `fizzbuzz`, `temperature`, `swap`, `letters`, `scores`, `intvec`, `safe_number`, `count`, `stack` and `fix_average`. A project joins them all: `wordfreq`, the ten most frequent words of any text. You write the program in your own editor, in `Documents/Academy Labs/Stage 01/`. The academy then compiles it with your C compiler (`-std=c17 -Wall -Wextra -Werror`, plus AddressSanitizer and UBSan where available), runs it against the test cases, and explains each failure with the line that differs, the exit code, the sanitizer's report, or the usual cause.
   - **Where:** Study Hall → Checked exercises, or `academy -check ID` from another terminal (`academy -check list` shows them all).
   - **The tests catch what matters:**
@@ -57,9 +57,20 @@ After a walk through the app as a new learner, at 40, 80 and 160 columns:
   - Stage 7: `atomic_save` (temporary file, fsync, rename, fsync the folder) and `wal_kv` (a key-value store with a write-ahead log that survives a torn record);
   - Stage 17: `safe_join` (canonicalise, then check) and `copy_string` (a bounded copy like strlcpy).
 
-  That makes 28 in all. Checks can now give the program files in subfolders and examine the files it leaves behind.
+- **Stages 2, 3 and 4 completed, to the depth of Stage 1.** Ten new lessons, and every lesson in the three stages now has an *Under the hood* section built on real measurements (compiler output, timings, the bytes in memory), and exercises in C, the language you know from Stage 1, instead of Python:
+  - **Stage 2, Data Structures & Algorithms** (5 → 9 lessons): new *Recursion & Divide and Conquer*, *Searching: Linear & Binary Search*, *Greedy Algorithms* and *Dynamic Programming*;
+  - **Stage 3, Discrete Mathematics** (5 → 8): new *Modular Arithmetic & Number Theory*, *Recurrences: The Cost of Recursion* and *Graph Theory: Degrees, Trees & Paths*;
+  - **Stage 4, Computer Architecture** (5 → 8): new *Building an ALU: Adders, Subtraction & Flags*, *Finite State Machines & Sequential Logic* and *Instruction Sets & Machine Code*.
+
+  Their glossaries, outcomes and quizzes grow with them (new quiz questions are added at the end, so your review cards keep their history). The academy now has 132 concepts and 396 exercises.
+- **Checked exercises for Stages 2 to 4.** Eighteen more, each timed on inputs where only the efficient idea passes:
+  - Stage 2: `duplicates` (O(n log n), not O(n²)), `hanoi`, `bsearch` (the first match, 100,000 lookups), `intervals` (greedy by end time) and `edit_distance` (a 2,000 × 2,000 table), so every Stage 2 lesson has one;
+  - Stage 3: `sat_count`, `bitsets`, `binomial` (exact up to C(67, 33)), `modpow` (exponents up to 10¹⁸), `inversions`, `euler` and `birthday`;
+  - Stage 4: `bases`, `nand_gates` (the checker counts your NAND gates), `alu` (zero, negative, carry and overflow flags), `number_fsm`, `cpu` (an emulator) and `rv_decode` (real RISC-V machine code).
+
+  That makes 46 in all. Checks can now give the program files in subfolders and examine the files it leaves behind.
 - **Mastery counts real code.** A concept with a checked exercise reaches "mastered" only once that check has passed (with or without hints). Concepts you had mastered before stay at "retained" until you pass their check. Where checks cannot run (Windows), nothing changes.
-- **Concept prerequisites.** Concepts now list the earlier concepts they build on (174 links across 117 concepts in all 21 stages). The list sits at the top of each card, with a tick for each one you have marked as understood.
+- **Concept prerequisites.** Concepts now list the earlier concepts they build on (198 links across 127 concepts in all 21 stages). The list sits at the top of each card, with a tick for each one you have marked as understood.
   - **What's next and Today's workout** use them. When the next concept builds on one you have not marked yet, they send you to the first missing step and say which concept it leads to. They do not stop you reading anything.
   - **Tests check the graph:** every name is a real concept, every prerequisite comes earlier and agrees with the stage prerequisites (so there can be no cycle), and every concept from Stage 1 on lists at least one.
 - **Get hired: the career center** (`e`). It turns learning into the three things companies hire on: foundations, finished projects and interview skill.

@@ -200,7 +200,7 @@ Checked-exercise files live in `Documents/Academy Labs` (`$ACADEMY_LABS` chooses
 | | 19 | Network Defence & Monitoring |
 | | 20 | Incident Response, Forensics & Privacy |
 
-That is **122 concepts** and **366 exercises**, plus a glossary, a resource library, lab blueprints, a quiz and a mastery check for every stage. Start Here also lists electives for afterwards: graphics, quantum computing, embedded systems and bioinformatics.
+That is **132 concepts** and **396 exercises**, plus a glossary, a resource library, lab blueprints, a quiz and a mastery check for every stage. Start Here also lists electives for afterwards: graphics, quantum computing, embedded systems and bioinformatics.
 
 ## How computers work (Stage 0)
 
@@ -328,6 +328,24 @@ The later stages have checked exercises too, written with C and POSIX only, so t
 | `hashmap` | 2: Hash tables | string keys copied, replacing, removing, colliding keys, a table that must grow for 100,000 keys, and no leaks |
 | `heap_sort` | 2: Heaps & sorting | an in-place heap sort: edge cases, sorted and reversed input, and a million numbers in the time limit (a quadratic sort cannot) |
 | `bfs` | 2: Graphs | the shortest path through a maze of up to 1000 × 1000: steps not cells, no path, the shortest rather than the first found |
+| `duplicates` | 2: Big-O | the first repeated number among 200,000: nested loops (O(n²)) run out of time, and a comparison written as `a - b` overflows |
+| `hanoi` | 2: Recursion | the Towers of Hanoi: every one of the 65,535 moves for 16 disks, and 0 disks |
+| `bsearch` | 2: Binary search | the first match among repeats, empty arrays, and 100,000 lookups in 200,000 numbers (a linear scan runs out of time) |
+| `intervals` | 2: Greedy algorithms | the most meetings in one room: back-to-back meetings, and the greedy rules that look right and fail (by start time, by length) |
+| `edit_distance` | 2: Dynamic programming | empty lines, sentences, and two 2,000-character lines (the plain recursion is exponential) |
+| `sat_count` | 3: Logic | rows of a truth table over 16 variables: variables numbered from 1, empty clauses, contradictions |
+| `bitsets` | 3: Sets | sets as `uint64_t` bits: union, intersection, differences, subsets, the empty set, and members 31 to 63 (`1 << i` is an int) |
+| `binomial` | 3: Counting | C(n, k) exactly up to C(67, 33): the factorial formula fails from 21!, and multiplying before dividing overflows |
+| `modpow` | 3: Modular arithmetic | aᵉ mod m with e up to 10¹⁸ (square and multiply), m = 1, and a bigger than m |
+| `inversions` | 3: Recurrences | inversions in 200,000 numbers with merge sort: ties, and counts above 2³¹ |
+| `euler` | 3: Graph theory | circuit, path or none: Königsberg, two separate triangles (degrees alone are not enough), lonely vertices, a ring of 100,000 |
+| `birthday` | 3: Probability | the exact birthday probability: integer division, and more than 365 people |
+| `bases` | 4: Binary | decimal, hex and binary in and out, 0, and 4,294,967,295 (which an `int` prints as -1) |
+| `nand_gates` | 4: Logic gates | NOT, AND, OR and XOR from NAND with the fewest gates (the checker counts them), and an 8-bit ripple-carry adder |
+| `alu` | 4: The ALU | the zero, negative, carry and overflow flags for addition, subtraction and logic, against a million random operations |
+| `number_fsm` | 4: State machines | valid decimal numbers: `5.` and `.5` but not `.`, exponents that need digits, spaces, and 400 generated lines |
+| `cpu` | 4: The CPU | an emulator for a tiny CPU: jumps by instruction number, 64-bit registers, and a step limit for endless loops |
+| `rv_decode` | 4: Machine code | real RISC-V machine code (from LLVM's assembler): sign-extended immediates, add vs sub in bit 30, and unknown words |
 | `bits` | 5: Integers & floating point in bits | popcount, rotating by 0 (a shift by 32 is undefined), powers of two, and the raw IEEE 754 fields of 1.0, -2.5, 0.1 and -0.0 |
 | `calc` | 5: Parsing | a recursive-descent calculator: precedence, left-to-right order (10 - 4 - 3 is 3), unary minus, truncating division, malformed lines, division by zero, 500 levels of parentheses |
 | `run` | 6: Processes | fork, execvp and waitpid: exit codes, death by a signal, arguments passed on, a program that does not exist (127) |
@@ -771,7 +789,7 @@ The tests check:
 - **The v1 → v2 migration and stage merging.**
 - **Retention:** the scheduler's intervals grow and reset on a lapse; deck unlocking and due cards; each step of the mastery ladder.
 - **Classic Mode:** every stage has a complete classic corner with HTTPS links; the struggle clock's thresholds and early unlock; notebook and type-in progress survive a save round trip.
-- **Checked exercises:** each check's reference solution passes every case, with gcc and with clang (28 checks, including a real loopback TCP server, forked processes and a write-ahead log the checker reads back). Mastery waits for a concept's check to pass. Typical mistakes fail with the right explanation:
+- **Checked exercises:** each check's reference solution passes every case, with gcc and with clang (46 checks, including a real loopback TCP server, forked processes and a write-ahead log the checker reads back). Mastery waits for a concept's check to pass. Typical mistakes fail with the right explanation:
   - the XOR swap;
   - `9 / 5` in integers;
   - an endless loop;
