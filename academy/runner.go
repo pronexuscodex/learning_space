@@ -257,6 +257,7 @@ func runCheck(ch Check, src string) (CheckRun, error) {
 	if run.Sanitizers {
 		args = append(args, sanitizerFlags()...)
 	}
+	args = append(args, ch.Flags...)
 	args = append(args, "-I", srcDir, "-o", prog)
 	args = append(args, sources...)
 	if ch.Harness != "" {

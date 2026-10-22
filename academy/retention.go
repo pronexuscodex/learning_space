@@ -225,11 +225,28 @@ const (
 var masteryNames = []string{"new", "understood", "practised", "retained", "mastered"}
 var masteryGlyphs = []string{"○", "◔", "◑", "◕", "●"}
 
+// checksPassed reports whether every checked exercise for a concept has
+// passed (with or without hints: a revealed hint stays recorded for good,
+// and must not lock mastery away). Where checks cannot run, they never
+// hold mastery back.
+func (r *Registry) checksPassed(name string) bool {
+	if !runnerSupported {
+		return true
+	}
+	for _, ch := range checksForConcept(name) {
+		if !r.checkStatus[ch.ID].Passed {
+			return false
+		}
+	}
+	return true
+}
+
 // conceptMastery places a concept on the mastery ladder:
 //   - understood: marked as understood;
 //   - practised:  understood, with at least two exercises done;
 //   - retained:   practised, and every review card remembered at ≥ 7-day spacing;
-//   - mastered:   all exercises done, and every card remembered at ≥ 21-day spacing.
+//   - mastered:   all exercises done, every card remembered at ≥ 21-day
+//     spacing, and the concept's checked exercise passed, where it has one.
 func (r *Registry) conceptMastery(s *Stage, c Concept) int {
 	if !s.hasStudied(c.Name) {
 		return MasteryNew
@@ -252,7 +269,7 @@ func (r *Registry) conceptMastery(s *Stage, c Concept) int {
 		minInterval = math.Min(minInterval, st.IntervalDays)
 	}
 	switch {
-	case done == len(c.Exercises) && minInterval >= masteredDays:
+	case done == len(c.Exercises) && minInterval >= masteredDays && r.checksPassed(c.Name):
 		return MasteryMastered
 	case minInterval >= retainedDays:
 		return MasteryRetained

@@ -107,6 +107,10 @@ func TestMasteryLadder(t *testing.T) {
 	}
 	step(MasteryRetained) // long retention, but one exercise still open
 	s.setDone(c.Name, 2, true)
+	if runnerSupported && len(checksForConcept(c.Name)) > 0 {
+		step(MasteryRetained) // everything else done, but the checked exercise has not passed
+		reg.checkStatus = map[string]CheckStatus{checksForConcept(c.Name)[0].ID: {Runs: 1, Passed: true}}
+	}
 	step(MasteryMastered)
 }
 

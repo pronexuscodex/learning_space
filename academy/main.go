@@ -1042,6 +1042,7 @@ func main() {
 			os.Exit(1)
 		}
 		sty.theme = reg.Settings.Theme
+		reg.checkStatus = checkStatusesAt(path) // mastery counts passed checks
 		for _, l := range reg.shareCard(time.Now(), termWidth()) {
 			if reg.Settings.PlainSymbols {
 				l = plainText(l)
@@ -1065,6 +1066,7 @@ func main() {
 		fmt.Fprintf(os.Stderr, "✗ %v\n  Refusing to start so the existing file is not overwritten.\n", err)
 		os.Exit(1)
 	}
+	reg.checkStatus = checkStatusesAt(path) // mastery and What's next count passed checks
 
 	reg.awardAchievements(time.Now()) // silently backfill earlier milestones
 

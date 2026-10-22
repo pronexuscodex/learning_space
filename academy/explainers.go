@@ -628,7 +628,9 @@ How the academy helps you keep the rule:
 MASTERY LEVELS
 Each concept climbs a ladder: ○ new → ◔ understood → ◑ practised (two
 exercises done) → ◕ retained (every review card remembered a week apart)
-→ ● mastered (all exercises done and remembered three weeks apart). You
+→ ● mastered (all exercises done, remembered three weeks apart, and its
+checked exercise passed, where it has one: your code, compiled and
+tested for real). You
 cannot reach mastered in a day, and that is the point: it measures what
 you still know weeks later. Each stage also has a Mastery Check, a mixed
 exam you pass at 80%.

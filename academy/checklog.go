@@ -214,6 +214,13 @@ func checkStatuses(events []CheckEvent) map[string]CheckStatus {
 	return out
 }
 
+// checkStatusesAt sums up the check log beside the registry at regPath.
+// An unreadable log counts as empty: it only ever adds evidence.
+func checkStatusesAt(regPath string) map[string]CheckStatus {
+	events, _ := readCheckLog(checkLogPath(regPath))
+	return checkStatuses(events)
+}
+
 // runEvent turns a run into its log line.
 func runEvent(run CheckRun, hints int, at time.Time) CheckEvent {
 	return CheckEvent{ID: run.Check.ID, At: at, Kind: checkEventRun, Built: run.Built,

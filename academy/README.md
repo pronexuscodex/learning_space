@@ -320,9 +320,21 @@ Ticking an exercise off says you did it; a checked exercise shows it. Stage 1 ha
 - It runs the program on each test case. For every failure it says what was wrong ("line 15 should be "FizzBuzz", but was "Fizz"", "main returned 0, expected 1", "did not finish within 2s") and the usual cause.
 - Hints are revealed one at a time. None contains the solution.
 
+The systems stages have checked exercises too, written with C and POSIX only, so they behave the same on Linux, macOS and the BSDs:
+
+| Check | Stage and concept | What the tests catch |
+|-------|-------------------|----------------------|
+| `bits` | 5: Integers & floating point in bits | popcount, rotating by 0 (a shift by 32 is undefined), powers of two, and the raw IEEE 754 fields of 1.0, -2.5, 0.1 and -0.0 |
+| `calc` | 5: Parsing | a recursive-descent calculator: precedence, left-to-right order (10 - 4 - 3 is 3), unary minus, truncating division, malformed lines, division by zero, 500 levels of parentheses |
+| `run` | 6: Processes | fork, execvp and waitpid: exit codes, death by a signal, arguments passed on, a program that does not exist (127) |
+| `rawcopy` | 6: System calls | a copy with `read` and `write` only: short writes, and half a megabyte of every byte value |
+| `counter` | 6: Synchronisation | threads sharing a counter: without a mutex, increments are lost |
+| `upper_server` | 8: Sockets | a TCP server on a real 127.0.0.1 socket: partial reads of 300 KB, a client that sends nothing, bytes above 127 |
+| `http_request` | 8: HTTP | parsing a request head: header names in any case, trimmed values, bare newlines, a 7,000-byte path, a missing Host, wrong versions, a head that never ends |
+
 **What's next** suggests a check as soon as you mark its concept as understood: you've read it, now make it work. It suggests the project once the whole stage is understood.
 
-**Evidence.** Every run and every hint is appended to `academy_checks.jsonl`, beside your progress. Each run line records the time, the compiler, the cases passed, whether the sanitizers were on, and how many hints you had seen. The academy shows a check as **passed on your own** (no hints), **passed, with hints**, or the cases passing in the latest run. Concept cards show the check for their concept.
+**Evidence.** Every run and every hint is appended to `academy_checks.jsonl`, beside your progress. Each run line records the time, the compiler, the cases passed, whether the sanitizers were on, and how many hints you had seen. The academy shows a check as **passed on your own** (no hints), **passed, with hints**, or the cases passing in the latest run. A concept with a checked exercise reaches **mastered** only once that check has passed: understanding, practice and spaced reviews are not enough on their own. Concept cards show the check for their concept.
 
 **Safety.**
 - Your program is your own code, run on your own computer.
@@ -350,7 +362,7 @@ Reading something once is not learning it. The academy builds in five techniques
 
 Each understood concept adds **three review cards** to your deck: its key idea, a real-life example, and its warm-up exercise. Once half of a stage's concepts are understood, the stage's quiz questions join the deck too. All answers come straight from the curriculum.
 
-**The mastery ladder:** each concept climbs ○ new → ◔ understood → ◑ practised (2 exercises) → ◕ retained (every card remembered at a spacing of 7+ days) → ● **mastered** (all 3 exercises done, and every card remembered at a spacing of 21+ days). "Mastered" cannot be reached in a single day; it measures what you still know weeks later. Campus progress is weighted by mastery.
+**The mastery ladder:** each concept climbs ○ new → ◔ understood → ◑ practised (2 exercises) → ◕ retained (every card remembered at a spacing of 7+ days) → ● **mastered** (all 3 exercises done, every card remembered at a spacing of 21+ days, and the concept's [checked exercise](#checked-exercises-your-c-compiled-and-tested-for-real) passed, where it has one). "Mastered" cannot be reached in a single day; it measures what you still know weeks later. Campus progress is weighted by mastery.
 
 **The Mastery Check:** each stage has a 12-question interleaved exam drawn from all of its cards, and you pass at 80%. The result is recorded, and graduating a stage warns you if you have not passed it.
 
@@ -510,7 +522,7 @@ For every stage:
 - **Mastery check:** a 12-question interleaved exam, passed at 80%.
 - **Classic corner:** anchor book, classic text, real source code, the type-in lab and your lab notebook.
 - **PDF library:** this stage's downloadable books and papers (the same as the main Library, filtered).
-- **Checked exercises** (Stage 1): C programs you write and the academy compiles and tests for real (see [Checked exercises](#checked-exercises-your-c-compiled-and-tested-for-real)).
+- **Checked exercises** (Stages 1, 5, 6 and 8): C programs you write and the academy compiles and tests for real (see [Checked exercises](#checked-exercises-your-c-compiled-and-tested-for-real)).
 
 Concepts link across stages. For example, logic gates (Stage 4) become the CPU; the memory hierarchy (Stage 5) returns as the roofline model (Stage 16); and paging (Stage 6) returns as PagedAttention.
 
@@ -751,7 +763,7 @@ The tests check:
 - **The v1 → v2 migration and stage merging.**
 - **Retention:** the scheduler's intervals grow and reset on a lapse; deck unlocking and due cards; each step of the mastery ladder.
 - **Classic Mode:** every stage has a complete classic corner with HTTPS links; the struggle clock's thresholds and early unlock; notebook and type-in progress survive a save round trip.
-- **Checked exercises:** each check's reference solution passes every case, with gcc and with clang. Typical mistakes fail with the right explanation:
+- **Checked exercises:** each check's reference solution passes every case, with gcc and with clang (20 checks, including a real loopback TCP server and forked processes). Mastery waits for a concept's check to pass. Typical mistakes fail with the right explanation:
   - the XOR swap;
   - `9 / 5` in integers;
   - an endless loop;
@@ -811,6 +823,7 @@ One package, one build target:
 | `goalsui.go` | goals, roadmap and achievements screens |
 | `library.go` | PDF catalogue, safe HTTPS downloader, system viewer, `-fetch-library` |
 | `checks.go` | checked exercises: tasks, test cases, hints, harnesses |
+| `checks_systems.go` | checked exercises for Stages 5, 6 and 8: bits, a parser, processes, system calls, threads, sockets, HTTP |
 | `runner.go`, `runner_*.go` | compile with the learner's C compiler, run each case with limits, explain failures |
 | `checklog.go` | the labs folder, starter files, and the append-only log of runs and hints |
 | `checksui.go` | checked-exercise screens and `-check` |
