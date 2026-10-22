@@ -30,8 +30,10 @@ func wrapPath(p string, width int) []string {
 	width = max(width, 8)
 	var lines []string
 	for visibleLen(p) > width {
-		cut := strings.LastIndexAny(p[:min(len(p), width)], `/\`) + 1 // either separator: paths may be shown from any system
-		if cut <= 1 {                                                 // no separator in reach: cut anywhere
+		// Break after a separator (either kind: paths may come from any
+		// system); with none in reach, cut anywhere.
+		cut := strings.LastIndexAny(p[:min(len(p), width)], `/\`) + 1
+		if cut <= 1 {
 			cut = len(truncateBytes(p, width))
 		}
 		lines = append(lines, p[:cut])
