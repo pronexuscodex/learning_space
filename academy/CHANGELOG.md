@@ -4,16 +4,6 @@ All notable changes to the Systems & AI Academy are listed here. The
 format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 versions follow [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
-
-### Added
-- **Checked exercises for data structures, storage and secure code.** Eight more:
-  - Stage 2: `linkedlist`, `hashmap` (it must grow), `heap_sort` (a million numbers in the time limit) and `bfs` (the shortest path through a maze of up to 1000 × 1000);
-  - Stage 7: `atomic_save` (temporary file, fsync, rename, fsync the folder) and `wal_kv` (a key-value store with a write-ahead log that survives a torn record);
-  - Stage 17: `safe_join` (canonicalise, then check) and `copy_string` (a bounded copy like strlcpy).
-
-  That makes 28 in all. Checks can now give the program files in subfolders and examine the files it leaves behind.
-
 ## [1.7.0] - 2026-10-22
 
 ### Changed
@@ -34,6 +24,12 @@ After a walk through the app as a new learner, at 40, 80 and 160 columns:
   - Development builds show a short `dev-<commit>` instead of a long Go pseudo-version.
 
 ### Added
+- **Checked exercises for data structures, storage and secure code.** Eight more:
+  - Stage 2: `linkedlist`, `hashmap` (it must grow), `heap_sort` (a million numbers in the time limit) and `bfs` (the shortest path through a maze of up to 1000 × 1000);
+  - Stage 7: `atomic_save` (temporary file, fsync, rename, fsync the folder) and `wal_kv` (a key-value store with a write-ahead log that survives a torn record);
+  - Stage 17: `safe_join` (canonicalise, then check) and `copy_string` (a bounded copy like strlcpy).
+
+  That makes 28 in all. Checks can now give the program files in subfolders and examine the files it leaves behind.
 - **C from zero, completed: four new Stage 1 lessons.** Each comes with analogies, a diagram, an under-the-hood section checked against real gcc output, exercises, glossary words and quiz questions:
   - **Structs:** fields, `.` and `->`, passing structs, padding and alignment;
   - **Dynamic Memory:** malloc, calloc, realloc and free; ownership; leaks, double frees; the growable array;
