@@ -46,6 +46,11 @@ After a walk through the app as a new learner, at 40, 80 and 160 columns:
     - each case has a 2-second limit, after which the whole process group is killed;
     - output is capped at 1 MB.
   - **Not a sandbox:** the academy only ever runs your own code. Checked exercises need Linux, macOS or a BSD (on Windows, use WSL).
+- **Checked exercises in the systems stages.** Seven more, in C and POSIX only, so they run the same on Linux, macOS and the BSDs:
+  - Stage 5: `bits` (bit tricks and the raw fields of a float) and `calc` (a recursive-descent calculator);
+  - Stage 6: `run` (fork, exec and wait), `rawcopy` (read and write only) and `counter` (threads and a mutex);
+  - Stage 8: `upper_server` (a TCP server tested over a real loopback socket) and `http_request` (parsing an HTTP/1.1 request head).
+- **Mastery counts real code.** A concept with a checked exercise reaches "mastered" only once that check has passed (with or without hints). Concepts you had mastered before stay at "retained" until you pass their check. Where checks cannot run (Windows), nothing changes.
 - **Concept prerequisites.** Concepts now list the earlier concepts they build on (174 links across 117 concepts in all 21 stages). The list sits at the top of each card, with a tick for each one you have marked as understood.
   - **What's next and Today's workout** use them. When the next concept builds on one you have not marked yet, they send you to the first missing step and say which concept it leads to. They do not stop you reading anything.
   - **Tests check the graph:** every name is a real concept, every prerequisite comes earlier and agrees with the stage prerequisites (so there can be no cycle), and every concept from Stage 1 on lists at least one.

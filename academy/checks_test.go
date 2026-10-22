@@ -43,7 +43,14 @@ func TestChecksAreWellFormed(t *testing.T) {
 			t.Errorf("%s: the checker supplies main, so the starter must not have one", ch.ID)
 		}
 	}
-	if _, ok := checkByID("hello"); !ok || len(checksFor(1)) != len(checks) {
+	total := 0
+	for _, id := range []int{1, 5, 6, 8} {
+		if len(checksFor(id)) == 0 {
+			t.Errorf("Stage %d has no checked exercises", id)
+		}
+		total += len(checksFor(id))
+	}
+	if _, ok := checkByID("hello"); !ok || total != len(checks) {
 		t.Error("lookup helpers")
 	}
 }
@@ -131,6 +138,288 @@ func TestLabsDir(t *testing.T) {
 
 // referenceSolutions pass every case of their check.
 var referenceSolutions = map[string]string{
+	"bits": `#include <stdint.h>
+#include <string.h>
+
+int popcount(unsigned x) {
+    int n = 0;
+    while (x != 0) {
+        x &= x - 1;
+        n++;
+    }
+    return n;
+}
+
+unsigned rotate_left(unsigned x, int n) {
+    if (n == 0) {
+        return x;
+    }
+    return (x << n) | (x >> (32 - n));
+}
+
+int is_power_of_two(unsigned x) { return x != 0 && (x & (x - 1)) == 0; }
+
+void float_parts(float f, int *sign, int *exponent, unsigned *mantissa) {
+    uint32_t bits;
+    memcpy(&bits, &f, sizeof bits);
+    *sign = (int)(bits >> 31);
+    *exponent = (int)((bits >> 23) & 0xFF);
+    *mantissa = bits & 0x7FFFFF;
+}
+`,
+	"calc": `#include <ctype.h>
+#include <stdio.h>
+#include <string.h>
+
+static const char *p;
+static int bad;
+
+static void skip(void) {
+    while (*p == ' ' || *p == '\t') p++;
+}
+
+static long long expr(void);
+
+static long long factor(void) {
+    skip();
+    if (*p == '-') {
+        p++;
+        return -factor();
+    }
+    if (*p == '(') {
+        p++;
+        long long v = expr();
+        skip();
+        if (*p != ')') {
+            bad = 1;
+            return 0;
+        }
+        p++;
+        return v;
+    }
+    if (!isdigit((unsigned char)*p)) {
+        bad = 1;
+        return 0;
+    }
+    long long v = 0;
+    while (isdigit((unsigned char)*p)) v = v * 10 + (*p++ - '0');
+    return v;
+}
+
+static long long term(void) {
+    long long v = factor();
+    for (;;) {
+        skip();
+        char op = *p;
+        if (bad || (op != '*' && op != '/')) return v;
+        p++;
+        long long r = factor();
+        if (op == '*') {
+            v *= r;
+        } else if (r == 0) {
+            bad = 1;
+            return 0;
+        } else {
+            v /= r;
+        }
+    }
+}
+
+static long long expr(void) {
+    long long v = term();
+    for (;;) {
+        skip();
+        char op = *p;
+        if (bad || (op != '+' && op != '-')) return v;
+        p++;
+        long long r = term();
+        v = op == '+' ? v + r : v - r;
+    }
+}
+
+int main(void) {
+    char line[8192];
+    while (fgets(line, sizeof line, stdin) != NULL) {
+        line[strcspn(line, "\n")] = '\0';
+        p = line;
+        bad = 0;
+        long long v = expr();
+        skip();
+        if (bad || *p != '\0') {
+            printf("error\n");
+        } else {
+            printf("%lld\n", v);
+        }
+    }
+    return 0;
+}
+`,
+	"run": `#define _POSIX_C_SOURCE 200809L
+#include <stdio.h>
+#include <sys/wait.h>
+#include <unistd.h>
+
+int main(int argc, char **argv) {
+    if (argc < 2) {
+        fprintf(stderr, "usage: run PROGRAM ARGS...\n");
+        return 2;
+    }
+    fflush(stdout);
+    pid_t pid = fork();
+    if (pid < 0) {
+        perror("fork");
+        return 1;
+    }
+    if (pid == 0) {
+        execvp(argv[1], &argv[1]);
+        perror(argv[1]);
+        _exit(127);
+    }
+    int status;
+    if (waitpid(pid, &status, 0) < 0) {
+        perror("waitpid");
+        return 1;
+    }
+    if (WIFEXITED(status)) {
+        printf("exit %d\n", WEXITSTATUS(status));
+    } else if (WIFSIGNALED(status)) {
+        printf("signal %d\n", WTERMSIG(status));
+    }
+    return 0;
+}
+`,
+	"rawcopy": `#define _POSIX_C_SOURCE 200809L
+#include <errno.h>
+#include <stdio.h>
+#include <unistd.h>
+
+int main(void) {
+    char buf[8192];
+    for (;;) {
+        ssize_t n = read(0, buf, sizeof buf);
+        if (n == 0) return 0;
+        if (n < 0) {
+            if (errno == EINTR) continue;
+            perror("read");
+            return 1;
+        }
+        ssize_t off = 0;
+        while (off < n) {
+            ssize_t w = write(1, buf + off, (size_t)(n - off));
+            if (w < 0) {
+                if (errno == EINTR) continue;
+                perror("write");
+                return 1;
+            }
+            off += w;
+        }
+    }
+}
+`,
+	"counter": `#define _POSIX_C_SOURCE 200809L
+#include <pthread.h>
+#include <stdlib.h>
+
+struct shared {
+    pthread_mutex_t lock;
+    long count;
+    long per_thread;
+};
+
+static void *worker(void *arg) {
+    struct shared *s = arg;
+    for (long i = 0; i < s->per_thread; i++) {
+        pthread_mutex_lock(&s->lock);
+        s->count++;
+        pthread_mutex_unlock(&s->lock);
+    }
+    return NULL;
+}
+
+long count_parallel(int threads, long per_thread) {
+    struct shared s = {PTHREAD_MUTEX_INITIALIZER, 0, per_thread};
+    if (threads <= 0) return 0;
+    pthread_t *t = malloc(sizeof *t * (size_t)threads);
+    if (t == NULL) return -1;
+    int started = 0;
+    for (; started < threads; started++) {
+        if (pthread_create(&t[started], NULL, worker, &s) != 0) break;
+    }
+    for (int i = 0; i < started; i++) pthread_join(t[i], NULL);
+    free(t);
+    return s.count;
+}
+`,
+	"upper_server": `#define _POSIX_C_SOURCE 200809L
+#include <unistd.h>
+
+void serve(int fd) {
+    char buf[4096];
+    ssize_t n;
+    while ((n = read(fd, buf, sizeof buf)) > 0) {
+        for (ssize_t i = 0; i < n; i++) {
+            if (buf[i] >= 'a' && buf[i] <= 'z') buf[i] = (char)(buf[i] - 'a' + 'A');
+        }
+        ssize_t off = 0;
+        while (off < n) {
+            ssize_t w = write(fd, buf + off, (size_t)(n - off));
+            if (w <= 0) return;
+            off += w;
+        }
+    }
+}
+`,
+	"http_request": `#include <ctype.h>
+#include <stdio.h>
+#include <string.h>
+#include <strings.h>
+
+static int fail(const char *why) {
+    fprintf(stderr, "bad request: %s\n", why);
+    return 1;
+}
+
+static int read_line(char *buf, size_t size) {
+    if (fgets(buf, (int)size, stdin) == NULL) return 0;
+    size_t n = strlen(buf);
+    if (n == 0 || buf[n - 1] != '\n') return -1; /* too long, or no newline */
+    buf[--n] = '\0';
+    if (n > 0 && buf[n - 1] == '\r') buf[--n] = '\0';
+    return 1;
+}
+
+int main(void) {
+    static char line[8192], method[16], path[8000], version[16], host[8000];
+    int r = read_line(line, sizeof line);
+    if (r <= 0) return fail("no request line");
+    char extra;
+    if (sscanf(line, "%15s %7999s %15s %c", method, path, version, &extra) != 3) return fail("request line");
+    for (char *m = method; *m; m++) {
+        if (!isupper((unsigned char)*m)) return fail("method");
+    }
+    if (path[0] != '/' || strcmp(version, "HTTP/1.1") != 0) return fail("path or version");
+    int have_host = 0;
+    for (;;) {
+        r = read_line(line, sizeof line);
+        if (r <= 0) return fail("the head never ended");
+        if (line[0] == '\0') break;
+        char *colon = strchr(line, ':');
+        if (colon == NULL) return fail("header without a colon");
+        *colon = '\0';
+        if (strcasecmp(line, "host") == 0) {
+            char *v = colon + 1;
+            while (*v == ' ' || *v == '\t') v++;
+            size_t n = strlen(v);
+            while (n > 0 && (v[n - 1] == ' ' || v[n - 1] == '\t')) v[--n] = '\0';
+            snprintf(host, sizeof host, "%s", v);
+            have_host = 1;
+        }
+    }
+    if (!have_host) return fail("no Host header");
+    printf("%s %s %s\n", method, path, host);
+    return 0;
+}
+`,
 	"types": `#include <stdio.h>
 
 int main(void) {
@@ -887,5 +1176,47 @@ SUMMARY: AddressSanitizer: 16 byte(s) leaked in 1 allocation(s).
 	want := "LeakSanitizer found memory that was never freed: 16 byte(s) leaked in 1 allocation(s), allocated in vec_push, intvec.c:21"
 	if got := sanitizerReport(report); got != want {
 		t.Errorf("got  %q\nwant %q", got, want)
+	}
+}
+
+// The systems checks catch the mistakes they were written for. (A missing
+// mutex is left out: a data race loses updates only most of the time.)
+func TestSystemsChecksCatchTypicalMistakes(t *testing.T) {
+	needCompiler(t)
+	ref := referenceSolutions
+
+	// Raw wait status instead of WEXITSTATUS: 3 << 8 is 768.
+	raw := strings.Replace(ref["run"], `printf("exit %d\n", WEXITSTATUS(status));`, `printf("exit %d\n", status);`, 1)
+	failsWith(t, "run", raw, "exit 3", `"exit 3", but was "exit 768"`)
+
+	// Recursing on the right makes - and / group from the right.
+	rightAssoc := strings.Replace(ref["calc"], "static long long expr(void) {\n    long long v = term();\n    for (;;) {\n        skip();\n        char op = *p;\n        if (bad || (op != '+' && op != '-')) return v;\n        p++;\n        long long r = term();\n        v = op == '+' ? v + r : v - r;\n    }\n}",
+		"static long long expr(void) {\n    long long v = term();\n    skip();\n    char op = *p;\n    if (bad || (op != '+' && op != '-')) return v;\n    p++;\n    long long r = expr();\n    return op == '+' ? v + r : v - r;\n}", 1)
+	if rightAssoc == ref["calc"] {
+		t.Fatal("calc right-recursion mutation did not apply")
+	}
+	failsWith(t, "calc", rightAssoc, "left to right", `"3", but was "9"`)
+
+	// Writing the whole buffer instead of the bytes read.
+	whole := strings.Replace(ref["rawcopy"], "write(1, buf + off, (size_t)(n - off))", "write(1, buf + off, sizeof buf - (size_t)off)", 1)
+	failsWith(t, "rawcopy", whole, "a line of text", "")
+
+	// One read is not the whole stream.
+	once := strings.Replace(ref["upper_server"], "while ((n = read(fd, buf, sizeof buf)) > 0) {", "if ((n = read(fd, buf, sizeof buf)) > 0) {", 1)
+	failsWith(t, "upper_server", once, "300 KB in pieces", `"300000 ok"`)
+
+	// Header names are case-insensitive.
+	exact := strings.Replace(ref["http_request"], `strcasecmp(line, "host")`, `strcmp(line, "Host")`, 1)
+	failsWith(t, "http_request", exact, "Host in any case, with spaces", "")
+
+	// Shifting by 32 is undefined: the sanitizer says so, where it is on.
+	shift := strings.Replace(ref["bits"], "    if (n == 0) {\n        return x;\n    }\n", "", 1)
+	run := runSource(t, "bits", shift)
+	if run.Sanitizers {
+		for _, c := range run.Cases {
+			if c.Case.Name == "rotate_left, including by 0" && (c.Pass || !strings.Contains(c.Problem, "shift")) {
+				t.Errorf("shift by 32: pass=%v problem=%q", c.Pass, c.Problem)
+			}
+		}
 	}
 }

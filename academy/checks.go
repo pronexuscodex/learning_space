@@ -37,6 +37,7 @@ type Check struct {
 	Project    bool          // a stage project, joining several concepts (Concept is then "")
 	Leaks      bool          // also fail on memory never freed (where the leak checker works)
 	Timeout    time.Duration // per case, when the default 2 s is too short
+	Flags      []string      // extra compiler flags (such as -pthread)
 	BuildHints []BuildHint   // explanations for compiler messages this check tends to cause
 
 	Cases []CheckCase
