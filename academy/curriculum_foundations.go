@@ -2164,14 +2164,20 @@ items.`,
 	// -----------------------------------------------------------------
 	4: {
 		Overview: `How does a lump of silicon run your code? This stage climbs from a
-single switch to a working CPU: binary numbers, logic gates, memory
-circuits, the instruction cycle and the tricks that make modern chips
-fast. After it, the machine is no longer magic. It is a clever
+single switch to a working CPU: binary numbers, logic gates, an ALU that
+adds, subtracts and compares, memory circuits, state machines, the
+instruction cycle, the machine code your compiler writes, and the tricks
+that make modern chips fast. Every step is checked against the real
+thing: the bytes gcc emits, the flags the CPU sets, the time a cache miss
+costs. After it, the machine is no longer magic. It is a clever
 arrangement of on/off switches.`,
 		Outcomes: []string{
-			"Explain how numbers, text and images are stored as bits",
-			"Design small digital circuits, including an adder",
-			"Describe what a CPU does on every clock tick and why some code runs faster",
+			"Explain how numbers, text and images are stored as bits, and read a hex dump",
+			"Design small digital circuits, including an adder, from NAND gates up",
+			"Explain how a CPU subtracts and compares with one adder, and what the carry and overflow flags mean",
+			"Model a controller as a finite state machine, in hardware or in C",
+			"Describe what a CPU does on every clock tick, and read the machine code your compiler produces",
+			"Explain why some code runs faster: caches, pipelines and branch prediction",
 		},
 		Glossary: []Term{
 			{"Bit", "A single binary digit: 0 or 1."},
@@ -2183,6 +2189,11 @@ arrangement of on/off switches.`,
 			{"ALU", "Arithmetic Logic Unit: the part of the CPU that does arithmetic and comparisons."},
 			{"ISA", "Instruction Set Architecture: the list of instructions a CPU understands (x86-64, ARM, RISC-V)."},
 			{"Core", "One independent processing unit; modern chips have several."},
+			{"Two's complement", "The way CPUs store negative integers: −x is the bits of x inverted, plus one."},
+			{"Flags", "Bits the ALU sets after an operation (zero, negative, carry, overflow) that conditional jumps test."},
+			{"Finite state machine", "A system that is always in one of a fixed set of states and moves between them on inputs."},
+			{"Opcode", "The part of a machine instruction that says which operation to perform."},
+			{"Endianness", "The order of a number's bytes in memory; x86 and most ARM systems store the lowest byte first (little-endian)."},
 		},
 		Concepts: []Concept{
 			{
@@ -2190,17 +2201,46 @@ arrangement of on/off switches.`,
 				Summary: "Everything in a computer (numbers, text, images) is patterns of 0s and 1s.",
 				Body: `A bit is one binary digit. Binary is base 2, so 1011 = 8 + 0 + 2 + 1 = 11.
 Eight bits make a byte (0 to 255). Hexadecimal (base 16, with digits
-0–9 and A–F) is shorthand for 4 bits per digit: 0xFF = 255.
+0–9 and A–F) is shorthand for 4 bits per digit: 0xFF = 255, and a byte
+is always exactly two hex digits.
 
 Text is numbers too. In ASCII, 'A' = 65, and Unicode (usually stored as
-UTF-8) extends this to every writing system and to emoji. Colours are
-three bytes (red, green, blue), so #FF8800 is orange. Meaning comes from
-interpretation: the same bytes can be a number, a letter, a pixel or an
-instruction.`,
+UTF-8) extends this to every writing system and to emoji, using one to
+four bytes per character. Colours are three bytes (red, green, blue), so
+#FF8800 is orange. Meaning comes from interpretation: the same bytes can
+be a number, a letter, a pixel or an instruction.
+
+Converting by hand: to read binary, add the place values of the 1s; to
+write a number in binary, repeatedly divide by 2 and collect the
+remainders, which come out from the lowest bit up. In C:
+
+  for (int i = 31; i >= 0; i--)
+      putchar((x >> i & 1) ? '1' : '0');    // x unsigned, bit 31 first
+
+printf prints hex with %x, but has no standard binary format, so you
+write that loop yourself. Numbers bigger than one byte also have a byte
+order in memory (endianness): see below.`,
 				Diagram: `bit value:  128  64  32  16   8   4   2   1
-bits:         0   1   0   0   0   0   0   1   = 64 + 1 = 65 = 'A'`,
+bits:         0   1   0   0   0   0   0   1   = 64 + 1 = 65 = 'A'
+hex:          └─── 4 ───┘   └─── 1 ───┘       = 0x41`,
+				UnderTheHood: `What the bytes really are, from od -An -tx1 (or xxd) on Linux:
+
+  printf 'A é 😀' | od -An -tx1
+   41 20 c3 a9 20 f0 9f 98 80
+
+'A' is the single byte 41, the space is 20, é takes two bytes (c3 a9)
+and the emoji takes four (f0 9f 98 80): that is UTF-8. A string's
+length in bytes (what strlen counts) is not its number of characters.
+
+Byte order: storing the 32-bit number 0x01020304 and printing its bytes
+in memory order, on an x86-64 machine, gives 04 03 02 01, lowest byte
+first. That is little-endian, used by x86 and almost every ARM system;
+network protocols send the highest byte first (big-endian), which is
+why C has htonl and ntohl to convert. And interpretation is everything:
+the byte 200 read as an int8_t is -56, the same bits as uint8_t are
+200.`,
 				MentalModel: "Bits have no meaning until you decide how to read them.",
-				TryIt:       "Convert your age and your birth year to binary and hex by hand, then check with Python's bin() and hex().",
+				TryIt:       "Convert your age and your birth year to binary and hex by hand, then check them with a C program that prints the bits with the loop above and the hex with %x.",
 				Analogy: `Morse code turns letters into dots and dashes; binary turns everything
 into 0s and 1s. A row of light switches, each on or off, can encode any
 number, as long as everyone agrees what each switch is worth.`,
@@ -2208,33 +2248,61 @@ number, as long as everyone agrees what each switch is worth.`,
 such as 192.168.1.1 is a 32-bit number written as four bytes. The emoji
 😀 is Unicode code point U+1F600, stored as 4 bytes in UTF-8.`,
 				Exercises: trio(
-					"Convert 13, 100 and 255 to binary, and convert 0x2A and 0x10 to decimal.",
-					"Repeatedly subtract the largest power of 2 that fits.",
-					"Write to_binary(n) and from_binary(s) without built-in conversions, and test them against bin() and int(s, 2) for every number from 0 to 10,000.",
-					"Repeated division by 2 gives the bits from right to left.",
-					`Open a small PNG and a text file in a hex viewer (xxd on Linux/macOS, or an online hex viewer) and identify the PNG's "magic number" header and any readable text in either file.`,
-					`PNG files start with 89 50 4E 47; the bytes 50 4E 47 spell "PNG".`,
+					"Convert 13, 100 and 255 to binary, and convert 0x2A and 0x10 to decimal. How many hex digits does a 32-bit number need?",
+					"1101, 1100100 and 11111111; 0x2A = 42 and 0x10 = 16. Each hex digit is 4 bits, so 8 digits.",
+					"In C, write void to_binary(uint32_t x, char out[33]) and uint32_t from_binary(const char *s) without library conversions, and test that from_binary(to_binary(x)) == x for a million random x, and for 0 and 4294967295.",
+					"Write the bits from bit 31 down, then terminate the string. from_binary: for each character, x = x * 2 + (c - '0').",
+					`Look at a small PNG and a text file byte by byte (xxd on most systems, or od -An -tx1 anywhere) and identify the PNG's "magic number" header and any readable text in either file. Then write your own hex dumper in C: offset, 16 bytes in hex, and the printable characters.`,
+					`PNG files start with 89 50 4E 47 0D 0A 1A 0A; the bytes 50 4E 47 spell "PNG". Read the file with fread in blocks of 16 bytes, and print a byte as a character only if isprint() says so.`,
 				),
 			},
 			{
 				Name:    "Logic Gates & Circuits",
 				Summary: "Tiny switches combined into circuits that compute.",
 				Body: `A transistor is an electrically controlled switch. Wire a few together
-and you get logic gates: NOT, AND, OR, XOR and NAND. NAND alone is
-universal, meaning any circuit can be built from NAND gates only.
+and you get logic gates: NOT, AND, OR, XOR and NAND. A NAND gate takes
+four transistors in CMOS, the technology of almost every chip, and NAND
+alone is universal: any circuit can be built from NAND gates only.
 
-Combinational circuits compute their outputs from their current inputs.
-A half adder uses XOR for the sum bit and AND for the carry. Chain full
-adders together and you can add 64-bit numbers. A multiplexer selects
-one of several inputs. Modern processors contain tens of billions of
-transistors.`,
+  NOT a     = a NAND a                            1 NAND
+  a AND b   = NOT (a NAND b)                      2 NANDs
+  a OR b    = (NOT a) NAND (NOT b)                3 NANDs
+  a XOR b   = with m = a NAND b:
+              (a NAND m) NAND (b NAND m)          4 NANDs
+
+Combinational circuits compute their outputs from their current inputs
+only. A half adder uses XOR for the sum bit and AND for the carry. A
+full adder also takes a carry in, and chaining 32 of them, each carry
+feeding the next, adds two 32-bit numbers (a ripple-carry adder). A
+multiplexer selects one of several inputs: out = (a AND s) OR (b AND NOT
+s). Modern processors contain tens of billions of transistors.`,
 				Diagram: `A ─┬─────▶ [ XOR ] ──▶ sum        A B │ sum carry
 B ─┼─┬───▶ [     ]                0 0 │  0    0
    │ │                            0 1 │  1    0
    └─┼───▶ [ AND ] ──▶ carry      1 0 │  1    0
      └───▶ [     ]                1 1 │  0    1   (1 + 1 = 10 in binary)`,
+				UnderTheHood: `C's bitwise operators are gates, 32 or 64 of them side by side. gcc -O2
+compiles unsigned mix(unsigned a, unsigned b) { return a ^ b; } to a
+single instruction,
+
+  xor   eax, esi
+
+which is 32 XOR gates working in parallel in one clock cycle. And the
+multiplexer is an instruction too: int pick(int c, int a, int b) {
+return c ? a : b; } compiles to
+
+  test  edi, edi
+  mov   eax, esi
+  cmove eax, edx        ; if c was zero, take b instead
+
+with no jump: the CPU computes both inputs and a multiplexer picks one.
+
+A ripple-carry adder is slow because the carry may have to travel
+through every bit, one gate delay after another. Real ALUs use
+carry-lookahead adders, which compute all the carries at once with more
+gates, so a 64-bit add finishes in one cycle.`,
 				MentalModel: "Arithmetic is just logic, and logic is just switches.",
-				TryIt:       "Build a half adder and a full adder in a free logic simulator (Digital or Logisim Evolution), then chain four into a 4-bit adder.",
+				TryIt:       "Build a half adder and a full adder in a free logic simulator (Digital or Logisim Evolution), then chain four into a 4-bit adder and add 7 + 9.",
 				Analogy: `Two light switches wired one after the other (both must be on for the
 bulb to light) make AND. Wired side by side (either one will do), they
 make OR. A hallway light with a switch at each end, where flipping either
@@ -2243,12 +2311,84 @@ switch toggles the light, behaves like XOR.`,
 of billions of transistors at a time. Minecraft players have even built
 working computers out of redstone logic gates.`,
 				Exercises: trio(
-					"Build NOT, AND and OR using only NAND gates, on paper.",
-					"NOT A = A NAND A. Then AND = NOT(A NAND B).",
-					"Write a program that simulates gates as functions, builds a full adder from them, and adds two 8-bit numbers bit by bit (ripple carry). Verify it against normal addition for every pair from 0 to 255.",
-					"The carry out of bit i is the carry into bit i + 1.",
-					"Design the logic for a car's seat-belt warning: beep if the engine is on AND (the driver's belt is off OR (the passenger seat is occupied AND the passenger's belt is off)). Write the truth table, simplify, and simulate it.",
-					"Name each sensor as a Boolean input, then list all 16 cases.",
+					"Build NOT, AND and OR using only NAND gates, on paper. How many NAND gates does each need?",
+					"NOT a = a NAND a (1). AND = NOT(a NAND b) (2). OR = (NOT a) NAND (NOT b) (3).",
+					"In C, write int nand(int a, int b), then not_, and_, or_ and xor_ using only nand, then a full adder from those, and add two 8-bit numbers bit by bit (ripple carry). Verify it against + for every pair from 0 to 255.",
+					"Full adder: sum = a XOR b XOR cin; cout = (a AND b) OR (cin AND (a XOR b)). The carry out of bit i is the carry into bit i + 1.",
+					"Design the logic for a car's seat-belt warning: beep if the engine is on AND (the driver's belt is off OR (the passenger seat is occupied AND the passenger's belt is off)). Write the truth table, simplify, and simulate it in C for all 16 cases.",
+					"Name each sensor as an input bit, loop over the 16 values of a 4-bit counter, and print the row and the result.",
+				),
+			},
+			{
+				Name:    "Building an ALU: Adders, Subtraction & Flags",
+				Summary: "One adder does addition, subtraction and comparison; four flag bits tell the program what happened.",
+				Body: `An ALU (arithmetic logic unit) takes two numbers and an operation code,
+and produces a result and a few flag bits. The surprising part is how
+little it needs: the adder from the last lesson does nearly everything.
+
+Subtraction is addition. CPUs store negative numbers in two's
+complement: −x is the bits of x inverted, plus one, so in 8 bits −1 is
+11111111 and −128 is 10000000. Then a − b = a + (NOT b) + 1, which is
+the adder with b's bits inverted and the carry-in set to 1. The same
+circuit adds signed and unsigned numbers: only the interpretation of the
+result differs.
+
+After each operation the ALU sets flags, which conditional jumps read:
+- Z, zero: the result is 0;
+- N (or S), negative: the top bit of the result is 1;
+- C, carry: an unsigned result did not fit (a carry out of the top bit,
+  or for subtraction, a borrow; ARM records the opposite of the borrow);
+- V (or O), overflow: a signed result did not fit (two positives gave a
+  negative, or two negatives a positive).
+
+A comparison is a subtraction that keeps only the flags: cmp a, b
+computes a − b and throws the result away. "a < b" is then a question
+about the flags: for unsigned numbers, did it borrow (C)? For signed
+numbers, is N different from V?`,
+				Diagram: `8-bit examples       result    Z N C V
+ 127 + 1             10000000  0 1 0 1   signed overflow: 127 + 1 ≠ −128
+ 255 + 1             00000000  1 0 1 0   unsigned carry: 255 + 1 ≠ 0
+   5 − 7             11111110  0 1 1 0   borrow; as signed it is −2, fine
+−128 − 1             01111111  0 0 0 1   signed overflow: gives +127`,
+				UnderTheHood: `The same comparison instruction serves signed and unsigned code; only
+the flag test after it differs. gcc -O2 compiles
+
+  int lt_s(int a, int b)           { return a < b; }
+  int lt_u(unsigned a, unsigned b) { return a < b; }
+
+to
+
+  cmp   edi, esi        cmp   edi, esi
+  setl  al              setb  al
+
+setl ("less") tests N ≠ V, the signed rule; setb ("below") tests the
+carry flag, the unsigned rule. That is why comparing a signed with an
+unsigned number in C is a trap: the compiler converts the signed one,
+and −1 < 1u is false.
+
+The overflow flag is also there for you to read. gcc's
+__builtin_add_overflow(a, b, &r) compiles to an add followed by setno,
+"set if no overflow", one instruction that reads V: checking every
+signed addition costs almost nothing.`,
+				MentalModel: "Subtract by adding the complement; compare by subtracting and reading the flags.",
+				TryIt:       "In C, print -1 < 1u, (unsigned)-1, and (int8_t)128, and explain each result in terms of two's complement. Then compile both lt_s and lt_u with gcc -O2 -S.",
+				Analogy: `A car's odometer: roll it back one from 000000 and it shows 999999. Two's
+complement treats that 999999 as −1: counting down from zero wraps
+around to the top. The carry flag is the odometer telling you it wrapped;
+the overflow flag is it telling you a signed reading jumped from the
+largest positive to the largest negative.`,
+				Example: `Every if, for and while in compiled code ends in a compare and a jump
+that reads these flags. Integer-overflow bugs are a whole class of
+security holes: a size computed as count × size that wraps around
+allocates a small buffer that is then overrun, which is why calloc
+checks the multiplication for you.`,
+				Exercises: trio(
+					"In 8-bit two's complement, write 5, −5, −1 and −128 in binary. What do 01111111 + 1 and 11111111 + 1 give, and which flags do they set?",
+					"00000101, 11111011, 11111111, 10000000. 127 + 1 = 10000000 sets N and V; 255 + 1 = 00000000 sets Z and C.",
+					"In C, write uint8_t add8(uint8_t a, uint8_t b, int *c, int *v) and sub8 the same way, computing the flags from the bits (not by testing the answer in a wider type), and check them against a wider-type calculation for all 65,536 pairs.",
+					"Carry: the 9th bit of a + b. Overflow: a and b have the same sign bit and the result's sign bit differs. sub8 is add8(a, ~b) with a carry-in of 1, and its borrow is the inverse of that carry.",
+					"Find an integer-overflow bug: write a function that allocates count elements of size bytes with malloc(count * size), and show that for count = 2⁶¹ + 1 and size = 8 (with 64-bit size_t) the product wraps around to just 8 bytes. Fix it with __builtin_mul_overflow, or with calloc.",
+					"(2⁶¹ + 1) × 8 = 2⁶⁴ + 8, which wraps to 8. Print count * size as an unsigned 64-bit number to see it. The check is: if (__builtin_mul_overflow(count, size, &bytes)) return NULL;",
 				),
 			},
 			{
@@ -2256,16 +2396,46 @@ working computers out of redstone logic gates.`,
 				Summary: "How circuits remember.",
 				Body: `Combinational circuits forget as soon as their inputs change. Feed a
 gate's output back into its input and you get a latch, which holds one
-bit. A flip-flop updates only on a clock tick, keeping the whole chip in
-lockstep. Groups of flip-flops form registers (for example, 64 bits).
+bit. Two NOR gates, each feeding the other, make an SR latch: S sets
+the stored bit to 1, R resets it to 0, and with both at 0 it holds
+whatever it last stored. A flip-flop updates only on a clock tick,
+keeping the whole chip in lockstep. Groups of flip-flops form registers
+(for example, 64 bits).
 
-SRAM (used in CPU caches) keeps each bit in a small flip-flop circuit of
-about six transistors: fast but large. DRAM (main memory) stores each bit
-as charge in a tiny capacitor that leaks, so it must be refreshed many
-times a second: dense and cheap, but slower. Flash memory (in SSDs)
-traps charge so that it survives power-off.`,
+SRAM (used in CPU caches and registers) keeps each bit in a small
+flip-flop circuit of about six transistors: fast but large. DRAM (main
+memory) stores each bit as charge in one transistor and a tiny
+capacitor, which leaks, so every row must be refreshed every 64
+milliseconds: dense and cheap, but slower. Flash memory (in SSDs) traps
+charge in an insulated gate, so it survives power-off.
+
+Memory is addressed: a decoder turns an address into a single selected
+row, and the bits of that row are read out or written. That is why
+reading any address takes the same time in principle ("random access").
+In practice the distance matters a great deal, as the next section
+measures.`,
+				Diagram: `SR latch: two NOR gates, each fed by the other's output
+
+  Q  = NOR(R, nQ)          S R │ Q
+  nQ = NOR(S, Q)           0 0 │ keep (memory)
+                           1 0 │ 1    (set)
+  nQ is "not Q"            0 1 │ 0    (reset)
+                           1 1 │ not allowed`,
+				UnderTheHood: `The speed gap between SRAM and DRAM is measurable from C. A program
+that follows a chain of pointers through a shuffled array (so the CPU
+cannot guess the next address) timed each load on a test machine:
+
+  working set     time per load    where the data lives
+  16 KiB              1.6 ns       L1 cache (SRAM, next to the core)
+  256 KiB             4.0 ns       L2 cache (SRAM)
+  4 MiB              28.5 ns       L3 cache (SRAM, shared)
+  256 MiB           207 ns         DRAM, across the memory bus
+
+Over a hundred times slower from L1 to DRAM, for the same instruction.
+That gap, and the caches built to hide it, are the subject of The Memory
+Hierarchy & Locality in Stage 5.`,
 				MentalModel: "Feedback turns logic into memory, and the clock keeps it in step.",
-				TryIt:       "Build an SR latch from two NOR gates in a simulator and watch it hold its value.",
+				TryIt:       "Build an SR latch from two NOR gates in a simulator and watch it hold its value. Then write the pointer-chasing program in C and measure your own machine's L1, L2, L3 and DRAM latencies.",
 				Analogy: `A light switch stays where you put it after you let go (a latch), while
 a doorbell only rings while you hold the button (combinational). DRAM is
 like a leaky bucket that must be topped up regularly, or the water (your
@@ -2276,11 +2446,91 @@ forgets without power. The "Rowhammer" attack flips bits in DRAM by
 rapidly reading neighbouring rows.`,
 				Exercises: trio(
 					"Why does an unsaved document vanish in a power cut, while files on the SSD survive? Use the words volatile and non-volatile.",
-					"Which kinds of memory need power to keep their data?",
-					"Simulate an SR latch in code (update the two NOR gates repeatedly until the outputs are stable) and show that set, reset and hold all behave correctly.",
-					"Loop until the outputs stop changing.",
+					"RAM is volatile: DRAM's capacitors lose their charge within milliseconds without power and refresh. Flash is non-volatile: its trapped charge stays for years.",
+					"In C, simulate an SR latch: two NOR gates updated in turn (first nQ = NOR(S, Q), then Q = NOR(R, nQ)) until the outputs stop changing, and show that set, reset and hold behave correctly over a sequence of inputs.",
+					"int nor(int a, int b) { return !(a | b); } and loop until neither output changed in a full pass. Start from Q = 0, nQ = 1.",
 					`Laptops advertise "16 GB RAM, 512 GB SSD". Explain to a friend what each one is for, then measure how much RAM your browser uses with 1, 10 and 30 tabs open.`,
 					"Use Task Manager (Windows), Activity Monitor (macOS) or htop (Linux).",
+				),
+			},
+			{
+				Name:    "Finite State Machines & Sequential Logic",
+				Summary: "A system that is always in one of a few states, and moves between them as inputs arrive.",
+				Body: `A finite state machine (FSM) has a fixed set of states, a starting
+state, and a transition rule: given the current state and an input,
+which state comes next. Some states may be accepting (the input so far
+is valid) or produce outputs.
+
+In hardware, an FSM is a register that holds the current state plus a
+combinational circuit that computes the next state from it and the
+inputs; on every clock tick the register loads the next state. A
+counter is the simplest: a register and an adder that adds 1. A traffic
+light controller, a vending machine and the control unit at the heart
+of a CPU are all FSMs.
+
+In software, FSMs are everywhere input arrives one piece at a time:
+parsers, protocol handlers, games and user interfaces. The clean way to
+write one in C is a state variable and a switch:
+
+  enum state { START, SIGN, DIGITS, ERROR };
+  enum state s = START;
+  for (const char *p = text; *p != '\0'; p++) {
+      int digit = isdigit((unsigned char)*p);
+      switch (s) {
+      case START:  s = *p == '-' ? SIGN : digit ? DIGITS : ERROR; break;
+      case SIGN:   s = digit ? DIGITS : ERROR; break;
+      case DIGITS: s = digit ? DIGITS : ERROR; break;
+      case ERROR:  break;
+      }
+  }
+  int is_integer = (s == DIGITS);      // the accepting state
+
+Drawing the states as circles and the transitions as arrows, before
+writing code, is the fastest way to find the cases you forgot.`,
+				Diagram: `an FSM that accepts integers such as 42 or -7
+
+             '-'               digit
+  START ──────────▶ SIGN ──────────▶ DIGITS ──┐
+    │                                 ▲  ▲    │ digit
+    └──────────── digit ──────────────┘  └────┘
+  any other character, from any state ──▶ ERROR, which it never leaves
+  the input is an integer if it ends in DIGITS`,
+				UnderTheHood: `A switch over a state variable compiles to a jump table, the software
+version of the hardware's next-state logic. For a seven-state switch,
+gcc -O2 produced:
+
+  cmp    edi, 6
+  ja     .L15                          ; state out of range
+  lea    rdx, .L17[rip]                ; the table of jump offsets
+  mov    edi, edi
+  movsx  rax, DWORD PTR [rdx+rdi*4]    ; this state's entry
+  add    rax, rdx
+  notrack jmp rax                      ; go straight to its case
+
+so moving to the right case takes the same few instructions whether
+there are 7 states or 700: no chain of comparisons.
+
+TCP, the protocol under the web, is specified as a state machine
+(CLOSED, LISTEN, SYN-SENT, ESTABLISHED, FIN-WAIT and others), and on
+Linux, ss -t shows each connection's current state. Regular expressions
+are compiled into state machines too (Stage 11).`,
+				MentalModel: "Draw the states and arrows first; the code is then a switch that follows the drawing.",
+				TryIt:       "Draw the FSM for a turnstile (states locked and unlocked, inputs coin and push), then write it in C as a switch, reading c and p characters from standard input and printing the state after each.",
+				Analogy: `A turnstile at a station: it is locked until you insert a coin, then
+unlocked until you push through, then locked again. Pushing when it is
+locked does nothing; a second coin when it is unlocked is wasted. Two
+states, two inputs, and a rule for every combination.`,
+				Example: `Traffic lights, lifts, washing machines and vending machines are run by
+state machines. Network protocols (TCP), text parsers, the lexer at the
+front of every compiler, game characters' behaviours and the "loading,
+loaded, error" states of an app's screen are all FSMs.`,
+				Exercises: trio(
+					"Draw the FSM for a traffic light that cycles red → red-and-amber → green → amber → red on each tick, with a pedestrian button that, when pressed during green, moves to amber on the next tick instead of waiting.",
+					"Four states in a cycle; the button only changes the transition out of green. Write the transition table first: one row per (state, input).",
+					"In C, write a vending machine FSM: a drink costs 70 cents; inputs are coins of 10, 20 and 50 and a cancel key; it dispenses and gives change when 70 or more is inserted, and refunds on cancel. Read inputs from standard input and print every state change.",
+					"The state is the amount inserted so far (0 to 60, in tens); each coin moves to a higher state, or to dispense-and-change.",
+					"Write a C program that strips comments from C source code with a state machine: states for normal code, inside a string, inside a character literal, after a /, inside a /* */ comment and inside a // comment. Test it on a file containing \"/* not a comment */\" in a string.",
+					"The tricky transitions: a backslash inside a string escapes the next character, and a * inside a block comment only ends it when followed by /.",
 				),
 			},
 			{
@@ -2290,18 +2540,49 @@ rapidly reading neighbouring rows.`,
 the address held in the program counter), decodes it, executes it in the
 ALU (arithmetic logic unit) using registers, and writes back the result.
 
+The datapath is the hardware the data flows through: the register file,
+the ALU, the connection to memory, and the multiplexers that choose which
+register feeds which input. The control unit is a finite state machine
+that, for each instruction, sets those multiplexers and tells the ALU
+which operation to do.
+
 Instructions are just numbers, defined by the instruction set
 architecture (ISA), such as x86-64, ARM or RISC-V. Branch instructions
 change the program counter, which is how ifs and loops exist in
-hardware. The clock (for example 3 GHz, or 3 billion ticks a second)
-sets the pace, and modern cores complete several instructions per tick.`,
+hardware: a loop is a compare that sets flags, and a jump back that
+happens only if a flag says so. The clock (for example 3 GHz, or 3
+billion ticks a second) sets the pace, and modern cores complete several
+instructions per tick.
+
+An emulator is this cycle written in software: an array for memory, a
+few variables for registers, and a loop that fetches, decodes with a
+switch, and executes.`,
 				Diagram: `   ┌───────┐    ┌────────┐    ┌─────────┐    ┌───────────┐
 ┌─▶│ FETCH │───▶│ DECODE │───▶│ EXECUTE │───▶│ WRITEBACK │───┐
 │  └───────┘    └────────┘    └─────────┘    └───────────┘   │
 │   PC → memory   which op?     ALU / memory   result → reg  │
 └──────────────── PC = next instruction ◀────────────────────┘`,
+				UnderTheHood: `The instructions really are bytes in your program file. gcc -O2 compiled
+int add(int a, int b) { return a + b; } and objdump -d shows:
+
+  f3 0f 1e fa          endbr64
+  8d 04 37             lea    eax, [rdi+rsi*1]
+  c3                   ret
+
+The CPU fetches f3 0f 1e fa (a marker for control-flow protection,
+which does nothing else), then 8d 04 37: opcode 8d (lea, "load effective
+address", used here simply as a fast add), and 04 37 encode the
+registers. The arguments arrive in edi and esi, and the result goes in
+eax, as the calling convention (Stage 5) says. Then c3, ret: fetch the
+return address from the stack and continue from there.
+
+A modern core does not run these strictly one at a time: it fetches and
+decodes several per cycle, splits them into simpler internal operations,
+and executes them out of order when their inputs are ready. The
+programmer-visible model, one instruction after another, is kept as a
+promise, not as a description of the hardware.`,
 				MentalModel: "A CPU is a loop that reads a number, does what the number says, and moves on.",
-				TryIt:       "Write a program for the Little Man Computer (a toy CPU simulator) that adds two inputs.",
+				TryIt:       "Compile a small C function with gcc -O2 -c, look at it with objdump -d -M intel, and find each instruction's bytes. Then change the function and see which bytes change.",
 				Analogy: `A cook following a recipe card: read the next step (fetch), understand it
 (decode), do it (execute), put the result on the counter (write back),
 then move on to the next step, unless the step says "go back to step 3".`,
@@ -2312,10 +2593,95 @@ RISC-V is an open ISA that anyone can implement.`,
 				Exercises: trio(
 					"A 3 GHz CPU completes on average 2 instructions per clock tick. How many instructions per second is that, and how long is one tick?",
 					"6 billion per second; one tick is 1 / 3,000,000,000 s ≈ 0.33 ns.",
-					"Write an emulator for a tiny CPU with 4 registers and the instructions LOAD, ADD, SUB, JUMP_IF_ZERO, PRINT and HALT. Then write a program for it that counts down from 10.",
-					"A while loop over a program counter, with an if/elif on the opcode.",
+					"In C, write an emulator for a tiny CPU with 4 registers and the instructions LOAD r value, ADD rd rs, SUB rd rs, JZ r target, JMP target, PRINT r and HALT, read as text. Then write a program for it that counts down from 10.",
+					"Parse the program into an array of structs first; then a loop over a program counter, with a switch on the opcode. A jump sets pc instead of adding 1.",
 					"Look up the CPU in your laptop or phone: its ISA, core count, clock speed and cache sizes. Explain which of those numbers matter most for gaming, video editing and web browsing.",
 					"lscpu on Linux, About This Mac on macOS, Task Manager → Performance on Windows.",
+				),
+			},
+			{
+				Name:    "Instruction Sets & Machine Code",
+				Summary: "How an instruction is packed into bits, and why x86 and RISC-V pack them so differently.",
+				Body: `An instruction set architecture defines the instructions, the
+registers, and the exact bit patterns that encode each instruction. The
+assembler turns text such as addi x1, x0, 5 into those bits; a
+disassembler (objdump) turns them back.
+
+RISC-V, an open ISA, shows the idea cleanly. Every instruction is 32
+bits, with fields at fixed positions:
+
+  bits:   31        20 19   15 14  12 11    7 6       0
+  I-type: [ imm 11:0  ][  rs1 ][funct3][  rd  ][ opcode ]
+  R-type: [funct7][rs2][  rs1 ][funct3][  rd  ][ opcode ]
+
+The opcode (bits 0–6) says the format: 0010011 for arithmetic with an
+immediate (I-type), 0110011 for register-to-register (R-type). funct3,
+and for R-type funct7, pick the operation (add or sub, and, or, xor).
+rd is the destination register and rs1, rs2 the sources, 5 bits each
+for 32 registers. The immediate is a 12-bit two's-complement number, so
+decoding it means sign-extending bit 31: -1 is all ones.
+
+Decoding is shifts and masks:
+
+  uint32_t opcode = w & 0x7f;
+  uint32_t rd     = (w >> 7)  & 0x1f;
+  uint32_t funct3 = (w >> 12) & 0x7;
+  uint32_t rs1    = (w >> 15) & 0x1f;
+  int32_t  imm    = (int32_t)w >> 20;    // sign-extends (see below)
+
+Shifting a negative int right is arithmetic (it copies the sign bit) in
+gcc and clang, though the C standard leaves it to the implementation;
+the portable alternative is to shift unsigned and subtract 4096 when bit
+11 of the field is set.
+
+RISC designs (RISC-V, ARM) use simple, fixed-size instructions that are
+easy to decode; x86, a CISC design from 1978 extended ever since, uses
+variable-length instructions from 1 to 15 bytes.`,
+				Diagram: `addi x1, x0, 5  =  0x00500093
+
+  000000000101  00000  000  00001  0010011
+  imm = 5       rs1=x0 add  rd=x1  opcode: I-type arithmetic`,
+				UnderTheHood: `llvm-mc, LLVM's assembler, shows the real encodings. For RISC-V:
+
+  addi x1, x0, 5      93 00 50 00    = 0x00500093
+  addi x2, x1, -1     13 81 f0 ff    = 0xfff08113
+  add  x3, x1, x2     b3 81 20 00    = 0x002081b3
+  sub  x3, x1, x2     b3 81 20 40    = 0x402081b3
+
+The bytes come out lowest first (RISC-V is little-endian), so the word
+is read right to left. add and sub differ in a single bit, bit 30 (the
+funct7 field), and -1's immediate is twelve 1 bits at the top of the
+word, the f f f in 0xfff08113.
+
+x86-64 is the opposite. objdump of three gcc-compiled instructions:
+
+  c3                               ret                     1 byte
+  8d 04 37                         lea  eax, [rdi+rsi*1]   3 bytes
+  48 b8 88 77 66 55 44 33 22 11    movabs rax, 0x1122334455667788
+                                                           10 bytes
+
+A decoder cannot even know where the next instruction starts until it
+has decoded this one, which is why x86 chips spend so many transistors
+on decoding, while every RISC-V instruction starts at a multiple of 4.`,
+				MentalModel: "An instruction is a number with fields; decoding is shifting and masking.",
+				TryIt:       "Decode 0x00500093 and 0x402081b3 by hand into their fields, then check yourself: write each field out in binary and compare with the diagram.",
+				Analogy: `A postcode or a vehicle registration number: positions in the string
+mean different things (region, district, street), so you can decode one
+by cutting it at fixed places. RISC-V instructions are like that. x86
+instructions are more like a sentence, whose meaning you only know once
+you have read up to the full stop.`,
+				Example: `Apple's M-series chips decode fixed-width ARM instructions, which helps
+them decode eight or more per cycle. Emulators such as QEMU, JIT
+compilers in browsers and the JVM, debuggers, and malware analysts all
+encode or decode machine code. RISC-V's openness lets universities and
+companies design their own CPUs without a licence.`,
+				Exercises: trio(
+					"Split 0x002081b3 into its fields: opcode (bits 0–6), rd (7–11), funct3 (12–14), rs1 (15–19), rs2 (20–24), funct7 (25–31). Which instruction is it?",
+					"opcode 0110011 (R-type), rd 3, funct3 000, rs1 1, rs2 2, funct7 0000000: add x3, x1, x2.",
+					"In C, write a decoder for the RISC-V instructions add, sub, and, or, xor, addi, andi, ori and xori, given 32-bit words in hex, printing them like addi x1, x0, 5. Test it with the encodings above, including negative immediates.",
+					"Check the opcode first, then funct3, then (for R-type) funct7. Get the immediate with an arithmetic right shift of the word as int32_t, which keeps the sign.",
+					"Write the reverse: a tiny assembler in C for the same nine instructions, reading lines like add x3, x1, x2 and printing the 32-bit words in hex. Check that your decoder turns its output back into the same lines, for a whole program.",
+					"Encoding is the decoder backwards: word = funct7 << 25 | rs2 << 20 | rs1 << 15 | funct3 << 12 | rd << 7 | opcode, with (imm & 0xfff) << 20 for I-type.",
 				),
 			},
 			{
@@ -2324,20 +2690,43 @@ RISC-V is an open ISA that anyone can implement.`,
 				Body: `Pipelining overlaps the stages of instructions like an assembly line:
 while one instruction executes, the next is decoded and a third is
 fetched. Branch prediction guesses which way an if will go, to keep the
-pipeline full; a wrong guess wastes roughly 15 to 20 cycles.
-Out-of-order execution runs independent instructions early, and caches
-(covered again in Stage 5) hide slow memory.
+pipeline full; a wrong guess throws away the work in flight and costs
+roughly 15 to 20 cycles. Out-of-order execution runs independent
+instructions early, and caches (covered again in Stage 5) hide slow
+memory.
 
 From the mid-2000s, clock speeds stopped rising because of heat, so
 chips added more cores instead. Software must run in parallel to use
 them, and Amdahl's law says the part that must run serially limits the
-overall speed-up.`,
+overall speed-up: if a fraction s of the work is serial, no number of
+cores can make it more than 1/s times faster.
+
+Compilers help too. They remove branches where they can, replacing a
+short if with a conditional move (cmov), and they vectorise loops with
+SIMD instructions that process 16, 32 or 64 bytes at once. Whether your
+code has a branch at all can depend on the optimisation flags, which is
+why performance claims must be measured, not assumed.`,
 				Diagram: `time →      1    2    3    4    5    6
 instr 1:   [F]  [D]  [E]  [W]
 instr 2:        [F]  [D]  [E]  [W]
 instr 3:             [F]  [D]  [E]  [W]     one instruction finishes per tick`,
-				MentalModel: "Keep every part of the chip busy: overlap, predict and parallelise.",
-				TryIt:       "Time summing only the values ≥ 128 of a big array, sorted versus unsorted, and explain the difference.",
+				UnderTheHood: `The famous experiment, re-run on a test machine: sum the bytes ≥ 128 of
+a 32 MB array, first in random order, then after sorting it.
+
+  compiled with                                 random    sorted
+  gcc -O2 -fno-if-conversion -fno-tree-vectorize  148 ms     20 ms
+  gcc -O0                                         264 ms     89 ms
+  gcc -O2                                          14 ms     15 ms
+
+With a real branch, random data makes the predictor wrong about half
+the time, and the loop is seven times slower than on sorted data, where
+the branch goes the same way for millions of iterations. But plain
+gcc -O2 removes the branch altogether: objdump shows pcmpgtb, a SIMD
+instruction that compares 16 bytes at once and turns the if into
+arithmetic on masks. No branch, nothing to mispredict, and the order of
+the data no longer matters.`,
+				MentalModel: "Keep every part of the chip busy: overlap, predict and parallelise, and measure which one the compiler already did.",
+				TryIt:       "Run the sorted-versus-random experiment in C with -O0, -O2, and -O2 -fno-if-conversion -fno-tree-vectorize, and use objdump to find the branch (or its absence) in each.",
 				Analogy: `A laundromat: washing, drying and folding different loads at the same
 time is far faster than finishing each load before starting the next.
 More cores are like more washing machines, but if one step has to happen
@@ -2349,10 +2738,10 @@ speculative execution to leak secrets.`,
 				Exercises: trio(
 					"A program is 90% parallelisable. What is the maximum speed-up with 10 cores? With unlimited cores?",
 					"Amdahl's law: 1 / (0.1 + 0.9/N) gives about 5.3× for 10 cores and 10× at most.",
-					"Run the sorted-versus-unsorted branch experiment in C, Go or Rust (Python hides the effect) and report the times.",
-					"Use a large array (10 million or more elements) and repeat each run several times.",
-					"Take a slow batch job (for example resizing a folder of 500 photos) and split it across all your CPU cores with multiprocessing or goroutines. Measure the speed-up and explain why it is less than the number of cores.",
-					"Look for the serial parts: listing files, reading from disk, merging results.",
+					"Run the sorted-versus-unsorted branch experiment in C and report the times with three sets of flags: -O0, -O2, and -O2 -fno-if-conversion -fno-tree-vectorize. Explain each result from the assembly.",
+					"Use an array of 32 million bytes and repeat each run several times. In the objdump output, look for a conditional jump inside the loop, a cmov, or SIMD instructions such as pcmpgtb.",
+					"Take a slow batch job (for example converting 500 images, or hashing 500 files) and split it across all your CPU cores with POSIX threads or by running several processes. Measure the speed-up and explain why it is less than the number of cores.",
+					"Give each thread a contiguous slice of the files. Look for the serial parts: listing the files, reading from disk, combining the results.",
 				),
 			},
 		},
@@ -2376,6 +2765,13 @@ speculative execution to leak secrets.`,
 			{"Why is NAND called a universal gate?", "Any logic circuit, including NOT, AND and OR, can be built from NAND gates alone."},
 			{"What are the four steps of the instruction cycle?", "Fetch, decode, execute and write back."},
 			{"Why did CPUs switch from faster clocks to more cores?", "Higher clock speeds produced too much heat and used too much power, so manufacturers added parallel cores instead."},
+			{"How many bytes does UTF-8 use for 'A', for é, and for an emoji such as 😀?", "One (0x41), two (c3 a9) and four (f0 9f 98 80)."},
+			{"How does a CPU compute a − b with an adder?", "It adds a, the inverted bits of b, and a carry-in of 1: a + (NOT b) + 1, which is a + (−b) in two's complement."},
+			{"What is the difference between the carry flag and the overflow flag?", "Carry means an unsigned result did not fit (a carry or borrow out of the top bit); overflow means a signed result did not fit (for example, two positives gave a negative)."},
+			{"Why does DRAM need refreshing, and SRAM not?", "DRAM stores each bit as charge in a capacitor that leaks away within milliseconds; SRAM holds each bit in a flip-flop that keeps its state as long as it has power."},
+			{"What makes up a finite state machine?", "A fixed set of states, a starting state, and a transition rule giving the next state for each state and input (plus, optionally, accepting states or outputs)."},
+			{"How does a RISC-V decoder find the destination register of an instruction?", "It is always bits 7 to 11: (w >> 7) & 0x1f."},
+			{"Why might sorting an array make no difference to the speed of an if inside a loop?", "The compiler may have removed the branch, with a conditional move or SIMD instructions, so there is nothing to mispredict."},
 		},
 	},
 }

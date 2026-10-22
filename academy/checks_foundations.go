@@ -405,6 +405,349 @@ var foundationsChecks = []Check{
 			"For k > 365 the answer is exactly 1: stop the loop at 365, where the factor reaches 0.",
 		},
 	},
+	{
+		ID: "bases", Stage: 4, Concept: "Binary & Number Representation",
+		Title: "Decimal, hex and binary",
+		Task:  "Read lines, each a number from 0 to 4,294,967,295 written in decimal (42), hexadecimal (0x2A or 0x2a) or binary (0b101010), and print it in all three: 42 0x2a 0b101010, with lowercase hex digits and no leading zeros (0 is 0 0x0 0b0). Parse and print binary yourself: printf has %x but no binary format.",
+		File:  "bases.c",
+		Starter: `/* Checked exercise: bases
+ * Input:  lines with a number: 42, 0x2A or 0b101010 (up to 2^32 - 1).
+ * Output: decimal, hex and binary on one line:
+ *   42 0x2a 0b101010
+ * Hold the value in a uint32_t (or unsigned long long while parsing).
+ * Parsing: value = value * base + digit, for base 10, 16 or 2.
+ * Printing binary: find the highest 1 bit, then print every bit from it
+ * down to bit 0. Zero is the special case: 0b0.
+ */
+#include <stdint.h>
+`,
+		Cases: []CheckCase{
+			{Name: "the same number three ways", Stdin: "42\n0x2A\n0b101010\n", Want: "42 0x2a 0b101010\n42 0x2a 0b101010\n42 0x2a 0b101010\n",
+				Explain: "Hex digits A to F may be upper or lower case on input; print them in lower case."},
+			{Name: "zero and one", Stdin: "0\n0b1\n0x0\n", Want: "0 0x0 0b0\n1 0x1 0b1\n0 0x0 0b0\n",
+				Explain: "Zero has no highest 1 bit: print it as 0b0, not as an empty string."},
+			{Name: "powers of two", Stdin: "256\n0x80000000\n", Want: "256 0x100 0b100000000\n2147483648 0x80000000 0b10000000000000000000000000000000\n"},
+			{Name: "the largest", Stdin: "4294967295\n0xffffffff\n", Want: "4294967295 0xffffffff 0b11111111111111111111111111111111\n4294967295 0xffffffff 0b11111111111111111111111111111111\n",
+				Explain: "4294967295 does not fit in an int (it prints as -1): use uint32_t, and %u or PRIu32 to print it."},
+		},
+		Hints: []string{
+			"Read each line with fgets, check whether it starts with 0x/0X or 0b/0B, and choose the base; then loop over the remaining characters.",
+			"A hex digit's value: c - '0' for 0–9, tolower(c) - 'a' + 10 for a–f.",
+			"For binary output, i from 31 down to 0: skip leading zeros until the first 1 bit, then print every bit.",
+		},
+	},
+	{
+		ID: "nand_gates", Stage: 4, Concept: "Logic Gates & Circuits",
+		Title: "Everything from NAND",
+		Task:  "The checker gives you one gate, int nand(int a, int b), and counts how often it is called. Using only nand (no &, |, ^, !, ~ or arithmetic on the bits), write int not_(int a), and_(int a, int b), or_(int a, int b) and xor_(int a, int b), with the fewest possible NAND gates (1, 2, 3 and 4), and a full adder int full_add(int a, int b, int cin, int *cout) built from your gates. The checker adds every pair of 8-bit numbers with your full adder. No main.",
+		File:  "nand_gates.c",
+		Starter: `/* Checked exercise: nand_gates
+ * The checker provides:   int nand(int a, int b);
+ * Write, using only nand() and your own gates (inputs and outputs are 0 or 1):
+ *   int not_(int a);                 1 NAND
+ *   int and_(int a, int b);          2 NANDs
+ *   int or_(int a, int b);           3 NANDs
+ *   int xor_(int a, int b);          4 NANDs
+ *   int full_add(int a, int b, int cin, int *cout);
+ *       returns the sum bit and sets *cout to the carry out
+ * No main.
+ */
+int nand(int a, int b);
+`,
+		Harness: `#include <stdio.h>
+#include <string.h>
+
+static long calls;
+int nand(int a, int b) { calls++; return !(a && b); }
+
+int not_(int a);
+int and_(int a, int b);
+int or_(int a, int b);
+int xor_(int a, int b);
+int full_add(int a, int b, int cin, int *cout);
+
+static void table(const char *name, int (*gate)(int, int)) {
+    long most = 0;
+    for (int a = 0; a <= 1; a++)
+        for (int b = 0; b <= 1; b++) {
+            calls = 0;
+            int out = gate(a, b);
+            if (calls > most) most = calls;
+            printf("%s(%d, %d) = %d\n", name, a, b, out);
+        }
+    printf("NAND gates: %ld\n", most);
+}
+
+static int not_2(int a, int b) { (void)b; return not_(a); }
+
+int main(int argc, char **argv) {
+    if (argc < 2) return 2;
+    if (strcmp(argv[1], "not") == 0) {
+        long most = 0;
+        for (int a = 0; a <= 1; a++) {
+            calls = 0;
+            printf("not(%d) = %d\n", a, not_2(a, 0));
+            if (calls > most) most = calls;
+        }
+        printf("NAND gates: %ld\n", most);
+    } else if (strcmp(argv[1], "and") == 0) table("and", and_);
+    else if (strcmp(argv[1], "or") == 0) table("or", or_);
+    else if (strcmp(argv[1], "xor") == 0) table("xor", xor_);
+    else if (strcmp(argv[1], "adder") == 0) {
+        for (int x = 0; x < 256; x++)
+            for (int y = 0; y < 256; y++) {
+                int carry = 0, sum = 0;
+                calls = 0;
+                for (int i = 0; i < 8; i++) {
+                    int c;
+                    sum |= full_add(x >> i & 1, y >> i & 1, carry, &c) << i;
+                    carry = c;
+                }
+                sum |= carry << 8;
+                if (sum != x + y) {
+                    printf("%d + %d gave %d\n", x, y, sum);
+                    return 0;
+                }
+                if (calls == 0) {
+                    printf("the adder never called nand\n");
+                    return 0;
+                }
+            }
+        printf("all 65536 sums correct\n");
+    } else return 2;
+    return 0;
+}
+`,
+		Cases: []CheckCase{
+			{Name: "not", Args: []string{"not"}, Want: "not(0) = 1\nnot(1) = 0\nNAND gates: 1\n",
+				Explain: "A NAND with both inputs tied together is a NOT: nand(a, a)."},
+			{Name: "and", Args: []string{"and"}, Want: "and(0, 0) = 0\nand(0, 1) = 0\nand(1, 0) = 0\nand(1, 1) = 1\nNAND gates: 2\n",
+				Explain: "AND is NOT NAND: nand(nand(a, b), nand(a, b)) uses 3 gates; reuse the inner result instead: x = nand(a, b); nand(x, x)."},
+			{Name: "or", Args: []string{"or"}, Want: "or(0, 0) = 0\nor(0, 1) = 1\nor(1, 0) = 1\nor(1, 1) = 1\nNAND gates: 3\n",
+				Explain: "De Morgan: a OR b = NOT(NOT a AND NOT b) = nand(not a, not b)."},
+			{Name: "xor", Args: []string{"xor"}, Want: "xor(0, 0) = 0\nxor(0, 1) = 1\nxor(1, 0) = 1\nxor(1, 1) = 0\nNAND gates: 4\n",
+				Explain: "Share the first gate: m = nand(a, b); then nand(nand(a, m), nand(b, m)). Building it from AND, OR and NOT takes more."},
+			{Name: "an 8-bit ripple-carry adder", Args: []string{"adder"}, Want: "all 65536 sums correct\n",
+				Explain: "sum = a XOR b XOR cin; carry out = (a AND b) OR (cin AND (a XOR b))."},
+		},
+		Hints: []string{
+			"Write each gate on paper as a little circuit of NANDs first, and count them.",
+			"The full adder needs no new tricks: two half adders (an XOR and an AND each) and an OR for the two carries.",
+		},
+	},
+	{
+		ID: "alu", Stage: 4, Concept: "Building an ALU: Adders, Subtraction & Flags",
+		Title: "An ALU with flags",
+		Task:  "Write uint32_t alu(uint32_t a, uint32_t b, char op, struct flags *f) for op '+', '-', '&', '|' and '^', setting f->z (the result is 0), f->n (bit 31 of the result is 1), f->c (for +: a carry out of bit 31; for -: a borrow, that is a < b as unsigned numbers) and f->v (signed overflow: the result as a signed number is wrong). For &, | and ^, c and v are 0. Compute the flags from the bits, as the hardware does; no main.",
+		File:  "alu.c",
+		Starter: `/* Checked exercise: alu
+ * struct flags as below; write alu(). No main.
+ *   op '+': a + b    op '-': a - b    '&' '|' '^': bitwise
+ *   z: result == 0          n: bit 31 of the result
+ *   c: '+' carry out of bit 31; '-' borrow (a < b unsigned); else 0
+ *   v: '+' a and b have the same sign bit and the result's differs
+ *      '-' a and b have different sign bits and the result's differs
+ *          from a's;  else 0
+ * Unsigned arithmetic wraps around, so a + b and a - b are always
+ * defined on uint32_t.
+ */
+#include <stdint.h>
+
+struct flags { int z, n, c, v; };
+
+uint32_t alu(uint32_t a, uint32_t b, char op, struct flags *f);
+`,
+		Harness: `#include <stdint.h>
+#include <stdio.h>
+#include <string.h>
+
+struct flags { int z, n, c, v; };
+uint32_t alu(uint32_t a, uint32_t b, char op, struct flags *f);
+
+static void show(uint32_t a, char op, uint32_t b) {
+    struct flags f = {9, 9, 9, 9};
+    uint32_t r = alu(a, b, op, &f);
+    printf("%08x %c %08x = %08x  Z%d N%d C%d V%d\n", (unsigned)a, op, (unsigned)b, (unsigned)r, f.z, f.n, f.c, f.v);
+}
+
+/* The flags computed the long way, with 64-bit arithmetic. */
+static struct flags expect(uint32_t a, uint32_t b, char op, uint32_t *r) {
+    struct flags f = {0, 0, 0, 0};
+    int64_t sa = (int32_t)a, sb = (int32_t)b, s = 0;
+    switch (op) {
+    case '+': *r = a + b; f.c = ((uint64_t)a + b) >> 32; s = sa + sb; f.v = s != (int32_t)*r; break;
+    case '-': *r = a - b; f.c = a < b; s = sa - sb; f.v = s != (int32_t)*r; break;
+    case '&': *r = a & b; break;
+    case '|': *r = a | b; break;
+    default:  *r = a ^ b; break;
+    }
+    f.z = *r == 0;
+    f.n = *r >> 31;
+    return f;
+}
+
+int main(int argc, char **argv) {
+    if (argc < 2) return 2;
+    if (strcmp(argv[1], "add") == 0) {
+        show(2, '+', 3);
+        show(0x7fffffff, '+', 1);
+        show(0xffffffff, '+', 1);
+        show(0x80000000, '+', 0x80000000);
+    } else if (strcmp(argv[1], "sub") == 0) {
+        show(7, '-', 5);
+        show(5, '-', 7);
+        show(0x80000000, '-', 1);
+        show(0, '-', 0);
+        show(0x7fffffff, '-', 0xffffffff);
+    } else if (strcmp(argv[1], "logic") == 0) {
+        show(0xf0f0f0f0, '&', 0x0f0f0f0f);
+        show(0x80000000, '|', 1);
+        show(0xffffffff, '^', 0x0000ffff);
+    } else if (strcmp(argv[1], "random") == 0) {
+        uint64_t x = 88172645463325252u;
+        const char *ops = "+-&|^";
+        for (int i = 0; i < 1000000; i++) {
+            x ^= x << 13; x ^= x >> 7; x ^= x << 17;
+            uint32_t a = (uint32_t)x, b = (uint32_t)(x >> 32), want;
+            if (i % 4 == 0) b = a ^ (b & 0x80000001u);   /* near-equal values */
+            char op = ops[i % 5];
+            struct flags g = {9, 9, 9, 9}, e = expect(a, b, op, &want);
+            uint32_t got = alu(a, b, op, &g);
+            if (got != want || g.z != e.z || g.n != e.n || g.c != e.c || g.v != e.v) {
+                printf("wrong: ");
+                show(a, op, b);
+                printf("want   %08x %c %08x = %08x  Z%d N%d C%d V%d\n", (unsigned)a, op, (unsigned)b, (unsigned)want, e.z, e.n, e.c, e.v);
+                return 0;
+            }
+        }
+        printf("1000000 operations correct\n");
+    } else return 2;
+    return 0;
+}
+`,
+		Cases: []CheckCase{
+			{Name: "addition", Args: []string{"add"}, Want: "00000002 + 00000003 = 00000005  Z0 N0 C0 V0\n7fffffff + 00000001 = 80000000  Z0 N1 C0 V1\nffffffff + 00000001 = 00000000  Z1 N0 C1 V0\n80000000 + 80000000 = 00000000  Z1 N0 C1 V1\n",
+				Explain: "Carry is about unsigned numbers (ffffffff + 1 wraps to 0); overflow is about signed ones (7fffffff + 1, the largest int plus one, becomes negative)."},
+			{Name: "subtraction", Args: []string{"sub"}, Want: "00000007 - 00000005 = 00000002  Z0 N0 C0 V0\n00000005 - 00000007 = fffffffe  Z0 N1 C1 V0\n80000000 - 00000001 = 7fffffff  Z0 N0 C0 V1\n00000000 - 00000000 = 00000000  Z1 N0 C0 V0\n7fffffff - ffffffff = 80000000  Z0 N1 C1 V1\n",
+				Explain: "For subtraction, c is the borrow: 1 when a < b as unsigned numbers. 5 − 7 borrows (c = 1) but is a correct signed result (−2), so v = 0."},
+			{Name: "logic", Args: []string{"logic"}, Want: "f0f0f0f0 & 0f0f0f0f = 00000000  Z1 N0 C0 V0\n80000000 | 00000001 = 80000001  Z0 N1 C0 V0\nffffffff ^ 0000ffff = ffff0000  Z0 N1 C0 V0\n",
+				Explain: "Logic operations clear c and v, and set z and n from the result like any other."},
+			{Name: "a million random operations", Args: []string{"random"}, Want: "1000000 operations correct\n"},
+		},
+		Hints: []string{
+			"Carry for +: the result is smaller than a (r < a) exactly when the addition wrapped around.",
+			"Overflow for +: ((a ^ r) & (b ^ r)) >> 31: the result's sign differs from both inputs' signs. For −: ((a ^ b) & (a ^ r)) >> 31.",
+			"Set every flag on every call: the checker fills them with 9 first.",
+		},
+	},
+	{
+		ID: "number_fsm", Stage: 4, Concept: "Finite State Machines & Sequential Logic",
+		Title: "Validate numbers with a state machine",
+		Task:  "Read lines (up to 10,000 characters each) and print valid or invalid for each, according to whether the whole line is a decimal number: an optional sign, then digits with an optional fractional part (12, 12., 12.5) or a dot and digits (.5), then optionally e or E, an optional sign, and at least one digit. Nothing else is allowed, not even spaces. Write it as a state machine: an enum of states and a switch.",
+		File:  "number_fsm.c",
+		Starter: `/* Checked exercise: number_fsm
+ * Input:  lines; output valid or invalid for each.
+ * Valid:   0  -12  +3.14  .5  5.  1e10  2E-3  6.02e+23
+ * Invalid: (empty)  .  e5  1e  1e+  +-1  1.2.3  12a  " 1"  1e2.5
+ * Suggested states:
+ *   START, SIGN, INT (digits), DOT_NO_INT (a "." with no digits before),
+ *   FRAC (after the "."), EXP (after e/E), EXP_SIGN, EXP_INT, ERROR
+ * Accepting states: INT, FRAC, EXP_INT.
+ * Draw the arrows first: which characters move from each state where?
+ */
+`,
+		Cases: []CheckCase{
+			{Name: "plain numbers", Stdin: "0\n-12\n+3.14\n.5\n5.\n", Want: "valid\nvalid\nvalid\nvalid\nvalid\n",
+				Explain: `"5." and ".5" are both numbers, but "." alone is not: a dot needs a digit on at least one side.`},
+			{Name: "exponents", Stdin: "1e10\n2E-3\n6.02e+23\n1e\n1e+\ne5\n1e2.5\n", Want: "valid\nvalid\nvalid\ninvalid\ninvalid\ninvalid\ninvalid\n",
+				Explain: "After e there must be at least one digit (a sign alone is not enough), and the exponent is a whole number: no dot."},
+			{Name: "not numbers", Stdin: "\n.\n+-1\n1.2.3\n12a\n 1\n1 \n-\n+.\n", Want: "invalid\ninvalid\ninvalid\ninvalid\ninvalid\ninvalid\ninvalid\ninvalid\ninvalid\n",
+				Explain: "An empty line, a lone sign or dot, two signs, two dots, letters and spaces are all invalid: only accepting states at the end of the line mean valid."},
+			{Name: "edge cases", Stdin: "+.5\n-0.0e-0\n00012\n.e1\n", Want: "valid\nvalid\nvalid\ninvalid\n"},
+			{Name: "many lines", Stdin: numberFSMInput(), Want: numberFSMWant(),
+				Explain: "Every one of these lines was generated from the rules; compare the first mismatch with your arrows."},
+		},
+		Hints: []string{
+			"Strip the newline (s[strcspn(s, \"\\n\")] = '\\0'), run the machine over every character, then check the final state.",
+			"From START: a sign goes to SIGN, a digit to INT, a dot to DOT_NO_INT, anything else to ERROR. From INT: digits stay, a dot goes to FRAC, e/E goes to EXP.",
+			"Once in ERROR, stay there: the rest of the line cannot make it valid.",
+		},
+	},
+	{
+		ID: "cpu", Stage: 4, Concept: "The CPU: Datapath & Instruction Cycle",
+		Title: "Emulate a tiny CPU",
+		Task:  "Read a program for a tiny CPU from standard input, one instruction per line, numbered from 0, and run it. Registers r0 to r3 start at 0 and hold 64-bit signed integers. Instructions: LOAD r n (r = n), ADD r s (r = r + s), SUB r s (r = r − s), JZ r t (if r is 0, continue at instruction t), JMP t, PRINT r (print the value on its own line) and HALT. Running past the last instruction also stops. If the program runs more than 1,000,000 instructions, print too many steps and stop.",
+		File:  "cpu.c",
+		Starter: `/* Checked exercise: cpu
+ * A program (up to 1000 lines), for example a countdown from 3:
+ *   LOAD r0 3          0
+ *   LOAD r1 1          1
+ *   PRINT r0           2
+ *   SUB r0 r1          3
+ *   JZ r0 6            4
+ *   JMP 2              5
+ *   HALT               6      prints 3, 2 and 1
+ * Fetch the instruction at pc, decode it (a switch on the opcode),
+ * execute it, and move pc on: pc + 1, or the jump target.
+ * Parse every line into an array of structs before running.
+ */
+`,
+		Cases: []CheckCase{
+			{Name: "count down", Stdin: "LOAD r0 3\nLOAD r1 1\nPRINT r0\nSUB r0 r1\nJZ r0 6\nJMP 2\nHALT\n", Want: "3\n2\n1\n"},
+			{Name: "sum 1 to 100", Stdin: cpuSumProgram, Want: "5050\n",
+				Explain: "A jump goes to the instruction with that number, counting from 0."},
+			{Name: "fibonacci", Stdin: cpuFibProgram, Want: "0\n1\n1\n2\n3\n5\n8\n13\n21\n34\n",
+				Explain: "ADD and SUB take two registers: ADD r2 r1 means r2 = r2 + r1."},
+			{Name: "fall off the end", Stdin: "LOAD r3 -7\nPRINT r3\nPRINT r2\n", Want: "-7\n0\n",
+				Explain: "Registers start at 0, and running past the last instruction stops the program."},
+			{Name: "an endless loop", Stdin: "LOAD r0 1\nJMP 0\n", Want: "too many steps\n",
+				Explain: "Count every instruction executed, and stop after 1,000,000."},
+			{Name: "big numbers", Stdin: "LOAD r0 4000000000\nLOAD r1 4000000000\nADD r0 r1\nPRINT r0\nHALT\n", Want: "8000000000\n",
+				Explain: "Registers are 64-bit: use long long, read with strtoll or %lld."},
+		},
+		Hints: []string{
+			"struct insn { int op; int a; long long b; }: for each line, sscanf the opcode word, then its operands; turn \"r2\" into 2 by skipping the r.",
+			"while (pc >= 0 && pc < count) { if (++steps > 1000000) { too many steps } switch (code[pc].op) { … } }",
+		},
+	},
+	{
+		ID: "rv_decode", Stage: 4, Concept: "Instruction Sets & Machine Code",
+		Title: "Disassemble RISC-V",
+		Task:  "Read lines, each a 32-bit RISC-V instruction as 8 hex digits (such as 00500093), and print it as assembly with numbered registers and decimal immediates: add, sub, and, or and xor as add x3, x1, x2; addi, andi, ori and xori as addi x1, x0, 5. Print unknown for any other instruction. The immediate is a signed 12-bit number in bits 20–31.",
+		File:  "rv_decode.c",
+		Starter: `/* Checked exercise: rv_decode
+ * Input:  lines of 8 hex digits, one 32-bit instruction each.
+ * Output: one line of assembly each, or "unknown":
+ *   00500093       addi x1, x0, 5
+ *   fff08113       addi x2, x1, -1
+ *   402081b3       sub x3, x1, x2
+ * Fields:  opcode = w & 0x7f      rd  = (w >> 7) & 0x1f
+ *          funct3 = (w >> 12) & 7 rs1 = (w >> 15) & 0x1f
+ *          rs2 = (w >> 20) & 0x1f funct7 = w >> 25
+ *          imm = the top 12 bits, as a SIGNED number
+ * opcode 0x33 (R-type): funct3 0 add (funct7 0) or sub (funct7 0x20),
+ *   4 xor, 6 or, 7 and (funct7 0)
+ * opcode 0x13 (I-type): funct3 0 addi, 4 xori, 6 ori, 7 andi
+ */
+#include <stdint.h>
+`,
+		Cases: []CheckCase{
+			{Name: "assembled by LLVM", Stdin: "00500093\nfff08113\n002081b3\n402081b3\n00c5f533\n00c5e533\n01df4fb3\n",
+				Want:    "addi x1, x0, 5\naddi x2, x1, -1\nadd x3, x1, x2\nsub x3, x1, x2\nand x10, x11, x12\nor x10, x11, x12\nxor x31, x30, x29\n",
+				Explain: "These words came from llvm-mc, LLVM's own assembler. add and sub differ only in bit 30, inside funct7."},
+			{Name: "immediates at the limits", Stdin: "7ff30293\n80030293\n0ff47393\nff046393\nfff44393\n00000013\n",
+				Want:    "addi x5, x6, 2047\naddi x5, x6, -2048\nandi x7, x8, 255\nori x7, x8, -16\nxori x7, x8, -1\naddi x0, x0, 0\n",
+				Explain: "The immediate is signed: 0x800 in the top 12 bits is −2048, not 2048. Shift the word as an int32_t, or subtract 4096 when bit 31 is set."},
+			{Name: "not ours", Stdin: "00311093\n00000000\n42008033\nffffffff\n",
+				Want:    "unknown\nunknown\nunknown\nunknown\n",
+				Explain: "slli (funct3 1), an all-zero word, an R-type with a funct7 that is neither 0 nor 0x20, and all ones: anything outside the nine instructions is unknown."},
+			{Name: "a thousand instructions", Stdin: rvInput(), Want: rvWant()},
+		},
+		Hints: []string{
+			"Read each line with scanf(\"%x\", &w) into an unsigned int, or strtoul(line, NULL, 16).",
+			"Decide by opcode first, then funct3, then (for R-type) funct7; every combination you do not handle falls through to unknown.",
+		},
+	},
 }
 
 // duplicatesValue is the number at position i of duplicatesInput.
@@ -735,4 +1078,200 @@ func eulerRingInput(n int) string {
 		fmt.Fprintln(&s, order[i]+1, order[(i+1)%n]+1)
 	}
 	return s.String()
+}
+
+// numberFSMLines are generated test lines for number_fsm: valid numbers
+// built from the grammar, and near misses.
+func numberFSMLines() []string {
+	r := rand.New(rand.NewPCG(8, 8))
+	digits := func(n int) string {
+		b := make([]byte, n)
+		for i := range b {
+			b[i] = byte('0' + r.IntN(10))
+		}
+		return string(b)
+	}
+	var lines []string
+	for i := 0; i < 400; i++ {
+		var s string
+		if r.IntN(3) == 0 {
+			s += string("+-"[r.IntN(2)])
+		}
+		switch r.IntN(3) {
+		case 0:
+			s += digits(1 + r.IntN(5))
+		case 1:
+			s += digits(1+r.IntN(5)) + "." + digits(r.IntN(4))
+		default:
+			s += "." + digits(1+r.IntN(4))
+		}
+		if r.IntN(2) == 0 {
+			s += string("eE"[r.IntN(2)])
+			if r.IntN(2) == 0 {
+				s += string("+-"[r.IntN(2)])
+			}
+			s += digits(1 + r.IntN(3))
+		}
+		if r.IntN(3) == 0 { // break it in one place
+			b := []byte(s)
+			at := r.IntN(len(b) + 1)
+			junk := string(".eE+- x9"[r.IntN(8)])
+			s = string(b[:at]) + junk + string(b[at:])
+		}
+		lines = append(lines, s)
+	}
+	lines = append(lines, strings.Repeat("7", 9997)+"e1") // 9,999 characters
+	return lines
+}
+
+// validNumber is the number_fsm grammar, written as a regular expression's
+// equivalent by hand: [+-]? (d+ (. d*)? | . d+) ([eE] [+-]? d+)?
+func validNumber(s string) bool {
+	i, n := 0, len(s)
+	isDigit := func(c byte) bool { return c >= '0' && c <= '9' }
+	if i < n && (s[i] == '+' || s[i] == '-') {
+		i++
+	}
+	intDigits := 0
+	for i < n && isDigit(s[i]) {
+		i, intDigits = i+1, intDigits+1
+	}
+	fracDigits := 0
+	if i < n && s[i] == '.' {
+		i++
+		for i < n && isDigit(s[i]) {
+			i, fracDigits = i+1, fracDigits+1
+		}
+	}
+	if intDigits == 0 && fracDigits == 0 {
+		return false
+	}
+	if i < n && (s[i] == 'e' || s[i] == 'E') {
+		i++
+		if i < n && (s[i] == '+' || s[i] == '-') {
+			i++
+		}
+		expDigits := 0
+		for i < n && isDigit(s[i]) {
+			i, expDigits = i+1, expDigits+1
+		}
+		if expDigits == 0 {
+			return false
+		}
+	}
+	return i == n
+}
+
+func numberFSMInput() string { return strings.Join(numberFSMLines(), "\n") + "\n" }
+
+func numberFSMWant() string {
+	var b strings.Builder
+	for _, l := range numberFSMLines() {
+		if validNumber(l) {
+			b.WriteString("valid\n")
+		} else {
+			b.WriteString("invalid\n")
+		}
+	}
+	return b.String()
+}
+
+// Programs for the cpu check.
+const cpuSumProgram = `LOAD r0 100
+LOAD r1 0
+LOAD r2 1
+JZ r0 7
+ADD r1 r0
+SUB r0 r2
+JMP 3
+PRINT r1
+HALT
+`
+
+const cpuFibProgram = `LOAD r0 0
+LOAD r1 1
+LOAD r3 10
+PRINT r0
+LOAD r2 0
+ADD r2 r0
+ADD r2 r1
+LOAD r0 0
+ADD r0 r1
+LOAD r1 0
+ADD r1 r2
+LOAD r2 1
+SUB r3 r2
+JZ r3 15
+JMP 3
+HALT
+`
+
+// rvWords is the large rv_decode case: a mix of the nine instructions,
+// with random registers and immediates, and some words that are not
+// among them.
+func rvWords() []uint32 {
+	r := rand.New(rand.NewPCG(9, 9))
+	words := make([]uint32, 1000)
+	for i := range words {
+		rd, rs1, rs2 := uint32(r.IntN(32)), uint32(r.IntN(32)), uint32(r.IntN(32))
+		switch r.IntN(4) {
+		case 0, 1: // R-type
+			f3 := []uint32{0, 0, 4, 6, 7}[r.IntN(5)]
+			f7 := uint32(0)
+			if f3 == 0 && r.IntN(2) == 0 {
+				f7 = 0x20
+			}
+			words[i] = f7<<25 | rs2<<20 | rs1<<15 | f3<<12 | rd<<7 | 0x33
+		case 2: // I-type
+			f3 := []uint32{0, 4, 6, 7}[r.IntN(4)]
+			imm := uint32(r.IntN(4096))
+			words[i] = imm<<20 | rs1<<15 | f3<<12 | rd<<7 | 0x13
+		default: // anything at all
+			words[i] = r.Uint32()
+		}
+	}
+	return words
+}
+
+func rvInput() string {
+	var b strings.Builder
+	for _, w := range rvWords() {
+		fmt.Fprintf(&b, "%08x\n", w)
+	}
+	return b.String()
+}
+
+// rvDecode is the reference disassembler for the nine instructions.
+func rvDecode(w uint32) string {
+	opcode, rd, f3 := w&0x7f, w>>7&0x1f, w>>12&7
+	rs1, rs2, f7 := w>>15&0x1f, w>>20&0x1f, w>>25
+	switch opcode {
+	case 0x33:
+		names := map[uint32]string{0: "add", 4: "xor", 6: "or", 7: "and"}
+		name, ok := names[f3]
+		switch {
+		case ok && f7 == 0:
+		case f3 == 0 && f7 == 0x20:
+			name = "sub"
+		default:
+			return "unknown"
+		}
+		return fmt.Sprintf("%s x%d, x%d, x%d", name, rd, rs1, rs2)
+	case 0x13:
+		names := map[uint32]string{0: "addi", 4: "xori", 6: "ori", 7: "andi"}
+		name, ok := names[f3]
+		if !ok {
+			return "unknown"
+		}
+		return fmt.Sprintf("%s x%d, x%d, %d", name, rd, rs1, int32(w)>>20)
+	}
+	return "unknown"
+}
+
+func rvWant() string {
+	var b strings.Builder
+	for _, w := range rvWords() {
+		b.WriteString(rvDecode(w) + "\n")
+	}
+	return b.String()
 }

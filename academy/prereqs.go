@@ -61,11 +61,14 @@ var conceptPrereqs = map[string][]string{
 	"Probability for Programmers":          {"Counting & Combinatorics"},
 
 	// ---- Stage 4
-	"Binary & Number Representation":              {"Bits & Bytes: Everything Is a Number"},
-	"Logic Gates & Circuits":                      {"Logic & Boolean Algebra", "Binary & Number Representation"},
-	"Memory: Latches, Registers & RAM":            {"Logic Gates & Circuits"},
-	"The CPU: Datapath & Instruction Cycle":       {"Memory: Latches, Registers & RAM", "The CPU at Work: Fetch, Decode, Execute"},
-	"Pipelining, Branch Prediction & Parallelism": {"The CPU: Datapath & Instruction Cycle"},
+	"Binary & Number Representation":               {"Bits & Bytes: Everything Is a Number"},
+	"Logic Gates & Circuits":                       {"Logic & Boolean Algebra", "Binary & Number Representation"},
+	"Building an ALU: Adders, Subtraction & Flags": {"Logic Gates & Circuits", "Binary & Number Representation"},
+	"Memory: Latches, Registers & RAM":             {"Logic Gates & Circuits"},
+	"Finite State Machines & Sequential Logic":     {"Memory: Latches, Registers & RAM", "Logic & Boolean Algebra"},
+	"The CPU: Datapath & Instruction Cycle":        {"Memory: Latches, Registers & RAM", "The CPU at Work: Fetch, Decode, Execute", "Building an ALU: Adders, Subtraction & Flags", "Finite State Machines & Sequential Logic"},
+	"Instruction Sets & Machine Code":              {"The CPU: Datapath & Instruction Cycle", "Binary & Number Representation"},
+	"Pipelining, Branch Prediction & Parallelism":  {"The CPU: Datapath & Instruction Cycle"},
 
 	// ---- Stage 5
 	"The Compilation Pipeline":                   {"Headers, the Preprocessor & make", "From Source Code to Running Program"},
