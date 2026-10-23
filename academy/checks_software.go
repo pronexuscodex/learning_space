@@ -6,7 +6,6 @@ package main
 import (
 	"crypto/sha1"
 	"fmt"
-	"math"
 	"math/rand/v2"
 	"regexp"
 	"strings"
@@ -193,14 +192,14 @@ int main(int argc, char **argv) {
  * score (Impact <= 0)          = 0.0
  * score (S:U) = roundup(min(Impact + Exploitability, 10))
  * score (S:C) = roundup(min(1.08 * (Impact + Exploitability), 10))
- * "roundup" means to the next higher 0.1 (ceil(x * 10) / 10, with a
- * little care for floating-point: the spec rounds 10^5 * x to an int).
+ * "roundup" to the next higher 0.1, as the spec defines it: round
+ * 100000 * x to the nearest integer r; the answer is r / 100000 when r
+ * is a multiple of 10000, else (r / 10000 + 1) / 10. The ^15 is a plain
+ * loop, so no <math.h> and no -lm are needed.
  */
-#include <math.h>
 #include <stdio.h>
 #include <string.h>
 `,
-		Flags: []string{"-lm"},
 		Cases: []CheckCase{
 			{Name: "the worst cases", Stdin: "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H\nCVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H\n", Want: cvssWant("CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H\nCVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H\n"),
 				Explain: "A network, no-privilege, no-interaction attack with full impact scores 9.8; with Scope Changed it reaches 10.0. These are the two every calculator agrees on."},
@@ -219,7 +218,7 @@ int main(int argc, char **argv) {
 		Hints: []string{
 			"Parse by finding each metric with strstr(line, \"/AV:\") and reading the letter after the colon, or split on '/' and then on ':'.",
 			"Guard the C:N/I:N/A:N case before the Scope-Changed power term, which is otherwise a tiny negative number raised to the 15th.",
-			"Round up with the spec's trick: long r = (long)ceil(x * 100000.0); return r % 10000 == 0 ? r / 100000.0 : (r / 10000 + 1) / 10.0; (printed with %.1f).",
+			"Round up with the spec's trick: long r = (long)(x * 100000.0 + 0.5); return r % 10000 == 0 ? r / 100000.0 : (double)(r / 10000 + 1) / 10.0; (printed with %.1f).",
 		},
 	},
 	{
@@ -859,7 +858,11 @@ func cvssScore(vector string) (float64, bool) {
 	iss := 1 - (1-c)*(1-i)*(1-a)
 	var impactScore float64
 	if changed {
-		impactScore = 7.52*(iss-0.029) - 3.25*math.Pow(iss-0.02, 15)
+		p15 := 1.0
+		for k := 0; k < 15; k++ {
+			p15 *= iss - 0.02
+		}
+		impactScore = 7.52*(iss-0.029) - 3.25*p15
 	} else {
 		impactScore = 6.42 * iss
 	}
@@ -875,7 +878,7 @@ func cvssScore(vector string) (float64, bool) {
 		raw = 10
 	}
 	// roundup to the next 0.1, via 100000ths as the spec defines it
-	r := int64(math.Ceil(raw*100000 - 1e-9))
+	r := int64(raw*100000 + 0.5)
 	if r%10000 == 0 {
 		return float64(r) / 100000, true
 	}

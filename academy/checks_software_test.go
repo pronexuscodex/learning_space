@@ -16,8 +16,7 @@ func init() {
 }
 
 var softwareSolutions = map[string]string{
-	"cvss": `#include <math.h>
-#include <stdio.h>
+	"cvss": `#include <stdio.h>
 #include <string.h>
 
 /* The letter after "/KEY:" in the vector, or 0 if the key is absent. */
@@ -55,9 +54,9 @@ int main(void) {
             continue;
         }
         double iss = 1 - (1 - c) * (1 - i) * (1 - a);
-        double impact = changed == 'C'
-            ? 7.52 * (iss - 0.029) - 3.25 * pow(iss - 0.02, 15)
-            : 6.42 * iss;
+        double p15 = 1.0;
+        for (int k = 0; k < 15; k++) p15 *= iss - 0.02;
+        double impact = changed == 'C' ? 7.52 * (iss - 0.029) - 3.25 * p15 : 6.42 * iss;
         double score;
         if (impact <= 0) {
             score = 0.0;
@@ -65,8 +64,8 @@ int main(void) {
             double raw = impact + 8.22 * av * ac * pr * ui;
             if (changed == 'C') raw *= 1.08;
             if (raw > 10) raw = 10;
-            long r = (long)ceil(raw * 100000 - 1e-9);
-            score = r % 10000 == 0 ? r / 100000.0 : (r / 10000 + 1) / 10.0;
+            long r = (long)(raw * 100000 + 0.5);
+            score = r % 10000 == 0 ? r / 100000.0 : (double)(r / 10000 + 1) / 10.0;
         }
         printf("%.1f\n", score);
     }
@@ -797,9 +796,9 @@ int main(void) {
 	failsWith(t, "stack_vm", mutate("stack_vm", "        if (op < 0) { fprintf(stderr, \"stack_vm: unknown instruction %s\\n\", name); return 2; }", "        if (op < 0) op = HALT;"), "an unknown instruction", "")
 
 	// The Scope-Changed impact formula dropped (6.42 * iss always).
-	failsWith(t, "cvss", mutate("cvss", "        double impact = changed == 'C'\n            ? 7.52 * (iss - 0.029) - 3.25 * pow(iss - 0.02, 15)\n            : 6.42 * iss;", "        double impact = 6.42 * iss;"), "scope changes the result", "")
+	failsWith(t, "cvss", mutate("cvss", "        double impact = changed == 'C' ? 7.52 * (iss - 0.029) - 3.25 * p15 : 6.42 * iss;", "        double impact = 6.42 * iss;\n        (void)p15;"), "scope changes the result", "")
 	// Rounding to nearest instead of up.
-	failsWith(t, "cvss", mutate("cvss", "            long r = (long)ceil(raw * 100000 - 1e-9);\n            score = r % 10000 == 0 ? r / 100000.0 : (r / 10000 + 1) / 10.0;", "            score = ((long)(raw * 10 + 0.5)) / 10.0;"), "rounding up", "")
+	failsWith(t, "cvss", mutate("cvss", "            long r = (long)(raw * 100000 + 0.5);\n            score = r % 10000 == 0 ? r / 100000.0 : (double)(r / 10000 + 1) / 10.0;", "            score = ((long)(raw * 10 + 0.5)) / 10.0;"), "rounding up", "")
 	// PR not adjusted for Scope Changed.
 	failsWith(t, "cvss", mutate("cvss", "        double pr = changed == 'C'\n            ? weight(metric(line, \"/PR:\"), \"NLH\", (double[]){0.85, 0.68, 0.50})\n            : weight(metric(line, \"/PR:\"), \"NLH\", (double[]){0.85, 0.62, 0.27});", "        double pr = weight(metric(line, \"/PR:\"), \"NLH\", (double[]){0.85, 0.62, 0.27});"), "scope changes the result", "")
 }
