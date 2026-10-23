@@ -10,11 +10,16 @@ var softwareGuides = map[int]StageGuide{
 		Overview: `Writing code that works once is programming. Writing code that keeps
 working as it grows, alongside other people, for years, is software
 engineering. This stage covers the everyday professional toolkit: the
-command line, Git, testing, design and shipping to real users.`,
+command line and shell scripts, Git, build systems and dependencies,
+testing, debugging tools, design, and shipping to real users. Each lesson
+looks under the hood with strace, Git's own object files, make, gcov,
+gdb and Linux namespaces.`,
 		Outcomes: []string{
 			"Work comfortably in a terminal and automate chores with scripts",
 			"Collaborate through Git and pull requests like a professional team",
 			"Test, structure and deploy software that others can rely on",
+			"Explain what Git stores, and what a build system rebuilds and why",
+			"Find a bug with a debugger, a core dump or git bisect instead of guessing",
 		},
 		Glossary: []Term{
 			{"Terminal", "A text window where you type commands to the computer."},
@@ -26,6 +31,13 @@ command line, Git, testing, design and shipping to real users.`,
 			{"CI", "Continuous Integration: automatically building and testing every change."},
 			{"Container", "A package holding an app plus everything it needs to run, so it runs the same everywhere."},
 			{"Refactoring", "Improving code's structure without changing what it does."},
+			{"Exit status", "The number a program returns when it ends: 0 for success, anything else for failure."},
+			{"Hash (Git object ID)", "The SHA-1 of an object's content, which Git uses as its name: the same content always gets the same ID."},
+			{"Dependency graph", "Which files or packages each one needs; a build system walks it to decide what to rebuild."},
+			{"Lockfile", "A file recording the exact version of every dependency, so every build uses the same ones."},
+			{"Code coverage", "Which lines and branches of a program its tests actually ran."},
+			{"Backtrace", "The chain of function calls that led to the current point, as a debugger prints it."},
+			{"git bisect", "A binary search through history for the commit that introduced a bug."},
 		},
 		Concepts: []Concept{
 			{
@@ -41,7 +53,32 @@ Programs read standard input and write standard output, so the pipe |
 chains small tools together: cat log.txt | grep ERROR | wc -l counts the
 error lines. Environment variables such as PATH configure programs, and
 package managers (apt, brew, winget, pip, npm) install software
-reproducibly.`,
+reproducibly.
+
+Some commands are programs on disk (ls is /usr/bin/ls); others are
+built into the shell (cd, echo, export), because they must change the
+shell itself: a separate program cannot change its parent's current
+directory. type ls tells you which kind a command is.`,
+				Diagram: `you type:  ls -l | wc -l
+shell:     fork ─▶ child: search PATH for "ls" ─▶ exec /usr/bin/ls
+           fork ─▶ child: search PATH for "wc" ─▶ exec /usr/bin/wc
+           ls's standard output ──pipe──▶ wc's standard input`,
+				UnderTheHood: `strace shows the shell finding ls. With PATH set to
+/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/bin, bash checked each
+folder in order:
+
+  newfstatat("/usr/local/sbin/ls")   ENOENT, no such file
+  newfstatat("/usr/local/bin/ls")    ENOENT
+  newfstatat("/usr/sbin/ls")         ENOENT
+  newfstatat("/usr/bin/ls")          found: a 142,312-byte program
+  execve("/usr/bin/ls", ["ls"], … 4 vars …)
+
+That is all PATH is: a list of folders searched left to right, so an
+earlier folder wins. The environment travels with every execve: in a
+normal session here, 152 variables and 8,278 bytes were copied into
+each program started. The kernel caps arguments plus environment at
+getconf ARG_MAX, 2,097,152 bytes, which is why rm * fails with
+"Argument list too long" in a folder of a million files.`,
 				MentalModel: "Small tools, joined by pipes, do big jobs.",
 				TryIt:       "Use one pipeline to find the 10 most common words in a text file.",
 				Analogy: `A graphical interface is a menu with pictures. The command line is
@@ -62,6 +99,73 @@ logs that no spreadsheet can even open.`,
 				),
 			},
 			{
+				Name:    "Shell Scripting & Automation",
+				Summary: "A script is a recipe of commands: quoting, exit codes and failing loudly make it safe.",
+				Body: `A shell script is a text file of commands, run top to bottom, with
+variables, if, for and functions. It turns a chore you do by hand into
+one command that does it the same way every time.
+
+Three rules prevent most script bugs:
+- Quote every variable: "$file", not $file. Unquoted, the shell splits
+  the value at spaces and expands wildcards, so a file named "my
+  file.txt" becomes two arguments, "my" and "file.txt".
+- Check exit statuses. Every command returns a number: 0 means success,
+  anything else failure. if, && and || test it; $? holds the last one.
+- Fail loudly: start scripts with set -euo pipefail. -e stops at the
+  first failing command, -u treats an unset variable as an error
+  instead of an empty string, and pipefail makes a pipeline fail if
+  any part of it fails, not just the last.
+
+The classic disaster is rm -rf "$DIR/" with DIR unset: without -u it
+becomes rm -rf /. For anything longer than a page, or with real data
+structures, switch to a proper language; shell is glue.`,
+				Diagram: `#!/usr/bin/env bash
+set -euo pipefail          # stop on errors, unset variables, broken pipes
+src=$1                     # the first argument
+for f in "$src"/*.log; do  # quoted: names with spaces stay whole
+  gzip -- "$f" || echo "could not compress $f" >&2
+done`,
+				UnderTheHood: `Word splitting, measured in bash. With f="my file.txt" and that file
+present:
+
+  ls $f       ls: cannot access 'my': No such file or directory
+              ls: cannot access 'file.txt': No such file or directory
+              exit status 2
+  ls "$f"     my file.txt
+              exit status 0
+
+Exit statuses as bash saw them:
+
+  exit 0           → 0
+  exit 3           → 3
+  false            → 1
+  kill -9 $$       → 137   (128 + 9: killed by SIGKILL)
+  false | true     → 0, but 1 with set -o pipefail
+
+Without pipefail, a pipeline's status is only its last command's, so
+a script that runs "curl … | tar x" carries on happily when the
+download fails.`,
+				MentalModel: "Quote everything, check every status, and make the script stop at the first surprise.",
+				TryIt:       "Create a file whose name contains a space, then compare for f in $(ls) and for f in * with echo \"[$f]\" in each loop.",
+				Analogy: `A recipe for a kitchen assistant who follows it literally. "Add the
+contents of the box" means one thing if the box is labelled "flour" and
+quite another if the label is missing and the assistant grabs whatever
+is nearest. set -u is an assistant who stops and asks.`,
+				Example: `In 2015 a bug in Steam's Linux client ran rm -rf "$STEAMROOT/"* with
+STEAMROOT empty, deleting users' entire home folders. Shell scripts
+still run most build systems, CI pipelines, Docker images and server
+start-up, which is why tools such as ShellCheck exist to catch exactly
+these mistakes.`,
+				Exercises: trio(
+					"What does this print when name is unset: echo \"Hello, $name!\"? And with set -u at the top?",
+					"Without -u: \"Hello, !\". With -u, bash stops with \"name: unbound variable\".",
+					"Write a script that takes a folder as its argument, checks that it exists (exit 1 with a message on stderr otherwise), and renames every .jpeg file in it to .jpg, coping with spaces in names. Test it on files named \"a b.jpeg\" and \"-x.jpeg\".",
+					"Loop with for f in \"$dir\"/*.jpeg, use \"${f%.jpeg}.jpg\" for the new name, and mv -- so a name starting with - is not taken for an option.",
+					"Automate a real chore: a script, run daily by cron (or a systemd timer, or Task Scheduler), that fetches something you check by hand (a web page, a file listing, disk usage), compares it with yesterday's copy, and only tells you when it changed.",
+					"Save each day's copy with the date in its name; diff -q returns 1 when the files differ.",
+				),
+			},
+			{
 				Name:    "Version Control with Git",
 				Summary: "A time machine and collaboration tool for your code.",
 				Body: `Git records snapshots of your project called commits. Each has a
@@ -72,10 +176,45 @@ and a conflict happens when two people changed the same lines.
 
 Remotes (GitHub, GitLab) share repositories, and pull requests let
 teammates review changes before they are merged. Good habits: small
-commits with clear messages, and never commit passwords or keys.`,
+commits with clear messages, and never commit passwords or keys.
+
+Underneath, Git is a content-addressed store of three kinds of object,
+each named by the SHA-1 hash of its content: blobs (a file's bytes),
+trees (a folder: names pointing to blobs and other trees) and commits
+(a tree, its parents, the author and the message). A branch is just a
+file holding one commit's ID. Because names are hashes of content,
+identical files are stored once, and changing anything in history
+changes every ID after it.`,
 				Diagram: `main:     A ── B ─────────── E   (merge commit)
                 ╲           ╱
-feature:         C ──── D ─╯`,
+feature:         C ──── D ─╯
+
+commit ─▶ tree ─▶ blob "hello\n"
+  │        └────▶ tree src/ ─▶ blobs …
+  └─▶ parent commit`,
+				UnderTheHood: `A one-file repository, opened up. git hash-object hello.txt (holding
+"hello" and a newline) printed ce013625030ba8dba906f756967f9e9ca394464a,
+and so did a plain SHA-1 of the header "blob 6", a zero byte and the 6
+bytes of content:
+
+  printf 'blob 6\0hello\n' | sha1sum
+  ce013625030ba8dba906f756967f9e9ca394464a
+
+After the first commit, .git/objects held exactly three files: that
+blob, a tree ("100644 blob ce0136… hello.txt") and the commit:
+
+  tree aaa96ced2d9a1c8e72c56b253a0e2fe78393feb7
+  author Ana <ana@example.com> 1767225600 +0000
+  committer Ana <ana@example.com> 1767225600 +0000
+
+  First commit
+
+.git/refs/heads/main was a 41-byte file: the commit's ID and a newline.
+In a repository of 1,000 files, changing one added exactly 4 objects: the
+new blob, its folder's tree, the root tree and the commit; the other 999
+blobs were shared. After a third commit changed every file, the loose
+objects took 9,136 KB; git gc packed them, storing similar versions as
+deltas, into 172 KB.`,
 				MentalModel: "Commit early, commit often, and write messages for your future self.",
 				TryIt:       "Create a repository, make a branch, change the same line on both branches, and resolve the merge conflict.",
 				Analogy: `Save points in a video game, plus parallel universes. You can branch off
@@ -88,10 +227,71 @@ million developers.`,
 				Exercises: trio(
 					"Explain in your own words the difference between git add, git commit and git push.",
 					"Staging area → local history → remote server.",
-					"Put one of your earlier projects in a Git repository, make at least 5 meaningful commits, and use git log, git diff and git switch --detach to travel back to an old version and return.",
-					"git log --oneline --graph shows the history compactly.",
+					"Put one of your earlier projects in a Git repository, make at least 5 meaningful commits, and use git log, git diff and git switch --detach to travel back to an old version and return. Then use git cat-file -p on HEAD, its tree and one blob.",
+					"git log --oneline --graph shows the history compactly; git rev-parse HEAD^{tree} gives the tree's ID.",
 					`Make an open-source contribution: find a project with a "good first issue" or a typo in its documentation, fork it, fix it on a branch and open a pull request.`,
 					"Read the project's CONTRIBUTING file first and follow its conventions.",
+				),
+			},
+			{
+				Name:    "Build Systems & Dependencies",
+				Summary: "Rebuild only what changed, and pin exactly what you depend on.",
+				Body: `A build system turns source into programs and knows the dependency
+graph: which outputs come from which inputs. make, the classic, reads
+rules of the form "target: prerequisites" followed by a command, and
+rebuilds a target when any prerequisite is newer than it (by file
+modification time). Modern tools (Ninja, Bazel, Go's and Rust's own
+builders) compare content hashes instead, and run independent steps in
+parallel.
+
+Two mistakes break incremental builds: a missing dependency (a header
+not listed, so changing it rebuilds nothing and the program is a mix
+of old and new code), and a dependency cycle, which no order can
+satisfy.
+
+Libraries you use are dependencies too. Semantic versioning
+(MAJOR.MINOR.PATCH) promises that minor and patch releases do not break
+you; a lockfile (package-lock.json, Cargo.lock, go.sum) records the
+exact versions and their hashes, so every machine builds the same thing
+and a tampered download is refused.`,
+				Diagram: `app ◀── main.o ◀── main.c
+ ▲  ◀── f1.o   ◀── f1.c, util.h
+ └───── util.o ◀── util.c, util.h
+touch util.h  ⇒  every .o that lists util.h, then app`,
+				UnderTheHood: `A Makefile building 42 C files (each including util.h) into one
+program, timed on a 4-core machine:
+
+  full build                               1,165 ms
+  nothing changed     "'app' is up to date"    5 ms
+  one .c file touched   2 commands (compile, link)   62 ms
+  util.h touched        43 commands               1,112 ms
+  full build with make -j8                    302 ms
+
+make -n prints what would run without running it. Touching one source
+file rebuilt one object and relinked; touching the header that every
+file includes rebuilt everything, which is why widely included headers
+should change rarely. Running jobs in parallel made the full build four
+times faster on four cores: the dependency graph says which steps are
+independent.`,
+				MentalModel: "A build is a graph: rebuild a node only when one of its inputs changed.",
+				TryIt:       "Write a Makefile for a three-file C program, then run make, touch one file, run make -n, and predict what it will rebuild before you look.",
+				Analogy: `Cooking a meal from several dishes. If you change the sauce recipe, you
+remake the sauce and every dish that uses it, but not the salad. A
+lockfile is the shopping list that names the exact brand and size of
+every ingredient, so the dish tastes the same in any kitchen.`,
+				Example: `In 2016 the removal of left-pad, an 11-line npm package, broke the builds
+of thousands of projects, including React, within hours. In 2024 the
+xz-utils backdoor reached Linux distributions through a trusted
+dependency's release files. Google builds most of its code with Bazel,
+whose content hashes let it skip any step whose exact inputs were built
+before, even on another machine.`,
+				Exercises: trio(
+					"A Makefile says app: main.o util.o, and main.o: main.c. main.c includes util.h, which the Makefile does not mention. You change util.h. What does make rebuild, and what goes wrong?",
+					"Nothing that includes it: main.o is not rebuilt, so app mixes old and new definitions. Generate header dependencies with gcc -MMD.",
+					"Write a Makefile for a C project with three source files and one header, using pattern rules and automatic header dependencies (-MMD -MP and -include $(DEPS)). Show that touching the header rebuilds exactly the files that include it.",
+					"$(SRCS:.c=.o) builds the object list; $@ is the target and $< the first prerequisite.",
+					"Pick a project with a lockfile (package-lock.json, Cargo.lock or go.sum), find one dependency's exact version and hash in it, and check the hash against the registry. Then explain what would happen if the downloaded file were altered.",
+					"npm view <package>@<version> dist.integrity prints the same SHA-512 that package-lock.json records.",
 				),
 			},
 			{
@@ -105,7 +305,36 @@ cases (empty input, zero, huge values) and error cases.
 Automated test suites run on every change through continuous integration
 (CI), so bugs are caught before users see them. Test-driven development
 writes the failing test first. Property-based testing generates hundreds
-of random inputs to find cases you did not think of.`,
+of random inputs to find cases you did not think of.
+
+Coverage tools report which lines and branches the tests ran. Low
+coverage proves that code is untested; high coverage does not prove it
+is correct, because a line can run with every input but the one that
+breaks it.`,
+				Diagram: `        ╱ end-to-end ╲        few, slow, the whole app
+       ╱ integration  ╲       some: pieces together
+      ╱   unit tests    ╲     many, fast, one function each
+     ────────────────────`,
+				UnderTheHood: `A C file with average(a, b) = (a + b) / 2 and a clamp function, tested
+by hand with average(2, 4), average(-3, 3) and clamp(5, 0, 10): all
+correct. gcc --coverage and gcov reported:
+
+  Lines executed: 46.15% of 13
+  Branches taken at least once: 25.00% of 12
+  clamp marked 1*: run, but some of its branches never taken
+
+Then a million random pairs, each checked against the same formula
+computed in 64-bit arithmetic:
+
+  first failure at test 14:
+    average(318608798, 2100852393) = -937753052, want 1209730595
+  250,239 of 1,000,000 random tests fail
+
+a + b overflows whenever the sum leaves the int range, about one input
+in four. Built with -fsanitize=undefined, the run reported it at that same
+test: "signed integer overflow: 318608798 + 2100852393 cannot be
+represented in type 'int'". Three hand-picked tests saw nothing; random
+tests found it in fourteen tries.`,
 				MentalModel: "A test is a claim about your code that a machine re-checks forever.",
 				TryIt:       "Write five tests for is_palindrome, including an empty string and a single character.",
 				Analogy: `A pilot's pre-flight checklist: the same checks every time, however
@@ -118,10 +347,73 @@ accidentally reactivated during a deployment.`,
 				Exercises: trio(
 					"For a function that computes a person's age from their birth date, list 8 test cases, including tricky ones.",
 					"A birthday today, 29 February, a date in the future, very old dates.",
-					"Write that age function test-first: write one failing test, make it pass, and repeat until all 8 cases pass.",
-					"Use pytest, or your language's built-in test tool.",
+					"Write that age function test-first in C: write one failing test (a small main that compares the result and returns non-zero on a mismatch), make it pass, and repeat until all 8 cases pass. Then measure your coverage with gcc --coverage and gcov.",
+					"A test can be one line: if (age(...) != 34) { printf(\"line %d failed\\n\", __LINE__); fails++; }",
 					"Set up continuous integration for one of your GitHub repositories (for example with GitHub Actions) so the tests run on every push, and add a status badge to the README.",
 					"A workflow file in .github/workflows/ that checks out the code and runs the tests.",
+				),
+			},
+			{
+				Name:    "Debugging Tools: gdb, Core Dumps & git bisect",
+				Summary: "Stop guessing: a debugger shows where it broke, and bisect finds the commit that broke it.",
+				Body: `When a program crashes or misbehaves, three tools replace guesswork:
+- A debugger (gdb, lldb) runs the program under control. bt prints the
+  backtrace, the chain of calls that led to the crash; frame and print
+  show any function's local variables at that moment; break and step
+  stop and walk through code. Build with -g so the debugger knows the
+  source lines, and -O0 so variables are not optimised away.
+- A core dump is the crashed process's memory written to a file. With
+  ulimit -c unlimited (or systemd-coredump), you can run gdb ./prog core
+  after the fact, even for a crash on a user's machine.
+- git bisect is a binary search through history. Mark one commit good
+  and one bad; Git checks out the middle, you test it, and it halves the
+  range. With a script that returns 0 for good, git bisect run does it
+  all automatically.
+
+Underneath them all is the scientific method: reproduce the bug
+reliably, make a hypothesis, test it, and change one thing at a time.`,
+				Diagram: `1000 commits:  good ●──────────────────────────● bad
+bisect:        test 500 ─▶ test 750 ─▶ test 625 ─▶ … (10 tests)
+                                                  ▲
+                                   the first bad commit`,
+				UnderTheHood: `A program that walked an array of user pointers with i <= n instead of
+i < n crashed: "Segmentation fault", exit status 139. Under gdb:
+
+  Program received signal SIGSEGV, Segmentation fault.
+  #0  __strlen_evex () at ../sysdeps/x86_64/multiarch/strlen-evex-base.S:81
+  #1  name_length (u=0x0) at crash.c:4
+  #2  total (users=0x7fffffffc710, n=2) at crash.c:5
+  #3  main () at crash.c:9
+  (gdb) frame 2
+  (gdb) print i          $1 = 2
+  (gdb) print users[i]   $2 = (struct user *) 0x0
+
+The crash was inside the C library's strlen, but the backtrace shows
+who called it with a NULL pointer, and print i shows the loop had run one
+step too far. Core dumps were off on this machine: ulimit -c reported 0.
+
+For history, a script made 1,000 commits with a bug introduced in
+commit 637. git bisect run, given only "the first commit was good, the
+last is bad" and a one-line test, ran the test 10 times and reported
+commit 637 as the first bad commit: log₂ 1000 ≈ 10.`,
+				MentalModel: "Bisect the time (git bisect) and the space (backtrace), then read the variables.",
+				TryIt:       "Build a program that crashes with gcc -g -O0, run it under gdb, and use bt, frame and print to explain the crash in one sentence.",
+				Analogy: `A detective at a crime scene (the core dump) reconstructing the chain of
+events from the evidence left behind, and the children's game of
+guessing a number between 1 and 1,000 with "higher or lower": ten
+questions are always enough.`,
+				Example: `Linux kernel developers bisect regressions across thousands of commits
+between releases, and git bisect run is how a single developer can find
+which of a month's changes broke a test overnight. Browsers and operating
+systems collect crash reports, essentially trimmed core dumps with
+backtraces, from millions of users to find the crashes that matter most.`,
+				Exercises: trio(
+					"git bisect starts with 4,000 commits between good and bad. At most how many tests does it need? And for 1,000,000 commits?",
+					"⌈log₂ 4000⌉ = 12; ⌈log₂ 1,000,000⌉ = 20.",
+					"In C, write a program with a bug that only appears for some inputs (for example an off-by-one in a loop). Debug it in gdb with a breakpoint (break file.c:LINE), a condition (condition 1 i == 99), step and print, without adding any printf.",
+					"run args, then bt when it stops; watch var stops whenever a variable changes.",
+					"In a project with real history (yours, or a clone of an open-source one), find when a behaviour changed using git bisect run and a small test script, and write up which commit it was and why it broke.",
+					"The script must exit 0 for good, 1 to 124 for bad, and 125 to skip a commit that does not build.",
 				),
 			},
 			{
@@ -137,7 +429,13 @@ duplication (but do not abstract too early), keep coupling low and
 cohesion high, and prefer clear names to clever code. Design patterns
 are named solutions to recurring problems (observer, strategy, adapter).
 Refactoring improves structure without changing behaviour, and it is
-safe because tests exist.`,
+safe because tests exist.
+
+In C, an interface is a header plus an opaque type: the header declares
+struct order; and the functions that use it, while only the .c file
+knows its fields, so no caller can depend on them. A table of function
+pointers is how C does polymorphism; it is what object-oriented
+languages build for you as a vtable.`,
 				Diagram: `┌──────────────────────────────────┐
 │ interface / API     (what)       │
 ├──────────────────────────────────┤
@@ -146,6 +444,19 @@ safe because tests exist.`,
 │ storage / network   (how)        │
 └──────────────────────────────────┘
 each layer only talks to the layer below it`,
+				UnderTheHood: `What does an interface cost? A C program called a square's area
+function 200 million times, directly and through a struct of function
+pointers whose contents the compiler could not see:
+
+  direct call            1.28 ns per call
+  through the ops table  2.91 ns per call
+
+objdump shows the difference: call 12d0 <square_area> for the direct
+call, call *(%rax) for the other, a jump to an address loaded from
+memory. The extra 1.6 ns is that load and an indirect branch the CPU
+must predict. Unless it is in the innermost loop of a hot path, an
+abstraction costs nothing you could measure; what costs real time is
+the code people cannot understand well enough to change.`,
 				MentalModel: "A good module is a deep box with a small lid.",
 				TryIt:       "Refactor a 100-line script into functions for input, processing and output, keeping its behaviour identical.",
 				Analogy: `A car: the driver uses a steering wheel and pedals (the interface) and
@@ -159,10 +470,10 @@ of teams could work independently.`,
 				Exercises: trio(
 					"Pick an app you use daily and sketch its likely modules (login, feed, messaging, storage). Which ones need to know about each other?",
 					"Draw boxes and arrows; fewer arrows is better.",
-					"Restructure your bill splitter or budget tracker so that the calculation logic has no print() or input() calls, then write unit tests for that logic alone.",
-					"Pure functions take data in and return data; the interface layer calls them.",
+					"Restructure your bill splitter or budget tracker in C so that the calculation logic lives in its own .c file with a header, with no printf or scanf, then write unit tests for that logic alone.",
+					"Pure functions take data in and return data; the interface layer (main.c) calls them and does the printing.",
 					"Your budget tool reads CSV files from your bank. Design it so that supporting a second bank's different CSV format means writing one small new component, not changing the rest. Implement both.",
-					"The adapter pattern: each bank gets a parser that outputs the same Transaction structure.",
+					"The adapter pattern: each bank gets a parser that outputs the same Transaction structure; in C, a struct of function pointers selects the parser.",
 				),
 			},
 			{
@@ -177,7 +488,43 @@ change automatically.
 In production you need logs (what happened), metrics (how much, how
 fast) and alerts (tell a human when something is wrong). Reliable teams
 use code review, gradual rollouts, feature flags, backups whose restore
-has actually been tested, and blameless post-mortems after incidents.`,
+has actually been tested, and blameless post-mortems after incidents.
+
+A container is not a virtual machine: it is an ordinary process that the
+kernel gives its own view of the system with namespaces (its own process
+IDs, mounts, network and host name) and its own limits with cgroups
+(memory, CPU). That is why containers start in milliseconds and share
+the host's kernel.`,
+				Diagram: `host kernel
+├── process: your shell          (the host's namespaces)
+└── container: a process tree with its own
+      pid namespace   (it sees itself as PID 1)
+      mnt namespace   (its own / from the image)
+      net namespace   (its own interfaces)
+      cgroup          (memory.max, cpu.max)`,
+				UnderTheHood: `unshare, run as root, starts a process in new namespaces, the same
+kernel feature Docker uses:
+
+  unshare --pid --fork --mount-proc sh -c 'echo $$; ps -e'
+  1
+      PID COMMAND
+        1 sh
+        2 ps
+
+Inside the new PID namespace the shell was process 1, and ps saw only
+two processes; outside, ps -e listed 79. unshare --uts let a shell set
+its host name to box-in-a-box while the machine itself stayed "vm".
+/proc/self/cgroup showed the shell running these experiments inside a
+memory cgroup set up by the machine's own supervisor.
+
+What goes into the box matters too. "hello" compiled three ways:
+
+  C, linked to the shared C library    15,960 bytes   needs libc.so.6
+  C, gcc -static                      785,360 bytes   needs nothing
+  Go                                2,209,303 bytes   needs nothing
+
+A static binary runs in an empty container image; a dynamic one needs
+the right shared libraries inside it.`,
 				MentalModel: "If it is not monitored, you do not know it works; if the backup is not tested, you do not have one.",
 				TryIt:       "Put a tiny web app in a Docker container and run it locally.",
 				Analogy: `A restaurant is more than a recipe. It needs suppliers (dependencies),
@@ -192,7 +539,7 @@ worldwide, which is why staged rollouts matter.`,
 					`List 10 things that could go wrong between "it works on my laptop" and "it works for 10,000 users".`,
 					"Think about configuration, load, data, network, versions and people.",
 					"Write a Dockerfile for one of your programs, build the image and run it. Then add a CI workflow that builds the image on every push.",
-					"Start FROM an official language image and COPY your code in.",
+					"Start FROM an official language image and COPY your code in; for a static C or Go binary, FROM scratch works.",
 					"Deploy a small web app to a free hosting tier, add a health-check endpoint and uptime monitoring that emails you when it goes down, then break it on purpose and confirm that the alert arrives.",
 					"Many free uptime monitors can check a URL every few minutes.",
 				),
@@ -219,6 +566,16 @@ worldwide, which is why staged rollouts matter.`,
 			{"What is a Git merge conflict?", "Two branches changed the same lines differently, so Git needs a human to choose the result."},
 			{"Why run tests in CI and not only on your laptop?", "Every change gets checked automatically in a clean environment, before it reaches users."},
 			{"What is the difference between refactoring and rewriting?", "Refactoring changes structure in small steps without changing behaviour, protected by tests; rewriting replaces the code wholesale."},
+			{"Why is cd built into the shell rather than a program in /usr/bin?", "A program runs in a child process and cannot change its parent's current directory; only the shell itself can change its own."},
+			{"Why should a shell script write \"$file\" rather than $file?", "Unquoted, the shell splits the value at spaces and expands wildcards, so a name with a space becomes several arguments."},
+			{"What does set -euo pipefail do?", "-e stops at the first failing command, -u makes unset variables an error, and pipefail makes a pipeline fail if any of its commands fails."},
+			{"What is a Git blob's ID, and why do identical files cost nothing extra?", "The SHA-1 of \"blob <size>\", a zero byte and the content. Identical content has the same ID, so Git stores it once."},
+			{"What is a branch, physically?", "A small file in .git/refs/heads holding the ID of one commit; committing on the branch rewrites that file."},
+			{"Why does touching a widely included header rebuild almost everything?", "Every object file that lists the header as a prerequisite is now older than it, so make recompiles each of them."},
+			{"What does a lockfile guarantee?", "Every build uses the same exact versions of every dependency, with their hashes checked, so builds are reproducible and a tampered download is refused."},
+			{"Can 100% line coverage miss a bug?", "Yes: every line can run with inputs that work, while the input that breaks it (an overflow, an edge case) is never tried."},
+			{"How many tests does git bisect need for 1,000 commits?", "About 10, since each test halves the range: ⌈log₂ 1000⌉ = 10."},
+			{"What makes a container different from a virtual machine?", "A container is a process tree on the host's kernel, isolated with namespaces and limited with cgroups; a virtual machine runs its own kernel on emulated hardware."},
 		},
 	},
 

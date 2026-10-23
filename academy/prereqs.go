@@ -112,11 +112,14 @@ var conceptPrereqs = map[string][]string{
 	"Timeouts, Retries & Idempotency":           {"HTTP, DNS & How the Web Works", "Sockets & I/O Multiplexing"},
 
 	// ---- Stage 9
-	"The Command Line & Your Environment": {"The Operating System: The Machine's Manager"},
-	"Version Control with Git":            {"The Command Line & Your Environment"},
-	"Testing & Reliability":               {"Functions & Decomposition"},
-	"Software Design & Abstraction":       {"Functions & Decomposition", "Testing & Reliability"},
-	"From Code to Production":             {"Version Control with Git", "Testing & Reliability"},
+	"The Command Line & Your Environment":           {"The Operating System: The Machine's Manager"},
+	"Shell Scripting & Automation":                  {"The Command Line & Your Environment"},
+	"Version Control with Git":                      {"The Command Line & Your Environment"},
+	"Build Systems & Dependencies":                  {"Version Control with Git", "Headers, the Preprocessor & make"},
+	"Testing & Reliability":                         {"Functions & Decomposition"},
+	"Debugging Tools: gdb, Core Dumps & git bisect": {"Version Control with Git", "Testing & Reliability", "Debugging & Reading Errors"},
+	"Software Design & Abstraction":                 {"Functions & Decomposition", "Testing & Reliability"},
+	"From Code to Production":                       {"Version Control with Git", "Testing & Reliability"},
 
 	// ---- Stage 10
 	"Web Vulnerabilities: Injection & XSS":           {"Thinking Like an Attacker: Threat Modelling", "HTTP, DNS & How the Web Works"},
