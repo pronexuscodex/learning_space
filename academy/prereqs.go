@@ -122,15 +122,18 @@ var conceptPrereqs = map[string][]string{
 	"From Code to Production":                       {"Version Control with Git", "Testing & Reliability"},
 
 	// ---- Stage 10
-	"Web Vulnerabilities: Injection & XSS":           {"Thinking Like an Attacker: Threat Modelling", "HTTP, DNS & How the Web Works"},
-	"Hashing & Password Storage":                     {"Hash Tables"},
-	"Encryption: Symmetric & Public-Key":             {"Counting & Combinatorics"},
-	"TLS & Authentication on the Web":                {"Encryption: Symmetric & Public-Key", "HTTP, DNS & How the Web Works"},
-	"Memory-Safety Bugs: Overflows & Use-After-Free": {"Safe Input & Undefined Behavior", "Dynamic Memory: malloc, free & Leaks", "Registers, the Stack & Calling Conventions"},
-	"Access Control: Who May Do What":                {"TLS & Authentication on the Web"},
-	"Network Attacks & Defences":                     {"TCP: Handshake, Flow & Congestion Control", "TLS & Authentication on the Web"},
-	"Secrets & the Software Supply Chain":            {"Thinking Like an Attacker: Threat Modelling", "Encryption: Symmetric & Public-Key"},
-	"Detection & Incident Response":                  {"Thinking Like an Attacker: Threat Modelling"},
+	"Web Vulnerabilities: Injection & XSS":            {"Thinking Like an Attacker: Threat Modelling", "HTTP, DNS & How the Web Works"},
+	"Hashing & Password Storage":                      {"Hash Tables"},
+	"Encryption: Symmetric & Public-Key":              {"Counting & Combinatorics"},
+	"TLS & Authentication on the Web":                 {"Encryption: Symmetric & Public-Key", "HTTP, DNS & How the Web Works"},
+	"Memory-Safety Bugs: Overflows & Use-After-Free":  {"Safe Input & Undefined Behavior", "Dynamic Memory: malloc, free & Leaks", "Registers, the Stack & Calling Conventions"},
+	"Access Control: Who May Do What":                 {"TLS & Authentication on the Web"},
+	"Network Attacks & Defences":                      {"TCP: Handshake, Flow & Congestion Control", "TLS & Authentication on the Web"},
+	"Secrets & the Software Supply Chain":             {"Thinking Like an Attacker: Threat Modelling", "Encryption: Symmetric & Public-Key"},
+	"Detection & Incident Response":                   {"Thinking Like an Attacker: Threat Modelling"},
+	"Reading Research Papers":                         {"Big-O: Measuring Growth"},
+	"Reading CVEs, CWEs & Advisories":                 {"Thinking Like an Attacker: Threat Modelling", "Web Vulnerabilities: Injection & XSS"},
+	"Vulnerability Research & Coordinated Disclosure": {"Memory-Safety Bugs: Overflows & Use-After-Free", "Reading CVEs, CWEs & Advisories"},
 
 	// ---- Stage 11
 	"Finite Automata & Regular Expressions":        {"Sets, Functions & Relations"},

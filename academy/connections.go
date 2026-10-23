@@ -237,6 +237,12 @@ var conceptLinks = map[string]links{
 		"OWASP Cheat Sheet Series: the Secrets Management and Software Supply Chain Security cheat sheets. CISA's Known Exploited Vulnerabilities Catalog."},
 	"Detection & Incident Response": {[]string{"From Code to Production", "The Command Line & Your Environment", "Thinking Like an Attacker: Threat Modelling"},
 		"Google's Site Reliability Engineering book: the chapters on managing incidents and postmortem culture. OWASP Cheat Sheet Series: the Logging cheat sheet."},
+	"Reading Research Papers": {[]string{"The Halting Problem & Undecidability", "Attention & the Transformer", "Consensus & Replication (Raft)"},
+		"S. Keshav, \"How to Read a Paper\" (one page, free online). The proceedings of USENIX Security, IEEE S&P, ACM CCS and NDSS."},
+	"Reading CVEs, CWEs & Advisories": {[]string{"Memory-Safety Bugs: Overflows & Use-After-Free", "Secrets & the Software Supply Chain", "Web Vulnerabilities: Injection & XSS"},
+		"The NVD (nvd.nist.gov), the CWE list (cwe.mitre.org), the FIRST CVSS v3.1 specification and calculator, and CISA's Known Exploited Vulnerabilities catalogue."},
+	"Vulnerability Research & Coordinated Disclosure": {[]string{"Memory-Safety Bugs: Overflows & Use-After-Free", "Reading CVEs, CWEs & Advisories", "Testing & Reliability"},
+		"Google Project Zero's blog and its disclosure policy. OSS-Fuzz and the libFuzzer/AFL++ documentation. The CERT Guide to Coordinated Vulnerability Disclosure."},
 
 	// ---- Stage 11
 	"Finite Automata & Regular Expressions": {[]string{"Parsing: Recursive Descent & Pratt", "Logic & Boolean Algebra"},

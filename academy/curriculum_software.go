@@ -596,6 +596,8 @@ own virtual machines.`,
 			"Explain how memory-safety bugs in C become exploits, and prevent them",
 			"Harden a server and its network, and keep secrets and dependencies under control",
 			"Detect an attack in logs and run a calm, documented incident response",
+			"Read a research paper, a CVE and a CVSS score, and prioritise what to patch",
+			"Find an unknown bug by fuzzing and disclose it responsibly, within the law",
 		},
 		Glossary: []Term{
 			{"Vulnerability", "A weakness that an attacker can exploit."},
@@ -613,6 +615,12 @@ own virtual machines.`,
 			{"Port scan", "Probing a machine to find which network services answer."},
 			{"Supply-chain attack", "Compromising software you depend on so the attack arrives through a trusted channel."},
 			{"Incident response", "The planned steps for detecting, containing and recovering from an attack."},
+			{"CVE", "Common Vulnerabilities and Exposures: a unique public ID for one known vulnerability, such as CVE-2021-44228."},
+			{"CWE", "Common Weakness Enumeration: the class a vulnerability belongs to, such as CWE-89 (SQL injection) or CWE-416 (use-after-free)."},
+			{"CVSS", "Common Vulnerability Scoring System: a 0.0 to 10.0 severity score computed from a vector of metrics."},
+			{"Zero-day", "A vulnerability the vendor does not yet know about, so no patch exists."},
+			{"Fuzzing", "Feeding a program huge numbers of malformed inputs under a sanitizer to find inputs that crash it."},
+			{"Coordinated disclosure", "Reporting a vulnerability privately to the vendor and giving them time to fix it before publishing."},
 		},
 		Concepts: []Concept{
 			{
@@ -1048,6 +1056,169 @@ outgoing traffic.`,
 					"Many countries require reporting some breaches within a deadline (72 hours under the EU's GDPR); put that in the plan.",
 				),
 			},
+			{
+				Name:    "Reading Research Papers",
+				Summary: "The frontier of computing lives in papers; learn to read one without drowning in it.",
+				Body: `Textbooks are years behind; the newest ideas, in security and
+everywhere else, arrive first as papers. Reading one is a skill, not a
+talent, and it is not read front to back.
+
+The three-pass method (Keshav): first pass, five minutes, read the
+title, abstract, introduction, section headings and conclusion, and
+decide whether to go on. Second pass, up to an hour, read the whole
+thing but skip the heavy proofs, studying the figures and tables, which
+carry most of the result, and marking terms to look up. Third pass, for
+a paper you must truly understand, rebuild it: re-derive the argument,
+re-implement the core, and note where you would have done it
+differently. Most papers deserve only the first pass.
+
+Read actively: a paper makes a claim, offers evidence and compares with
+what came before. Ask what exactly is new, what the threat model or
+assumptions are, what the evaluation does not cover, and whether you
+believe the result. Find papers through Google Scholar, arXiv and a
+venue's proceedings; follow a paper backwards through its references and
+forwards through "cited by". Preprints are not peer-reviewed, and a
+single paper is a claim, not a settled fact.`,
+				Diagram: `pass 1 (5 min)   title · abstract · intro · headings · conclusion → read on?
+pass 2 (1 hr)    whole paper, skip proofs, study figures and tables
+pass 3 (hours)   re-derive and re-implement; find the unstated assumptions
+                 most papers: stop after pass 1`,
+				MentalModel: "A paper is an argument to interrogate, read in passes, not a chapter to absorb front to back.",
+				TryIt:       "Give a famous short paper (Dijkstra's \"Go To Statement Considered Harmful\", or the original RSA paper) a five-minute first pass and write down its one claim.",
+				Analogy: `Watching a match before studying the players. First you see the whole
+game and the final score (abstract and conclusion); only if it matters
+do you rewatch in slow motion to see exactly how each goal was built
+(the method and proofs).`,
+				Example: `Every technology in this degree began as a paper: Shannon's 1948 theory
+of communication, Codd's 1970 relational model, Diffie and Hellman's
+1976 key exchange, and the 2017 "Attention Is All You Need", which
+started the large-language-model era. Security research is published at
+venues such as USENIX Security, IEEE S&P ("Oakland"), ACM CCS and NDSS,
+and the talks at Black Hat and DEF CON.`,
+				Exercises: trio(
+					"For a paper of your choice, write one sentence each for: its claim, its evidence, and what it does not address.",
+					"The abstract gives the claim; the evaluation section gives the evidence and, read carefully, its limits.",
+					"Give three papers a first pass in 15 minutes total and rank them by how much you would gain from a second pass. Pick one and do the second pass, listing every term you had to look up.",
+					"Figures and tables first: they usually carry the result more clearly than the prose.",
+					"Re-implement the core idea of a short systems or security paper (a data structure, an algorithm, a small protocol) from its description alone, then compare your version with the authors' code if they released it.",
+					"If your implementation behaves differently, you have found either a bug of yours or an unstated assumption of theirs; both are worth writing down.",
+				),
+			},
+			{
+				Name:    "Reading CVEs, CWEs & Advisories",
+				Summary: "The shared language defenders use to name, score and prioritise known vulnerabilities.",
+				Body: `When a vulnerability becomes public it gets a CVE ID, such as
+CVE-2021-44228 (Log4Shell): a unique name everyone can refer to. The
+record names the affected product and versions, links to the fix, and
+usually cites a CWE, the class of weakness (CWE-79 cross-site scripting,
+CWE-89 SQL injection, CWE-416 use-after-free, CWE-787 out-of-bounds
+write): the same bugs this stage has been teaching.
+
+Severity is scored with CVSS, from 0.0 to 10.0. The base score is
+computed from a vector string such as
+CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H: how the vulnerability is
+reached (Attack Vector: Network, Adjacent, Local, Physical), how hard
+(Attack Complexity), what privileges and user interaction it needs, and
+its impact on confidentiality, integrity and availability. A high score
+is not the same as high risk to you: a 9.8 in software you do not run,
+or that is not reachable from your network, may matter less than a 6.5
+on your public login page.
+
+Prioritise with more than the number. CISA's Known Exploited
+Vulnerabilities (KEV) catalogue lists what attackers are using right
+now, and EPSS estimates the probability a vulnerability will be
+exploited. "Patch the highest CVSS first" is a worse rule than "patch
+what is being exploited and reachable first".`,
+				Diagram: `CVE-2021-44228                  the name (year + number)
+  └ CWE-917  expression-language injection   the weakness class
+  └ CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H  = 10.0   the score
+  └ affected: Log4j 2.0-beta9 .. 2.14.1;  fixed in 2.15.0 (then 2.17.1)
+  └ on CISA KEV: yes  → being exploited: patch now`,
+				MentalModel: "A CVE names the bug, a CWE names its family, CVSS scores it, and KEV tells you if it is on fire.",
+				TryIt:       "Look up CVE-2021-44228 on the NVD and read its CVSS vector field by field.",
+				Analogy: `A disease registry. The CVE is the case number, the CWE is the diagnosis
+("it's a kind of pneumonia"), CVSS is the severity triage score, and the
+KEV catalogue is the public-health alert that this strain is actively
+spreading right now.`,
+				Example: `Log4Shell (CVE-2021-44228) scored 10.0 and was in a logging library
+buried inside thousands of applications, so the hard part was not the
+score but finding everywhere it was used. The Equifax breach exploited
+CVE-2017-5638 in Apache Struts, a patch that had been available for
+months: the vulnerability was known, the patching was not done.`,
+				Exercises: trio(
+					"Two vulnerabilities score CVSS 9.8 and 6.1. One is in a library on your internet-facing server; the other needs an attacker already logged in as an admin. Which do you patch first, and why is the score not enough?",
+					"Reachability and context beat the raw number: an exploitable, reachable 6.1 can outrank an unreachable 9.8.",
+					"Parse a CVSS v3.1 base vector yourself and compute the base score, then check it against the official calculator for three real CVEs.",
+					"The base score combines the exploitability metrics and the impact metrics with a defined formula; the specification gives the exact weights.",
+					"Take a project with dependencies, list its known vulnerabilities with your language's audit tool, and for each decide patch now, patch soon or accept, writing down the reasoning (reachable? exploited in the wild per KEV? a fix available?).",
+					"A vulnerability in code you never call may be a lower priority than a medium one on a hot path; record why, so the decision can be reviewed.",
+				),
+			},
+			{
+				Name:    "Vulnerability Research & Coordinated Disclosure",
+				Summary: "How researchers find a flaw nobody knew about, and get it fixed without causing harm.",
+				Body: `A zero-day is a vulnerability the vendor does not yet know about, so
+there is no patch. Finding one before an attacker does, and getting it
+fixed, is the work of a security researcher, and it is a legitimate,
+well-paid career. It is also bounded by law and ethics: in most
+countries, testing a system you do not own or have permission to test is
+a crime (the US Computer Fraud and Abuse Act, the UK Computer Misuse
+Act), whatever your intention. Everything below is practised only on
+your own systems, on deliberately vulnerable targets built for it, or
+under the explicit scope of a bug-bounty or engagement.
+
+How researchers find unknown bugs, all of which you have met in this
+degree:
+- fuzzing: feed a program millions of malformed or random inputs under a
+  sanitizer (AddressSanitizer, UBSan) and watch for crashes. Modern
+  fuzzers (AFL++, libFuzzer) guide themselves by code coverage. This is
+  how most memory-safety bugs are now found.
+- code audit: read the source for the patterns from this stage, missing
+  length checks, integer overflow, unchecked return values, trust of
+  user input.
+- diffing patches: compare a program before and after a fix to see what
+  changed, which can reveal a related, still-unpatched bug.
+
+A crash is not yet a finding. You minimise the input to the smallest
+that still triggers it, work out the root cause (which line, which
+assumption), and assess impact: can it be made to disclose memory, or
+only to crash? That assessment is where judgement, and restraint, matter.
+
+Then you disclose, coordinated. Report privately to the vendor (or
+through a CERT or a bug-bounty platform), give them a reasonable time to
+fix it (90 days is the common norm, as Google Project Zero uses), and
+publish only after a fix is available, or the deadline passes with none.
+Selling to the highest bidder, or publishing a working exploit against
+unpatched software people rely on, causes the harm the whole field
+exists to prevent.`,
+				Diagram: `find ─▶ reproduce ─▶ minimise ─▶ root cause ─▶ assess impact
+                                                   │
+                                                   ▼
+          report privately to the vendor ─▶ they fix it ─▶ CVE issued
+                              │  (≈90 days)            │
+                              └─ no fix in time ───────┴─▶ publish responsibly`,
+				MentalModel: "Find it, prove it minimally, report it privately, and let the fix ship before the world hears.",
+				TryIt:       "Read a published Project Zero write-up end to end and note the timeline from report to fix to disclosure.",
+				Analogy: `Finding a faulty lock on a neighbour's door. The responsible thing is to
+tell them quietly and give them time to change it, not to pick it to
+prove you can, and not to post the technique while every door in the
+street still has that lock.`,
+				Example: `Google's Project Zero finds zero-days in widely used software and
+publishes after a 90-day deadline, which pushed the industry toward
+timely patching. OSS-Fuzz runs fuzzers continuously against hundreds of
+open-source projects and has reported tens of thousands of bugs to their
+maintainers. Bug-bounty programmes (HackerOne, Bugcrowd, and vendors'
+own) pay researchers for exactly this work, under rules that make it
+legal; some single high-impact reports have paid over $100,000.`,
+				Exercises: trio(
+					"Put these in the right order and say why each matters: publish, minimise the input, report to the vendor, confirm the crash reproduces, assess impact.",
+					"Reproduce, minimise, assess, report, then publish only after a fix or the deadline: skipping \"report first\" is what makes disclosure irresponsible.",
+					"Write a small parser in C (for a config format, or a simple image header), then fuzz it with libFuzzer or AFL++ under -fsanitize=address,undefined. Minimise the first crashing input by hand to the fewest bytes that still crash it, find the root cause, and fix it. Keep the crashing input as a regression test.",
+					"A libFuzzer target is one function, int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size); build with -fsanitize=fuzzer,address.",
+					"Practise the full loop legally: pick a target that invites it (a pwn.college or picoCTF challenge, or a program with an open bug-bounty scope you have read), find an issue, and write it up as a disclosure report: summary, affected version, reproduction steps, impact, and suggested fix.",
+					"A good report lets the maintainer reproduce the bug in minutes; that is what gets it fixed, and what earns a bounty.",
+				),
+			},
 		},
 		Resources: []Resource{
 			{"Site", "OWASP Top 10:2025", "https://owasp.org/Top10/2025/0x00_2025-Introduction/", "The current list of the most critical web-application security risks."},
@@ -1083,6 +1254,12 @@ outgoing traffic.`,
 			{"What is the difference between a 401 and a 403 response?", "401: we do not know who you are (authenticate). 403: we know who you are, and you may not do this."},
 			{"You leaked an API key in a public commit and deleted it. What now?", "Revoke it and issue a new one; it stays in Git history and has probably been scraped already."},
 			{"Why should you not wipe a hacked server immediately?", "It destroys the evidence of how the attacker got in; isolate it and investigate first."},
+			{"What is the three-pass method for reading a paper?", "Pass 1: title, abstract, intro, headings and conclusion, to decide whether to read on. Pass 2: the whole paper, skipping proofs, studying figures. Pass 3: re-derive and re-implement it."},
+			{"What do a CVE ID, a CWE and a CVSS score each tell you?", "The CVE names a specific vulnerability; the CWE names its class of weakness; the CVSS score (0 to 10) rates its severity."},
+			{"Why is the highest CVSS score not always what to patch first?", "A high score in software you do not run, or that an attacker cannot reach, can matter less than a lower-scored, reachable, actively exploited bug (see the CISA KEV catalogue)."},
+			{"What is a zero-day?", "A vulnerability the vendor does not yet know about, so no patch exists; finding and responsibly reporting one before attackers use it is the work of a security researcher."},
+			{"What is coordinated disclosure, and why the delay before publishing?", "Report the flaw privately to the vendor and give them a reasonable time (often 90 days) to fix it, publishing only after a fix exists, so attackers do not get a working exploit against unpatched systems."},
+			{"Why is testing a system you do not own a crime even with good intentions?", "Laws such as the US CFAA and the UK Computer Misuse Act forbid unauthorised access regardless of intent; practise only on your own systems, deliberately vulnerable targets, or within an explicit bug-bounty or engagement scope."},
 		},
 	},
 

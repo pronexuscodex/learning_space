@@ -16,6 +16,63 @@ func init() {
 }
 
 var softwareSolutions = map[string]string{
+	"cvss": `#include <math.h>
+#include <stdio.h>
+#include <string.h>
+
+/* The letter after "/KEY:" in the vector, or 0 if the key is absent. */
+static char metric(const char *line, const char *key) {
+    const char *p = strstr(line, key);
+    return p ? p[strlen(key)] : 0;
+}
+
+static double weight(char c, const char *letters, const double *weights) {
+    for (int i = 0; letters[i]; i++)
+        if (letters[i] == c) return weights[i];
+    return -1;
+}
+
+int main(void) {
+    char line[256];
+    int bad = 0;
+    while (fgets(line, sizeof line, stdin)) {
+        line[strcspn(line, "\r\n")] = 0;
+        if (line[0] == 0) continue;
+        char changed = metric(line, "/S:");
+        double av = weight(metric(line, "/AV:"), "NALP", (double[]){0.85, 0.62, 0.55, 0.20});
+        double ac = weight(metric(line, "/AC:"), "LH", (double[]){0.77, 0.44});
+        double ui = weight(metric(line, "/UI:"), "NR", (double[]){0.85, 0.62});
+        double pr = changed == 'C'
+            ? weight(metric(line, "/PR:"), "NLH", (double[]){0.85, 0.68, 0.50})
+            : weight(metric(line, "/PR:"), "NLH", (double[]){0.85, 0.62, 0.27});
+        double c = weight(metric(line, "/C:"), "HLN", (double[]){0.56, 0.22, 0.0});
+        double i = weight(metric(line, "/I:"), "HLN", (double[]){0.56, 0.22, 0.0});
+        double a = weight(metric(line, "/A:"), "HLN", (double[]){0.56, 0.22, 0.0});
+        if (strncmp(line, "CVSS:3.1/", 9) != 0 || (changed != 'U' && changed != 'C') ||
+            av < 0 || ac < 0 || ui < 0 || pr < 0 || c < 0 || i < 0 || a < 0) {
+            fprintf(stderr, "cvss: invalid vector: %s\n", line);
+            bad = 1;
+            continue;
+        }
+        double iss = 1 - (1 - c) * (1 - i) * (1 - a);
+        double impact = changed == 'C'
+            ? 7.52 * (iss - 0.029) - 3.25 * pow(iss - 0.02, 15)
+            : 6.42 * iss;
+        double score;
+        if (impact <= 0) {
+            score = 0.0;
+        } else {
+            double raw = impact + 8.22 * av * ac * pr * ui;
+            if (changed == 'C') raw *= 1.08;
+            if (raw > 10) raw = 10;
+            long r = (long)ceil(raw * 100000 - 1e-9);
+            score = r % 10000 == 0 ? r / 100000.0 : (r / 10000 + 1) / 10.0;
+        }
+        printf("%.1f\n", score);
+    }
+    return bad;
+}
+`,
 	"git_blob": `#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -738,4 +795,11 @@ int main(void) {
 	failsWith(t, "stack_vm", mutate("stack_vm", "push(a - b);", "push(b - a);"), "arithmetic", "")
 	// Treating an unknown instruction as HALT instead of refusing the program.
 	failsWith(t, "stack_vm", mutate("stack_vm", "        if (op < 0) { fprintf(stderr, \"stack_vm: unknown instruction %s\\n\", name); return 2; }", "        if (op < 0) op = HALT;"), "an unknown instruction", "")
+
+	// The Scope-Changed impact formula dropped (6.42 * iss always).
+	failsWith(t, "cvss", mutate("cvss", "        double impact = changed == 'C'\n            ? 7.52 * (iss - 0.029) - 3.25 * pow(iss - 0.02, 15)\n            : 6.42 * iss;", "        double impact = 6.42 * iss;"), "scope changes the result", "")
+	// Rounding to nearest instead of up.
+	failsWith(t, "cvss", mutate("cvss", "            long r = (long)ceil(raw * 100000 - 1e-9);\n            score = r % 10000 == 0 ? r / 100000.0 : (r / 10000 + 1) / 10.0;", "            score = ((long)(raw * 10 + 0.5)) / 10.0;"), "rounding up", "")
+	// PR not adjusted for Scope Changed.
+	failsWith(t, "cvss", mutate("cvss", "        double pr = changed == 'C'\n            ? weight(metric(line, \"/PR:\"), \"NLH\", (double[]){0.85, 0.68, 0.50})\n            : weight(metric(line, \"/PR:\"), \"NLH\", (double[]){0.85, 0.62, 0.27});", "        double pr = weight(metric(line, \"/PR:\"), \"NLH\", (double[]){0.85, 0.62, 0.27});"), "scope changes the result", "")
 }

@@ -200,7 +200,7 @@ Checked-exercise files live in `Documents/Academy Labs` (`$ACADEMY_LABS` chooses
 | | 19 | Network Defence & Monitoring |
 | | 20 | Incident Response, Forensics & Privacy |
 
-That is **152 concepts** and **456 exercises**, plus a glossary, a resource library, lab blueprints, a quiz and a mastery check for every stage. Start Here also lists electives for afterwards: graphics, quantum computing, embedded systems and bioinformatics.
+That is **155 concepts** and **465 exercises**, plus a glossary, a resource library, lab blueprints, a quiz and a mastery check for every stage. Start Here also lists electives for afterwards: graphics, quantum computing, embedded systems and bioinformatics.
 
 ## How computers work (Stage 0)
 
@@ -368,6 +368,7 @@ The later stages have checked exercises too, written with C and POSIX only, so t
 | `git_blob` | 9: Git | SHA-1 written by hand, matching `git hash-object`: the empty file, the 55-, 56- and 64-byte padding boundaries, a three-digit length, and 2 MB of every byte value |
 | `make_order` | 9: Build systems | the order make builds in: depth-first, each target once, cycles (exit 1), a missing rule (exit 2), and 100,000 rules |
 | `bisect` | 9: Debugging tools | git bisect as a function: at most ⌈log₂ n⌉ tests, never the known ends, and a midpoint that cannot overflow near `LONG_MAX` |
+| `cvss` | 10: Reading CVEs | a CVSS v3.1 base-score calculator: scope-dependent weights, round-up (not round-to-nearest), zero-impact vectors, and thousands of combinations against the official formula |
 | `nfa_match` | 11: Regex engines | a regex engine that never backtracks: precedence, whole-line matches, `(a+)+b` on 30 a's, 100,000-character lines, invalid patterns |
 | `turing` | 11: Turing machines | a Turing-machine simulator: the move into H counts, the 1s left on the tape, step limits, and the 5-state busy beaver's 47,176,870 steps |
 | `dpll` | 11: Reductions | a SAT solver for DIMACS CNF: clauses across lines, pigeonholes (UNSAT), and the Inkala Sudoku as 11,988 clauses |
@@ -809,7 +810,7 @@ The tests check:
 - **The v1 → v2 migration and stage merging.**
 - **Retention:** the scheduler's intervals grow and reset on a lapse; deck unlocking and due cards; each step of the mastery ladder.
 - **Classic Mode:** every stage has a complete classic corner with HTTPS links; the struggle clock's thresholds and early unlock; notebook and type-in progress survive a save round trip.
-- **Checked exercises:** each check's reference solution passes every case, with gcc and with clang (66 checks, including a real loopback TCP server, forked processes and a write-ahead log the checker reads back). Mastery waits for a concept's check to pass. Typical mistakes fail with the right explanation:
+- **Checked exercises:** each check's reference solution passes every case, with gcc and with clang (67 checks, including a real loopback TCP server, forked processes and a write-ahead log the checker reads back). Mastery waits for a concept's check to pass. Typical mistakes fail with the right explanation:
   - the XOR swap;
   - `9 / 5` in integers;
   - an endless loop;

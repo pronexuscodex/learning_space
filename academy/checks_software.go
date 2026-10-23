@@ -6,6 +6,7 @@ package main
 import (
 	"crypto/sha1"
 	"fmt"
+	"math"
 	"math/rand/v2"
 	"regexp"
 	"strings"
@@ -170,6 +171,55 @@ int main(int argc, char **argv) {
 		Hints: []string{
 			"while (bad - good > 1) { long mid = good + (bad - good) / 2; if (is_bad(mid)) bad = mid; else good = mid; } return bad;",
 			"good and bad themselves are known: testing them wastes a test, and the checker counts it as outside the range.",
+		},
+	},
+	{
+		ID: "cvss", Stage: 10, Concept: "Reading CVEs, CWEs & Advisories",
+		Title: "A CVSS v3.1 base-score calculator",
+		Task:  "Read CVSS v3.1 base vector strings from standard input, one per line, such as CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H, and print each one's base score to one decimal place. Use the official formula: compute the Impact Sub-Score (ISS) from the C/I/A metrics, the Impact from it (which depends on Scope), and the Exploitability from AV/AC/PR/UI (PR's weight depends on Scope); if Impact <= 0 the score is 0.0, otherwise it is the sum (multiplied by 1.08 when Scope is Changed), capped at 10.0, then rounded UP to one decimal. A line that is not a valid vector gets a message on standard error and makes the program exit 1 at the end (after printing the valid lines' scores).",
+		File:  "cvss.c",
+		Starter: `/* Checked exercise: cvss (CVSS v3.1 base score)
+ * Metric weights:
+ *   AV: N 0.85  A 0.62  L 0.55  P 0.20
+ *   AC: L 0.77  H 0.44
+ *   UI: N 0.85  R 0.62
+ *   PR (Scope Unchanged): N 0.85  L 0.62  H 0.27
+ *   PR (Scope Changed):   N 0.85  L 0.68  H 0.50
+ *   C/I/A: H 0.56  L 0.22  N 0.00
+ * ISS   = 1 - (1 - C)(1 - I)(1 - A)
+ * Impact (S:U) = 6.42 * ISS
+ * Impact (S:C) = 7.52 * (ISS - 0.029) - 3.25 * (ISS - 0.02)^15
+ * Exploitability = 8.22 * AV * AC * PR * UI
+ * score (Impact <= 0)          = 0.0
+ * score (S:U) = roundup(min(Impact + Exploitability, 10))
+ * score (S:C) = roundup(min(1.08 * (Impact + Exploitability), 10))
+ * "roundup" means to the next higher 0.1 (ceil(x * 10) / 10, with a
+ * little care for floating-point: the spec rounds 10^5 * x to an int).
+ */
+#include <math.h>
+#include <stdio.h>
+#include <string.h>
+`,
+		Flags: []string{"-lm"},
+		Cases: []CheckCase{
+			{Name: "the worst cases", Stdin: "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H\nCVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H\n", Want: cvssWant("CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H\nCVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H\n"),
+				Explain: "A network, no-privilege, no-interaction attack with full impact scores 9.8; with Scope Changed it reaches 10.0. These are the two every calculator agrees on."},
+			{Name: "scope changes the result", Stdin: "CVSS:3.1/AV:N/AC:L/PR:L/UI:N/S:U/C:L/I:L/A:N\nCVSS:3.1/AV:N/AC:L/PR:L/UI:N/S:C/C:L/I:L/A:N\n", Want: cvssWant("CVSS:3.1/AV:N/AC:L/PR:L/UI:N/S:U/C:L/I:L/A:N\nCVSS:3.1/AV:N/AC:L/PR:L/UI:N/S:C/C:L/I:L/A:N\n"),
+				Explain: "Scope Changed raises PR:L from 0.62 to 0.68 and multiplies the total by 1.08, so the same metrics score higher."},
+			{Name: "no impact is zero", Stdin: "CVSS:3.1/AV:A/AC:H/PR:H/UI:R/S:U/C:N/I:N/A:N\n", Want: cvssWant("CVSS:3.1/AV:A/AC:H/PR:H/UI:R/S:U/C:N/I:N/A:N\n"),
+				Explain: "With C:N/I:N/A:N the Impact is 0, so the score is 0.0 whatever the other metrics are: a vulnerability that changes nothing has no base severity."},
+			{Name: "rounding up", Stdin: "CVSS:3.1/AV:L/AC:L/PR:L/UI:N/S:U/C:N/I:N/A:H\nCVSS:3.1/AV:P/AC:H/PR:H/UI:R/S:U/C:L/I:L/A:L\nCVSS:3.1/AV:N/AC:H/PR:N/UI:R/S:U/C:L/I:N/A:N\n", Want: cvssWant("CVSS:3.1/AV:L/AC:L/PR:L/UI:N/S:U/C:N/I:N/A:H\nCVSS:3.1/AV:P/AC:H/PR:H/UI:R/S:U/C:L/I:L/A:L\nCVSS:3.1/AV:N/AC:H/PR:N/UI:R/S:U/C:L/I:N/A:N\n"),
+				Explain: "The score is rounded up to the next 0.1, not to nearest: 5.499 is 5.5. Round 100000 times the value to an integer first, as the spec does, so a value like 4.0000001 does not become 4.1."},
+			{Name: "an invalid vector", Stdin: "CVSS:3.1/AV:X/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H\n", WantExit: 1, Stderr: true,
+				Explain: "AV:X is not a defined value: report the bad vector on standard error and exit 1 (the scores of any valid lines are still printed as they are read)."},
+			{Name: "many real-looking vectors", Gen: generated(cvssManyCase),
+				Explain: "Every combination of metrics must match the formula: a weight table typed slightly wrong shows up on one metric here."},
+		},
+		Timeout: 5 * time.Second,
+		Hints: []string{
+			"Parse by finding each metric with strstr(line, \"/AV:\") and reading the letter after the colon, or split on '/' and then on ':'.",
+			"Guard the C:N/I:N/A:N case before the Scope-Changed power term, which is otherwise a tiny negative number raised to the 15th.",
+			"Round up with the spec's trick: long r = (long)ceil(x * 100000.0); return r % 10000 == 0 ? r / 100000.0 : (r / 10000 + 1) / 10.0; (printed with %.1f).",
 		},
 	},
 	{
@@ -773,4 +823,109 @@ POP
 PRINT
 HALT
 `, n)
+}
+
+// cvssScore computes a CVSS v3.1 base score from a base vector string,
+// returning the score and whether the vector was valid.
+func cvssScore(vector string) (float64, bool) {
+	m := map[string]string{}
+	for _, part := range strings.Split(vector, "/") {
+		kv := strings.SplitN(part, ":", 2)
+		if len(kv) == 2 {
+			m[kv[0]] = kv[1]
+		}
+	}
+	look := func(key string, table map[string]float64) (float64, bool) {
+		w, ok := table[m[key]]
+		return w, ok
+	}
+	changed := m["S"] == "C"
+	av, ok1 := look("AV", map[string]float64{"N": 0.85, "A": 0.62, "L": 0.55, "P": 0.2})
+	ac, ok2 := look("AC", map[string]float64{"L": 0.77, "H": 0.44})
+	ui, ok3 := look("UI", map[string]float64{"N": 0.85, "R": 0.62})
+	prTable := map[string]float64{"N": 0.85, "L": 0.62, "H": 0.27}
+	if changed {
+		prTable = map[string]float64{"N": 0.85, "L": 0.68, "H": 0.5}
+	}
+	pr, ok4 := look("PR", prTable)
+	impact := map[string]float64{"H": 0.56, "L": 0.22, "N": 0.0}
+	c, ok5 := look("C", impact)
+	i, ok6 := look("I", impact)
+	a, ok7 := look("A", impact)
+	_, ok8 := map[string]bool{"U": true, "C": true}[m["S"]]
+	if m["CVSS"] != "3.1" || !(ok1 && ok2 && ok3 && ok4 && ok5 && ok6 && ok7 && ok8) {
+		return 0, false
+	}
+	iss := 1 - (1-c)*(1-i)*(1-a)
+	var impactScore float64
+	if changed {
+		impactScore = 7.52*(iss-0.029) - 3.25*math.Pow(iss-0.02, 15)
+	} else {
+		impactScore = 6.42 * iss
+	}
+	if impactScore <= 0 {
+		return 0, true
+	}
+	exploitability := 8.22 * av * ac * pr * ui
+	raw := impactScore + exploitability
+	if changed {
+		raw = 1.08 * raw
+	}
+	if raw > 10 {
+		raw = 10
+	}
+	// roundup to the next 0.1, via 100000ths as the spec defines it
+	r := int64(math.Ceil(raw*100000 - 1e-9))
+	if r%10000 == 0 {
+		return float64(r) / 100000, true
+	}
+	return float64(r/10000+1) / 10, true
+}
+
+func cvssWant(input string) string {
+	var sb strings.Builder
+	for _, line := range strings.Split(strings.TrimRight(input, "\n"), "\n") {
+		if s, ok := cvssScore(line); ok {
+			fmt.Fprintf(&sb, "%.1f\n", s)
+		}
+	}
+	return sb.String()
+}
+
+// cvssManyCase generates every combination of the eight base metrics
+// (a few thousand vectors) and the scores the formula gives them.
+func cvssManyCase() (stdin, want string) {
+	av := []string{"N", "A", "L", "P"}
+	ac := []string{"L", "H"}
+	pr := []string{"N", "L", "H"}
+	ui := []string{"N", "R"}
+	sc := []string{"U", "C"}
+	cia := []string{"H", "L", "N"}
+	var in, out strings.Builder
+	r := rand.New(rand.NewPCG(15, 15))
+	var all []string
+	for _, AV := range av {
+		for _, AC := range ac {
+			for _, PR := range pr {
+				for _, UI := range ui {
+					for _, S := range sc {
+						for _, C := range cia {
+							for _, I := range cia {
+								for _, A := range cia {
+									all = append(all, fmt.Sprintf("CVSS:3.1/AV:%s/AC:%s/PR:%s/UI:%s/S:%s/C:%s/I:%s/A:%s", AV, AC, PR, UI, S, C, I, A))
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+	r.Shuffle(len(all), func(i, j int) { all[i], all[j] = all[j], all[i] })
+	for _, v := range all {
+		s, _ := cvssScore(v)
+		in.WriteString(v + "\n")
+		fmt.Fprintf(&out, "%.1f\n", s)
+	}
+	return in.String(), out.String()
 }
