@@ -457,6 +457,128 @@ int main(void) {
     return 0;
 }
 `,
+	"higher_order": `#include <stddef.h>
+
+void map(int *xs, size_t n, int (*f)(int x, void *ctx), void *ctx) {
+    for (size_t i = 0; i < n; i++) xs[i] = f(xs[i], ctx);
+}
+
+size_t filter(const int *in, size_t n, int *out, int (*keep)(int x, void *ctx), void *ctx) {
+    size_t k = 0;
+    for (size_t i = 0; i < n; i++)
+        if (keep(in[i], ctx)) out[k++] = in[i];
+    return k;
+}
+
+long fold(const int *xs, size_t n, long init, long (*f)(long acc, int x, void *ctx), void *ctx) {
+    long acc = init;
+    for (size_t i = 0; i < n; i++) acc = f(acc, xs[i], ctx);
+    return acc;
+}
+`,
+	"refcount": `#include <stdlib.h>
+#include <string.h>
+
+struct rcstr { int count; char text[]; };
+
+struct rcstr *rc_new(const char *s) {
+    size_t len = strlen(s);
+    struct rcstr *p = malloc(sizeof *p + len + 1);
+    if (p == NULL) return NULL;
+    p->count = 1;
+    memcpy(p->text, s, len + 1);
+    return p;
+}
+
+struct rcstr *rc_retain(struct rcstr *p) { p->count++; return p; }
+
+void rc_release(struct rcstr *p) {
+    if (--p->count == 0) free(p);
+}
+
+const char *rc_text(const struct rcstr *p) { return p->text; }
+
+int rc_count(const struct rcstr *p) { return p->count; }
+`,
+	"stack_vm": `#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+enum op { PUSH, POP, DUP, SWAP, OVER, ADD, SUB, MUL, DIV, JMP, JZ, PRINT, HALT };
+static const char *names[] = {"PUSH", "POP", "DUP", "SWAP", "OVER", "ADD", "SUB", "MUL", "DIV", "JMP", "JZ", "PRINT", "HALT"};
+
+struct insn { enum op op; long long arg; };
+
+static long long *stack;
+static size_t top, cap;
+
+static void push(long long v) {
+    if (top == cap) {
+        cap = cap ? cap * 2 : 256;
+        stack = realloc(stack, cap * sizeof *stack);
+        if (stack == NULL) exit(3);
+    }
+    stack[top++] = v;
+}
+
+static long long pop(size_t pc) {
+    if (top == 0) { fprintf(stderr, "stack_vm: empty stack at instruction %zu\n", pc); exit(1); }
+    return stack[--top];
+}
+
+int main(void) {
+    struct insn *code = NULL;
+    size_t n = 0, codecap = 0;
+    char line[128], name[16];
+    while (fgets(line, sizeof line, stdin)) {
+        long long arg = 0;
+        int got = sscanf(line, "%15s %lld", name, &arg);
+        if (got < 1) continue;
+        int op = -1;
+        for (int i = 0; i <= HALT; i++) if (strcmp(name, names[i]) == 0) op = i;
+        if (op < 0) { fprintf(stderr, "stack_vm: unknown instruction %s\n", name); return 2; }
+        if (n == codecap) {
+            codecap = codecap ? codecap * 2 : 64;
+            code = realloc(code, codecap * sizeof *code);
+            if (code == NULL) return 3;
+        }
+        code[n].op = (enum op)op;
+        code[n].arg = arg;
+        n++;
+    }
+    for (size_t i = 0; i < n; i++)
+        if ((code[i].op == JMP || code[i].op == JZ) && (code[i].arg < 0 || (size_t)code[i].arg >= n)) {
+            fprintf(stderr, "stack_vm: jump to %lld is outside the program\n", code[i].arg);
+            return 2;
+        }
+    size_t pc = 0;
+    while (pc < n) {
+        struct insn in = code[pc];
+        long long a, b;
+        switch (in.op) {
+        case PUSH: push(in.arg); pc++; break;
+        case POP: pop(pc); pc++; break;
+        case DUP: a = pop(pc); push(a); push(a); pc++; break;
+        case SWAP: b = pop(pc); a = pop(pc); push(b); push(a); pc++; break;
+        case OVER: b = pop(pc); a = pop(pc); push(a); push(b); push(a); pc++; break;
+        case ADD: b = pop(pc); a = pop(pc); push(a + b); pc++; break;
+        case SUB: b = pop(pc); a = pop(pc); push(a - b); pc++; break;
+        case MUL: b = pop(pc); a = pop(pc); push(a * b); pc++; break;
+        case DIV:
+            b = pop(pc); a = pop(pc);
+            if (b == 0) { fprintf(stderr, "stack_vm: division by zero at instruction %zu\n", pc); return 1; }
+            push(a / b); pc++; break;
+        case JMP: pc = (size_t)in.arg; break;
+        case JZ: a = pop(pc); pc = a == 0 ? (size_t)in.arg : pc + 1; break;
+        case PRINT: printf("%lld\n", pop(pc)); pc++; break;
+        case HALT: pc = n; break;
+        }
+    }
+    free(code);
+    free(stack);
+    return 0;
+}
+`,
 }
 
 // Each Stage 9 to 12 check fails the typical wrong answer, for the reason
@@ -561,4 +683,59 @@ int main(int argc, char **argv) {
 	).Replace(ref["dpll"]), "four pigeons, three holes", "")
 	// Reading clauses line by line.
 	failsWith(t, "dpll", mutate("dpll", "        if (x == 0) { start[++k] = n; continue; }", "        if (x == 0) { start[++k] = n; while ((c = getchar()) != '\\n' && c != EOF) {} continue; }"), "clauses over several lines", "")
+
+	// fold from the right.
+	failsWith(t, "higher_order", mutate("higher_order", "    for (size_t i = 0; i < n; i++) acc = f(acc, xs[i], ctx);", "    for (size_t i = n; i > 0; i--) acc = f(acc, xs[i - 1], ctx);"), "fold, left to right", "")
+	// The context not passed on.
+	failsWith(t, "higher_order", mutate("higher_order", "        if (keep(in[i], ctx)) out[k++] = in[i];", "        if (keep(in[i], ((void)ctx, NULL))) out[k++] = in[i];"), "filter with a threshold chosen at run time", "")
+
+	// Freeing on every release: use after free while others still hold it.
+	failsWith(t, "refcount", mutate("refcount", "    if (--p->count == 0) free(p);", "    p->count--;\n    free(p);"), "three holders", "")
+	// Never freeing: every case leaks.
+	if run := runSource(t, "refcount", mutate("refcount", "    if (--p->count == 0) free(p);", "    --p->count;")); run.Leaks && run.OK() {
+		t.Error("refcount: a string never freed must be reported as a leak")
+	}
+	// Keeping the caller's pointer instead of a copy.
+	failsWith(t, "refcount", strings.NewReplacer(
+		"struct rcstr { int count; char text[]; };", "struct rcstr { int count; const char *text; };",
+		"    struct rcstr *p = malloc(sizeof *p + len + 1);", "    struct rcstr *p = malloc(sizeof *p);\n    (void)len;",
+		"    memcpy(p->text, s, len + 1);", "    p->text = s;",
+	).Replace(ref["refcount"]), "rc_new copies", "")
+
+	// Re-reading the text of each instruction on every step: correct, but far too slow.
+	reparse := `#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+static char lines[4096][128];
+static long long st[1 << 16];
+
+int main(void) {
+    int n = 0, top = 0;
+    while (n < 4096 && fgets(lines[n], sizeof lines[n], stdin)) n++;
+    for (int pc = 0; pc < n;) {
+        char name[16]; long long arg = 0, a, b;
+        sscanf(lines[pc], "%15s %lld", name, &arg);
+        if (!strcmp(name, "PUSH")) { st[top++] = arg; pc++; }
+        else if (!strcmp(name, "POP")) { top--; pc++; }
+        else if (!strcmp(name, "DUP")) { st[top] = st[top - 1]; top++; pc++; }
+        else if (!strcmp(name, "SWAP")) { a = st[top - 1]; st[top - 1] = st[top - 2]; st[top - 2] = a; pc++; }
+        else if (!strcmp(name, "OVER")) { st[top] = st[top - 2]; top++; pc++; }
+        else if (!strcmp(name, "ADD")) { b = st[--top]; st[top - 1] += b; pc++; }
+        else if (!strcmp(name, "SUB")) { b = st[--top]; st[top - 1] -= b; pc++; }
+        else if (!strcmp(name, "MUL")) { b = st[--top]; st[top - 1] *= b; pc++; }
+        else if (!strcmp(name, "DIV")) { b = st[--top]; st[top - 1] /= b; pc++; }
+        else if (!strcmp(name, "JMP")) pc = (int)arg;
+        else if (!strcmp(name, "JZ")) pc = st[--top] == 0 ? (int)arg : pc + 1;
+        else if (!strcmp(name, "PRINT")) { printf("%lld\n", st[--top]); pc++; }
+        else break;
+    }
+    return 0;
+}
+`
+	failsWith(t, "stack_vm", reparse, "ninety million instructions", "did not finish")
+	// SUB with its operands the wrong way round.
+	failsWith(t, "stack_vm", mutate("stack_vm", "push(a - b);", "push(b - a);"), "arithmetic", "")
+	// Treating an unknown instruction as HALT instead of refusing the program.
+	failsWith(t, "stack_vm", mutate("stack_vm", "        if (op < 0) { fprintf(stderr, \"stack_vm: unknown instruction %s\\n\", name); return 2; }", "        if (op < 0) op = HALT;"), "an unknown instruction", "")
 }

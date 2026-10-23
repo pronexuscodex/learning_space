@@ -1633,13 +1633,18 @@ within a few percent in seconds.`,
 	12: {
 		Overview: `Every programming language is a set of design choices about how to
 express computation. This stage teaches the big ideas behind all of
-them (paradigms, type systems, memory management, execution models and
-concurrency), so that you can learn any new language in days instead of
-months.`,
+them (paradigms, type systems, recursion and closures, generics, error
+handling, memory management, execution models and concurrency), so that
+you can learn any new language in days instead of months. Each idea is
+shown in the languages built around it, and measured: C, Java, OCaml,
+Haskell, Rust, Go, Erlang, JavaScript, Python and SQL, all run for these
+lessons.`,
 		Outcomes: []string{
 			"Recognise the paradigm and design choices behind any language",
 			"Use types, memory models and concurrency models deliberately",
 			"Pick up a new programming language quickly",
+			"Write recursive and higher-order code that does not overflow the stack",
+			"Choose between exceptions, result types and error codes, and between generics and interfaces",
 		},
 		Glossary: []Term{
 			{"Paradigm", "A style of programming, such as imperative, object-oriented or functional."},
@@ -1651,6 +1656,12 @@ months.`,
 			{"Bytecode", "A compact, portable instruction format run by a virtual machine."},
 			{"JIT", "Just-in-time compiler: compiles frequently run code to machine code while the program runs."},
 			{"Concurrency", "Structuring a program as several tasks that make progress independently."},
+			{"Type inference", "The compiler working out the types you did not write, as OCaml and Haskell do for whole programs."},
+			{"Closure", "A function together with the variables it captured from where it was created."},
+			{"Tail call", "A call that is the very last thing a function does, which a compiler can turn into a jump that uses no stack."},
+			{"Generics", "Code written once for many types, such as a list of T; compiled as one copy per type or as one shared copy."},
+			{"Result type", "A return value that is either a success with a value or an error, which the caller must handle (Rust's Result, Haskell's Either)."},
+			{"Actor", "An isolated process with its own state that communicates only by sending messages, as in Erlang."},
 		},
 		Concepts: []Concept{
 			{
@@ -1661,14 +1672,42 @@ early BASIC). Object-oriented programming bundles data with the methods
 that act on it into objects, using encapsulation, inheritance and
 polymorphism (Java, C#, Python). Functional programming builds programs
 from pure functions that do not change state, and treats functions as
-values that can be passed around (Haskell, Clojure, and map/filter/reduce
-in most languages). Declarative languages describe what you want, not
-how to get it (SQL, HTML, regex).
+values that can be passed around (Haskell, OCaml, Erlang, Clojure, and
+map/filter/reduce in most languages). Declarative languages describe
+what you want, not how to get it (SQL, HTML, regex).
 
 Most modern languages mix paradigms. The skill is choosing the right
 style for each part of a program.`,
+				Diagram: `the same question: the sum of the squares of the even numbers to 1,000,000
+
+C        for (i = 1; i <= n; i++) if (i % 2 == 0) total += i * i;
+Java     LongStream.rangeClosed(1, n).filter(i -> i % 2 == 0).map(i -> i * i).sum()
+Haskell  sum [x * x | x <- [1 .. n], even x]
+Erlang   lists:sum([X * X || X <- lists:seq(1, N), X rem 2 =:= 0])
+SQL      SELECT sum(i * i) FROM n WHERE i % 2 = 0`,
+				UnderTheHood: `All of the versions above were run for this lesson, and all printed
+166667166667000000. The OCaml one, written with lists:
+
+  List.init 1_000_000 (fun i -> i + 1)
+  |> List.filter (fun i -> i mod 2 = 0)
+  |> List.map (fun i -> i * i)
+  |> List.fold_left ( + ) 0
+
+crashed with "Fatal error: exception Stack_overflow". In OCaml 4.14,
+List.init and List.filter are tail-recursive but List.map is not: on
+500,000 elements it needed 500,000 stack frames, more than the 8 MB stack
+holds. Rewritten with Seq, a lazy sequence that produces one element at
+a time, the same pipeline printed the right answer.
+
+Laziness goes further in Haskell, where every list is lazy:
+
+  take 5 (filter even (map (^ 2) [1 ..]))   →   [4,16,36,64,100]
+
+map over the infinite list [1 ..] finishes, because only the five
+squares asked for are ever computed. A paradigm is a choice of what the
+language does for you, and of its costs.`,
 				MentalModel: "Paradigms are lenses; use the one that makes the problem simplest.",
-				TryIt:       "Sum the squares of the even numbers in a list three ways: a for loop, a class, and map/filter/reduce.",
+				TryIt:       "Sum the squares of the even numbers in a list three ways: a for loop in C, a stream in Java, and a list comprehension in Haskell or Erlang.",
 				Analogy: `Giving directions. Imperative: "walk 200 m, turn left, go two blocks".
 Declarative: "meet me at the library", and you find your own way.
 Object-oriented: asking a taxi driver (an object that knows how to drive)
@@ -1681,9 +1720,9 @@ Android apps were historically written in Java.`,
 				Exercises: trio(
 					"Classify each as imperative, object-oriented, functional or declarative: a SQL query, a recipe, a spreadsheet formula, a class Dog with a bark() method.",
 					"Does it say how, say what, or bundle data with behaviour?",
-					"Implement a shopping cart twice: once with classes (Cart, Item) and once with only pure functions over lists and dictionaries. Compare which is easier to test.",
-					"The pure version returns a new cart instead of modifying the old one.",
-					"Take a script that processes a CSV of orders with nested loops and mutable counters, and rewrite the processing as a pipeline of pure functions (parse → filter → group → summarise), keeping its tests passing.",
+					"Implement a shopping cart twice: in Java with classes (Cart, Item, methods that change the cart), and in OCaml or Haskell with only pure functions that return a new cart. Write the same five tests for both and compare which was easier to test.",
+					"In the functional version, add_item cart item returns a new cart; nothing is ever modified.",
+					"Take a program that processes a CSV of orders with nested loops and mutable counters, and rewrite the processing as a pipeline of pure functions (parse → filter → group → summarise) in a functional language (OCaml, Haskell, Elixir) or with JavaScript's map, filter and reduce, keeping its tests passing.",
 					"Each stage takes data and returns new data, with no global variables.",
 				),
 			},
@@ -1691,18 +1730,48 @@ Android apps were historically written in Java.`,
 				Name:    "Type Systems",
 				Summary: "Rules that catch mistakes before your code runs.",
 				Body: `A type system classifies values and checks that operations make sense.
-Static typing checks before the program runs (Go, Rust, Java,
-TypeScript); dynamic typing checks while it runs (Python, JavaScript,
-Ruby). Strong versus weak typing is about implicit conversions, such as
-what "5" + 3 does. Type inference lets the compiler work out types for
-you, and generics let one function work safely over many types
-(List<T>).
+Static typing checks before the program runs (Go, Rust, Java, OCaml,
+Haskell, TypeScript); dynamic typing checks while it runs (Python,
+JavaScript, Ruby, Erlang). Strong versus weak typing is about implicit
+conversions, such as what "5" + 3 does. Type inference lets the
+compiler work out types for you, and generics let one function work
+safely over many types (List<T>).
 
 Richer types can rule out whole classes of bugs. Optional types replace
 null, which Tony Hoare called his "billion-dollar mistake". Sum types
 (enums that carry data) force you to handle every case.`,
+				Diagram: `                   checked before running      checked while running
+no surprises       Rust, OCaml, Haskell        Python, Ruby
+(strong)           Java, Go                    Erlang
+converts quietly   C (int ↔ pointer, casts)    JavaScript ("5" + 3 = "53")
+(weak)`,
+				UnderTheHood: `"5" + 3, run in three dynamic languages:
+
+  JavaScript   "53"      and "5" * 3 is 15: it converts quietly
+  Python       TypeError: can only concatenate str (not "int") to str
+  Ruby         TypeError: no implicit conversion of Integer into String
+
+OCaml inferred every type in this file without a single annotation
+(ocamlc -i prints them):
+
+  let f x = x + 1                  val f : int -> int
+  let g x y = if x then y else []  val g : bool -> 'a list -> 'a list
+  let compose f g x = f (g x)      val compose : ('a -> 'b) -> ('c -> 'a) -> 'c -> 'b
+
+A traffic light as a sum type, with a case forgotten:
+
+  OCaml   Warning 8 [partial-match]: this pattern-matching is not
+          exhaustive. Here is an example of a case that is not matched:
+          Yellow
+  Rust    error[E0004]: non-exhaustive patterns: Light::Yellow not covered
+
+And null, in C: a lookup that returned NULL for an unknown name, passed
+straight to strlen, compiled without a warning and ended in
+"Segmentation fault", exit status 139. Rust's Option and Haskell's
+Maybe make that impossible: the "no answer" case is a value the
+compiler makes you handle.`,
 				MentalModel: "Types are tests that the compiler writes and runs for free.",
-				TryIt:       "Add type hints to a Python program and run mypy to find mismatches.",
+				TryIt:       "Write let f x = x + 1 and let g x = x ^ \"!\" in OCaml's toplevel (ocaml), read the types it infers, then try f \"a\".",
 				Analogy: `Electrical plugs are shaped so that you cannot push a kettle's plug into
 a phone-charger socket. The shape (the type) prevents a dangerous mistake
 before any current flows.`,
@@ -1713,11 +1782,202 @@ companies have reported that it would have caught a significant fraction
 of their production bugs.`,
 				Exercises: trio(
 					`Predict the result in Python and in JavaScript: "5" + 3 and "5" * 3. Which language is stricter here?`,
-					`Python raises TypeError for "5" + 3; JavaScript converts, giving "53" and 15.`,
-					"Model a traffic light as a sum type (Red | Yellow | Green) in Rust, TypeScript or Python (Enum plus match), with a next() function. Show that forgetting a case is caught by the compiler or type checker.",
-					"Rust's match, or a TypeScript switch with a never check, both detect missing cases.",
-					"Take a small untyped JavaScript or Python project (yours or an open-source one), add types step by step (TypeScript, or mypy --strict), and record every real bug or unclear piece of code the types exposed.",
+					`Python raises TypeError for "5" + 3 and gives "555" for "5" * 3; JavaScript converts, giving "53" and 15.`,
+					"Model a traffic light as a sum type (Red | Yellow | Green) with a next function in OCaml, Rust or Haskell, and an Option-returning lookup function. Show that forgetting a case, or using the lookup's result without checking for None, is caught by the compiler.",
+					"OCaml's match warns (make it an error with -w +8); Rust's match refuses to compile; in Haskell compile with -Wall.",
+					"Take a small untyped JavaScript project (yours or an open-source one), convert it to TypeScript step by step with strict mode on, and record every real bug or unclear piece of code the types exposed.",
 					"Start at the edges: function signatures for inputs and outputs.",
+				),
+			},
+			{
+				Name:    "Recursion, Closures & Higher-Order Functions",
+				Summary: "Functions as values: passed in, returned, and remembering where they were made.",
+				Body: `A higher-order function takes functions as arguments or returns them:
+map, filter and fold (reduce) replace most loops over collections. A
+closure is a function together with the variables it captured where it
+was created; calling make_counter() twice gives two counters, each with
+its own hidden count. In C, which has no closures, the same thing takes
+a function pointer plus a void * pointer to the captured data, passed
+along by hand; qsort and pthread_create work this way.
+
+Functional languages loop by recursion, which raises the question of the
+stack. A tail call, a call that is the very last thing a function does,
+can reuse the current stack frame, so a tail-recursive loop runs in
+constant stack space. OCaml, Haskell, Erlang and Scheme guarantee this;
+C compilers often do it at -O2; Java, Python and JavaScript in practice
+do not, so deep recursion there overflows. The standard fix is an
+accumulator: carry the result along as an argument, so nothing is left
+to do after the recursive call.`,
+				Diagram: `sum 3 = 3 + sum 2                 sum_acc 0 3 = sum_acc 3 2
+      = 3 + (2 + sum 1)                        = sum_acc 5 1
+      = 3 + (2 + (1 + sum 0))                  = sum_acc 6 0
+      = 6   (every frame waits)                 = 6   (nothing waits: a loop)`,
+				UnderTheHood: `The same recursive sum, sum n = n + sum (n − 1), pushed until it broke:
+
+  Python      n = 900 fine; n = 1,000: RecursionError (its limit is 1,000)
+  JavaScript  the deepest that worked, by bisection: 9,642 (Node.js 22)
+  OCaml       n = 100,000 fine; n = 1,000,000: Stack_overflow
+  OCaml, with an accumulator, sum_acc (acc + n) (n − 1):
+              n = 100,000,000 → 5000000050000000, in constant stack
+
+The tail-recursive version made a hundred million calls in the stack
+space of one, because OCaml compiles a tail call into a jump. This is the
+same reason List.map overflowed in the first lesson: it is not tail-
+recursive in OCaml 4.14 (OCaml 5.1 rewrote it so that it is).
+
+Closures, measured in OCaml:
+
+  let make_counter () = let count = ref 0 in fun () -> incr count; !count
+  a() twice, then a() → 3; a fresh b() → 1
+
+Each closure carries its own count: the function's code plus a pointer to
+its captured variables, which is exactly what a C programmer builds by
+hand with a function pointer and a void *.`,
+				MentalModel: "A closure is code plus the variables it remembers; a tail call is a loop in disguise.",
+				TryIt:       "In JavaScript or OCaml, write make_counter, create two counters and call them in turn; then write the same in C with a struct holding a count and a function pointer.",
+				Analogy: `A recipe card with a note clipped to it, "use the oven at Mum's house":
+the recipe (the code) plus what it needs from where it was written (the
+captured variables). Tail recursion is passing a running total down a
+line of people instead of having each one wait to add their number on
+the way back.`,
+				Example: `JavaScript is built on closures: every event handler and callback that
+remembers a variable from the code around it is one. React's hooks are
+closures over a component's state. MapReduce and Spark are higher-order
+functions (map, then reduce) run over clusters, and Erlang servers run
+for years as tail-recursive loops that never grow the stack.`,
+				Exercises: trio(
+					"What does this print, and why? let a = make_counter () and b = make_counter () in a (); a (); print (b ())",
+					"1: b has its own count, captured when it was created; a's two calls do not touch it.",
+					"In OCaml or Haskell, implement map, filter and fold yourself, first with plain recursion and then tail-recursively with an accumulator (reversing at the end). Run both on a list of 10 million elements and explain which survives.",
+					"The accumulator version builds the result backwards, so reverse it once at the end: still O(n).",
+					"In C, write map, filter and fold over an array of ints that take a function pointer and a void *context, and use the context to filter by a threshold chosen at run time and to count calls. Then write the same in JavaScript with closures, and compare what each language had to make explicit.",
+					"The context pointer is the closure's environment: in C you allocate and pass it; in JavaScript the language does it for you.",
+				),
+			},
+			{
+				Name:    "Generics & Polymorphism",
+				Summary: "One piece of code for many types: copied per type, or shared through a table of functions.",
+				Body: `Polymorphism means one interface for many types. There are two ways to
+compile it:
+- monomorphisation (static dispatch): the compiler makes a separate copy
+  of the generic code for every type it is used with, and can optimise
+  each copy fully. C++ templates, Rust generics and (mostly) Go generics
+  work this way. Fast, but more code and longer builds.
+- dynamic dispatch: one shared copy calls the type-specific parts through
+  a table of function pointers (a vtable): Java interfaces, C++ virtual
+  functions, Rust's dyn Trait, Go interfaces, and C's qsort with its
+  comparison function. Smaller, flexible, a little slower per call.
+
+Java implements generics by erasure: List<String> and List<Integer> are
+the same class at run time, and the type parameters exist only for the
+compiler. Haskell's type classes and Rust's traits group the operations a
+type must provide (Ord, Display) and pick the implementation by type.`,
+				Diagram: `monomorphised (Rust, C++)            dynamic dispatch (Java, Go, C)
+largest::<i32>   ─▶ its own code      largest(xs) ─▶ calls cmp through
+largest::<f64>   ─▶ its own code                     a pointer, one copy
+largest::<char>  ─▶ its own code                     for every type`,
+				UnderTheHood: `A generic Rust function, largest<T: PartialOrd + Copy>, called with i32,
+f64 and char, compiled to an object file, and nm listed three
+functions named gen::largest: one copy per type.
+
+Java's erasure, from a two-line program:
+
+  new ArrayList<String>().getClass() == new ArrayList<Integer>().getClass()
+  → true; the class is java.util.ArrayList, for both
+
+The cost of not specialising: sorting 10 million random ints at -O2,
+
+  C qsort, comparison through a function pointer    1.67 s
+  C++ std::sort, comparison inlined by the template  0.88 s
+
+The same algorithm family and the same data. qsort calls its
+comparison function 200-odd million times through a pointer, and
+cannot inline it; std::sort is compiled anew for int, and its
+comparison becomes one instruction.`,
+				MentalModel: "Copy the code per type for speed, or share it through a function table for flexibility.",
+				TryIt:       "Write a generic largest function in Rust (or a template in C++), call it with two types, and find the two copies with nm on the object file.",
+				Analogy: `A cookie cutter for every shape you need (monomorphisation) against one
+adjustable cutter that you reconfigure by looking up a chart each time
+(dynamic dispatch). The first is faster on the production line; the
+second takes up less room in the drawer and works for shapes invented
+later.`,
+				Example: `Go waited until version 1.18 (2022) to add generics, after a decade of
+debate about exactly these trade-offs. Rust programs are known for long
+compile times partly because of monomorphisation. Java's erasure kept
+old bytecode compatible when generics arrived in 2004, which is why a
+Java program cannot ask what T is at run time.`,
+				Exercises: trio(
+					"After erasure, what can a Java method with a List<T> parameter not do that a Rust function with a Vec<T> can? Give one example.",
+					"It cannot create a new T, or check whether the list holds Strings: T is gone at run time. Rust has a separate copy that knows T.",
+					"In Rust, write a trait Shape with area(), two structs that implement it, and two functions that sum the areas of a list: one generic (fn total<T: Shape>(v: &[T])) and one with Vec<Box<dyn Shape>>. Explain which can mix circles and squares in one list, and why.",
+					"Only the dyn version holds different types together; the generic one needs all elements to be the same T.",
+					"Benchmark C's qsort against a sort written for int only (or C++ std::sort) on 10 million numbers, then look at both in objdump or Compiler Explorer and find the indirect call that the specialised version does not have.",
+					"In the qsort loop, look for call *%rax or call *%rcx: the comparison function, reached through a pointer.",
+				),
+			},
+			{
+				Name:    "Error Handling: Exceptions, Results & Error Codes",
+				Summary: "Every language must answer: how does a function say it failed, and who must notice?",
+				Body: `Four designs, all in wide use:
+- error codes: the function returns a special value (-1, NULL) and puts
+  the reason somewhere (C's errno). Cheap, but easy to ignore silently.
+- exceptions: the function throws, and the error unwinds the stack to
+  the nearest handler (Java, Python, C#, OCaml). The happy path stays
+  clean, but any call may throw, and nothing in its signature says so
+  (except Java's checked exceptions).
+- result types: the function returns either a value or an error, and the
+  type system makes the caller deal with it (Rust's Result and its ?
+  operator, Haskell's Either, Swift's throws). Explicit and checked.
+- multiple returns: Go's value, err := f(), checked with if err != nil.
+
+Erlang adds a fifth philosophy, "let it crash": processes are cheap and
+isolated, so a process that hits an unexpected error simply dies, and a
+supervisor restarts it in a known good state. Whatever the design, the
+rules are the same: never silently ignore an error, add context as it
+travels up, and handle it where you can actually do something about it.`,
+				Diagram: `C        fd = open(path, O_RDONLY);  if (fd < 0) perror(path);
+Java     try { read(path); } catch (IOException e) { … }
+Rust     let text = fs::read_to_string(path)?;     // ? returns the Err early
+Go       data, err := os.ReadFile(path); if err != nil { return err }
+Erlang   let the process crash; its supervisor restarts it`,
+				UnderTheHood: `The same failure, opening a file that does not exist, in three styles:
+
+  C       open() returned -1, errno 2, "No such file or directory"
+  Go      open /no/such/file: no such file or directory
+  Rust    total("40", "two") → Err(ParseIntError { kind: InvalidDigit })
+          total("40", "2")   → Ok(42)
+
+What does each style cost? Five million calls, half of them failing,
+after the JIT had warmed up:
+
+  Java, returning -1 for the failure          2.1 ns per call
+  Java, throwing IllegalArgumentException   291.1 ns per call
+  OCaml, raising an exception                 4.4 ns per call
+
+A Java exception records the stack trace when it is created, which is
+most of its cost; OCaml's exceptions are a jump to the handler, cheap
+enough to use for control flow. So in Java, exceptions are for
+exceptional cases; in OCaml, raising Not_found from a lookup is
+ordinary style.`,
+				MentalModel: "Make failure impossible to ignore, and handle it where you can act on it.",
+				TryIt:       "In Rust, write a function that parses two numbers from strings with ? and returns Result<i64, ParseIntError>; call it with good and bad input and print both results.",
+				Analogy: `A delivery that cannot be made. Error codes: a note through the door
+that you may or may not read. Exceptions: the parcel is sent back up the
+chain until someone signs for it. Result types: the courier will not
+leave until you say what to do with it. Let it crash: the van is
+replaced and the route restarts from the depot.`,
+				Example: `Ericsson's AXD301 telephone switch, written in Erlang with supervisors,
+was reported to reach nine nines of availability. Go's explicit if err !=
+nil is the most discussed feature of the language. A famous 2014 Apple
+bug ("goto fail") skipped a TLS certificate check because of a single
+duplicated line in C error-handling code.`,
+				Exercises: trio(
+					"In C, what goes wrong in: FILE *f = fopen(path, \"r\"); fgets(buf, sizeof buf, f);? Fix it.",
+					"fopen returns NULL when the file cannot be opened, and fgets(…, NULL) crashes: check f first and report errno with perror.",
+					"Write the same small config-file parser (key = value lines, with a line number in every error) twice: in Rust with a custom error enum and ?, and in Go with fmt.Errorf(\"line %d: %w\", …). Compare how each version shows where an error came from.",
+					"In Rust, implement std::fmt::Display for the error enum; in Go, errors.Is and errors.As look through wrapped errors.",
+					"In Erlang (or Elixir), write a worker process that crashes on bad input and a supervisor that restarts it, then send it a mix of good and bad messages and show that the service keeps running.",
+					"spawn_link links the two processes; process_flag(trap_exit, true) lets the supervisor receive the crash as a message.",
 				),
 			},
 			{
@@ -1728,15 +1988,40 @@ C++), the programmer frees it, and mistakes cause leaks (memory never
 freed), use-after-free and double-free bugs, a major source of security
 holes.
 
-Garbage collection (Java, Go, Python, JavaScript) automatically finds
-unreachable objects and frees them, at the cost of some CPU time and
-occasional pauses. Reference counting (Python, Swift) frees an object as
-soon as nothing refers to it, but needs extra help with cycles. Rust's
-ownership system checks at compile time that every value has exactly one
-owner and that references never outlive it: memory safety without a
-garbage collector.`,
+Garbage collection (Java, Go, JavaScript, OCaml, Haskell, Erlang)
+automatically finds unreachable objects and frees them, at the cost of
+some CPU time and occasional pauses. Reference counting (Python, Swift)
+frees an object as soon as nothing refers to it, but needs extra help
+with cycles. Rust's ownership system checks at compile time that every
+value has exactly one owner and that references never outlive it: memory
+safety without a garbage collector.`,
+				Diagram: `manual (C)        malloc ──────────────────── free   you decide when
+refcount (Python) count++ on each new reference, count-- on each drop; 0 → freed
+tracing GC (Go)   from the roots, mark what is reachable; sweep the rest
+ownership (Rust)  one owner; freed when the owner goes out of scope`,
+				UnderTheHood: `Reference counting, watched in CPython with sys.getrefcount:
+
+  a new list x                1 reference
+  after y = x                 2
+  after del y                 1
+
+Two objects pointing at each other, then deleted, are never freed by
+counting alone (each still has a count of 1); with the automatic
+collector disabled, gc.collect() then found and freed exactly 2 objects.
+
+Rust refused to compile a use after a move:
+
+  error[E0382]: borrow of moved value: name
+    let moved = name;      value moved here
+    println!("{} {}", name, moved);   value borrowed here after move
+
+Go's collector, traced with GODEBUG=gctrace=1, on a program that
+allocated 20 million 72-byte nodes and kept one in a thousand: 641
+collections in about 2.1 seconds, each with stop-the-world pauses of
+around 0.02 and 0.07 ms either side of 4 ms of concurrent marking, the
+live heap held near 2 MB, against more than 1.4 GB allocated in all.`,
 				MentalModel: "Every allocation needs an owner who knows when it is finished.",
-				TryIt:       "In Python, use sys.getrefcount and the gc module to watch an object's reference count change.",
+				TryIt:       "In Python, use sys.getrefcount and the gc module to watch an object's reference count change, then make a cycle and see who frees it.",
 				Analogy: `A library. With manual management, you must return every book yourself:
 forget and the shelves empty out; return one twice and the records are
 chaos. Garbage collection is a librarian who periodically collects the
@@ -1749,8 +2034,8 @@ US government agencies have urged a move to memory-safe languages.`,
 				Exercises: trio(
 					"Explain what goes wrong in each case: forgetting to free memory, freeing it twice, and using it after freeing it.",
 					"A leak, a double free and a use-after-free.",
-					"In C, write a program with a memory leak and a use-after-free, find both with AddressSanitizer or Valgrind, and fix them.",
-					"gcc -g -fsanitize=address prog.c && ./a.out",
+					"In C, write a program with a memory leak and a use-after-free, find both with AddressSanitizer or Valgrind, and fix them. Then write the same program in Rust and read the compiler's error for the use-after-free.",
+					"gcc -g -fsanitize=address prog.c && ./a.out; in Rust, the borrow checker refuses the program before it runs.",
 					"A long-running Python web service grows from 200 MB to 4 GB over a week. Reproduce a similar leak in a small script (for example an ever-growing cache), find it with tracemalloc, and fix it with a bounded cache.",
 					"functools.lru_cache(maxsize=…) or an explicit eviction policy.",
 				),
@@ -1760,19 +2045,46 @@ US government agencies have urged a move to memory-safe languages.`,
 				Summary: "Different ways of turning source code into a running program.",
 				Body: `An interpreter reads your program and executes it directly (shell
 scripts, simple interpreters). A compiler translates it ahead of time
-into machine code (C, Go, Rust): fast to run, slower to build. Many
-languages compile to bytecode for a virtual machine (Java's JVM, Python's
-CPython VM, .NET's CLR), which makes the program portable across CPUs.
+into machine code (C, Go, Rust, OCaml, Haskell): fast to run, slower to
+build. Many languages compile to bytecode for a virtual machine (Java's
+JVM, Python's CPython VM, Erlang's BEAM, .NET's CLR), which makes the
+program portable across CPUs.
 
 Just-in-time (JIT) compilers watch the running program and compile its
 hot paths to machine code, getting the best of both worlds (V8 for
 JavaScript, the JVM's HotSpot, PyPy). The runtime provides services such
-as garbage collection, threads and the standard library.`,
-				Diagram: `source ─▶ [compiler] ─▶ machine code ──────────────▶ CPU   (C, Go, Rust)
+as garbage collection, threads and the standard library, and its start-up
+time is part of every run.`,
+				Diagram: `source ─▶ [compiler] ─▶ machine code ──────────────▶ CPU   (C, Go, Rust, OCaml)
 source ─▶ [compiler] ─▶ bytecode ─▶ [VM + JIT] ────▶ CPU   (Java, C#, JavaScript)
+source ─▶ [compiler] ─▶ bytecode ─▶ [VM, no JIT] ──▶ CPU   (CPython, Ruby, Erlang)
 source ─────────────────────────▶ [interpreter] ───▶ CPU   (shell scripts)`,
+				UnderTheHood: `The same naive fib(35), about 30 million calls, everywhere, timed with
+start-up included:
+
+  C, gcc -O2                    45 ms    native code
+  Go                            67 ms    native code
+  OCaml, ocamlopt               73 ms    native code
+  Haskell, ghc -O2              88 ms    native code
+  JavaScript, Node.js 22       196 ms    JIT (V8), start-up 43 ms
+  Java, HotSpot                304 ms    JIT, start-up 53 ms
+  Java, -Xint (no JIT)         923 ms    bytecode interpreter
+  Ruby 3.3                   1,323 ms    bytecode VM
+  Erlang                     1,365 ms    of which 1,179 ms is starting the VM
+  Python 3.11                1,962 ms    bytecode VM
+  Guile Scheme, interpreted  5,731 ms
+
+The JIT made the same Java bytecode three times faster than the JVM's own
+interpreter. Python's dis module shows what CPython runs instead of
+machine code:
+
+  LOAD_FAST n · LOAD_CONST 2 · COMPARE_OP < · POP_JUMP_FORWARD_IF_FALSE
+  LOAD_GLOBAL fib · LOAD_FAST n · LOAD_CONST 1 · BINARY_OP - · CALL 1 …
+
+Each of those instructions is a trip through the interpreter's loop;
+each line of the C version is one or two machine instructions.`,
 				MentalModel: "Interpreted versus compiled describes an implementation, not a language.",
-				TryIt:       "Use Python's dis module to see the bytecode of a small function.",
+				TryIt:       "Use Python's dis module to see the bytecode of a small function, and javap -c to see the JVM bytecode of the same function in Java.",
 				Analogy: `A live interpreter translating a speech sentence by sentence (an
 interpreter), versus a translated book prepared in advance (a compiler).
 A JIT is an interpreter who notices you keep repeating the same phrases
@@ -1784,10 +2096,10 @@ near-native speed; Figma uses it.`,
 				Exercises: trio(
 					"For Python (CPython), Go and JavaScript in Chrome, say whether each is usually compiled ahead of time, run as bytecode by a VM, or JIT-compiled.",
 					"CPython: a bytecode VM. Go: compiled to native code. V8: JIT.",
-					`Write a tiny stack-based bytecode VM (PUSH, ADD, MUL, PRINT) and a compiler that turns expressions such as "2 * (3 + 4)" into that bytecode.`,
+					`In C, write a tiny stack-based bytecode VM (PUSH, ADD, MUL, PRINT) and a compiler that turns expressions such as "2 * (3 + 4)" into that bytecode.`,
 					"Compile the syntax tree in post-order: children first, then the operator.",
-					"Benchmark the same CPU-heavy function (for example naive Fibonacci of 30) in CPython, PyPy (if available), Node.js and Go, and explain the differences using the words interpreter, JIT and compiler.",
-					"Run each several times and take the median.",
+					"Benchmark the same CPU-heavy function (for example naive Fibonacci of 35) in at least four languages from different rows of the diagram above, measure each runtime's empty start-up separately, and explain the differences using the words interpreter, bytecode, JIT and compiler.",
+					"Run each several times and take the median; subtract start-up before comparing.",
 				),
 			},
 			{
@@ -1802,8 +2114,29 @@ models:
 - data parallelism: the same operation on lots of data at once (GPUs, Stage 16).
 
 Choosing the right model matters more than micro-optimising.`,
+				Diagram: `threads      ┌ thread ┐ ┌ thread ┐   share memory, guard it with locks
+             └───┬────┘ └───┬────┘
+                 └─ memory ─┘
+actors       (proc) ──msg──▶ (proc) ──msg──▶ (proc)   nothing shared
+event loop   one thread: run a callback, wait for the next ready event`,
+				UnderTheHood: `What a concurrent task costs, measured for 100,000 of each:
+
+  Erlang processes    spawned in 322 ms, 2,688 bytes each;
+                      every one pinged and answered in 241 ms
+  Go goroutines       started in 343 ms, about 2,800 bytes each;
+                      every one woken and finished in 53 ms
+  POSIX threads       70 µs each to create and join, one at a time,
+                      and each reserves an 8 MiB stack (Stage 8)
+
+An Erlang process or a goroutine starts with a stack of a few kilobytes
+that grows when needed, and the language's own scheduler switches
+between them without entering the kernel. That is why a server can give
+each connection its own process or goroutine where it could never give
+each one an operating-system thread. (At a million, both still worked:
+about 2.7 GB in all, though touching that much fresh memory took this
+virtual machine 8 to 21 seconds.)`,
 				MentalModel: "Prefer passing messages over sharing state; when you must share, lock carefully.",
-				TryIt:       "Download 20 web pages one after another, then concurrently with asyncio or goroutines, and compare the times.",
+				TryIt:       "Download 20 web pages one after another, then concurrently with goroutines or JavaScript's Promise.all, and compare the times.",
 				Analogy: `A kitchen. Several cooks sharing one chopping board need rules (locks).
 Cooks passing dishes through a hatch (channels) avoid collisions. A
 single waiter who takes an order, then serves other tables while the
@@ -1815,10 +2148,10 @@ Kubernetes.`,
 				Exercises: trio(
 					"Is each one concurrency, parallelism or both: one chef juggling three dishes; three chefs each cooking one dish; a single-core computer playing music while you browse?",
 					"Parallelism needs things happening at literally the same instant.",
-					"Write a producer–consumer program: one task generates numbers, three workers square them, and one task collects the results, using channels (Go) or queues (Python).",
-					"Close the channel, or send a sentinel value, to tell the workers to stop.",
-					"Build a link checker that crawls a site you own (or a local test site) concurrently, with at most 10 requests in flight at a time, and reports broken links.",
-					"A semaphore or a fixed worker pool limits concurrency so you do not overload the server.",
+					"Write a producer–consumer program twice: in Go (one goroutine generates numbers, three workers square them over channels, one collects the results) and in Erlang (the same with processes and messages).",
+					"In Go, close the channel to tell the workers to stop; in Erlang, send each worker a stop message.",
+					"Build a link checker that crawls a site you own (or a local test site) concurrently, with at most 10 requests in flight at a time, and reports broken links, in Go or with JavaScript's async/await.",
+					"A buffered channel of size 10 (Go) or a small pool of workers pulling from a queue (JavaScript) limits concurrency so you do not overload the server.",
 				),
 			},
 		},
@@ -1842,6 +2175,15 @@ Kubernetes.`,
 			{"What is the difference between static and dynamic typing?", "Static typing checks types before running; dynamic typing checks them while running."},
 			{"How does Rust achieve memory safety without a garbage collector?", "Its ownership and borrowing rules are checked at compile time."},
 			{"What is the difference between concurrency and parallelism?", "Concurrency is structuring work as independent tasks; parallelism is executing them simultaneously."},
+			{"Why does Haskell's take 5 (map (^2) [1 ..]) finish although [1 ..] is infinite?", "Haskell is lazy: elements are computed only when needed, so only the first five squares are ever produced."},
+			{"What does type inference do?", "The compiler works out the types you did not write from how values are used, as OCaml does for f x = x + 1 (int -> int)."},
+			{"What is a closure?", "A function together with the variables it captured where it was created, so that two closures from the same code can each keep their own state."},
+			{"Why does a tail-recursive function not overflow the stack in OCaml or Erlang?", "The recursive call is the last thing it does, so the compiler turns it into a jump that reuses the current stack frame."},
+			{"What is the difference between monomorphisation and dynamic dispatch?", "Monomorphisation compiles a separate copy of generic code for each type; dynamic dispatch shares one copy that calls type-specific functions through a table of pointers."},
+			{"What does Java's type erasure mean?", "Generic type parameters exist only at compile time: List<String> and List<Integer> are the same class at run time."},
+			{"Why are Java exceptions expensive and OCaml exceptions cheap?", "A Java exception records a stack trace when it is created; an OCaml exception is little more than a jump to the handler."},
+			{"What does Rust's ? operator do?", "If the Result is an Err, it returns that error from the current function at once; otherwise it unwraps the Ok value."},
+			{"Why can a server give each connection an Erlang process or a goroutine, but not an OS thread?", "They start with a stack of a few kilobytes and are switched by the language's own scheduler; an OS thread reserves megabytes and needs the kernel to switch."},
 		},
 	},
 }

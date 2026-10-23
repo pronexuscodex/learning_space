@@ -144,10 +144,13 @@ var conceptPrereqs = map[string][]string{
 
 	// ---- Stage 12
 	"Paradigms: Imperative, Object-Oriented & Functional": {"Functions & Decomposition"},
-	"Type Systems":                       {"Values, Types & Variables"},
-	"Memory Management":                  {"Dynamic Memory: malloc, free & Leaks", "Safe Input & Undefined Behavior"},
-	"Interpreters, Compilers & Runtimes": {"The Compilation Pipeline"},
-	"Concurrency Models":                 {"Paradigms: Imperative, Object-Oriented & Functional"},
+	"Type Systems": {"Values, Types & Variables"},
+	"Recursion, Closures & Higher-Order Functions":      {"Paradigms: Imperative, Object-Oriented & Functional", "Recursion & Divide and Conquer"},
+	"Generics & Polymorphism":                           {"Type Systems", "Trees, Heaps & Sorting"},
+	"Error Handling: Exceptions, Results & Error Codes": {"Type Systems", "Debugging & Reading Errors"},
+	"Memory Management":                                 {"Dynamic Memory: malloc, free & Leaks", "Safe Input & Undefined Behavior"},
+	"Interpreters, Compilers & Runtimes":                {"The Compilation Pipeline"},
+	"Concurrency Models":                                {"Paradigms: Imperative, Object-Oriented & Functional"},
 
 	// ---- Stage 13
 	"Matrices as Linear Maps":                      {"Sets, Functions & Relations"},

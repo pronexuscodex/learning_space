@@ -69,7 +69,12 @@ After a walk through the app as a new learner, at 40, 80 and 160 columns:
   - **Stage 7, Storage Engines** (6 → 8): new *Pages, Records & the Buffer Pool* and *Query Planning & Join Algorithms*; measured with fsync timings and SQLite (its file header, B-tree depth from `dbstat`, commit cost per journal mode, an MVCC snapshot, `EXPLAIN QUERY PLAN` before and after an index, a nested loop against an automatic index);
   - **Stage 8, Networks** (6 → 9): new *IP Addressing, Routing & NAT*, *Partitioning & Consistent Hashing* and *Timeouts, Retries & Idempotency*; packets captured on loopback and decoded byte by byte, the routing table, Nagle against delayed ACKs (43 ms against 0.07 ms), SYN retransmissions, and simulations of Raft elections, consistent hashing and retry storms.
 
-  The academy now has 143 concepts and 429 exercises.
+- **Stages 9, 11 and 12 completed, to the same depth.** Nine new lessons, an *Under the hood* section in every lesson of the three stages, and exercises in the languages each idea belongs to:
+  - **Stage 9, Software Engineering** (5 → 8 lessons): new *Shell Scripting & Automation*, *Build Systems & Dependencies* and *Debugging Tools: gdb, Core Dumps & git bisect*; measured with strace (bash searching PATH), Git's own object files (a blob ID recomputed with sha1sum), make's incremental and parallel builds, gcov coverage against a million random tests, gdb, git bisect over 1,000 commits, and Linux namespaces with unshare;
+  - **Stage 11, Theory of Computation** (5 → 8): new *NFAs, DFAs & How Regex Engines Work*, *Reductions & NP-Completeness* and *Approximation & Heuristics for Hard Problems*; measured with Python's backtracking regex against grep, the subset construction's 2ⁿ states, JSON nesting limits in three languages, the 5-state busy beaver (47,176,870 steps), a Sudoku solved as SAT, and 2-opt against the optimum;
+  - **Stage 12, Programming Languages** (5 → 8): new *Recursion, Closures & Higher-Order Functions*, *Generics & Polymorphism* and *Error Handling: Exceptions, Results & Error Codes*. Its examples and exercises now use the languages built around each idea (C, Java, OCaml, Haskell, Rust, Go, Erlang, JavaScript and SQL, with Python where reference counting or dynamic typing is the point), all run for these lessons: one task in six languages, type inference and exhaustiveness errors, recursion limits, monomorphisation, the cost of exceptions, Go's garbage collector, fib(35) in eleven runtimes, and 100,000 Erlang processes and goroutines.
+
+  The academy now has 152 concepts and 456 exercises.
 - **Checked exercises for Stages 2 to 4.** Eighteen more, each timed on inputs where only the efficient idea passes:
   - Stage 2: `duplicates` (O(n log n), not O(n²)), `hanoi`, `bsearch` (the first match, 100,000 lookups), `intervals` (greedy by end time) and `edit_distance` (a 2,000 × 2,000 table), so every Stage 2 lesson has one;
   - Stage 3: `sat_count`, `bitsets`, `binomial` (exact up to C(67, 33)), `modpow` (exponents up to 10¹⁸), `inversions`, `euler` and `birthday`;
@@ -81,9 +86,11 @@ After a walk through the app as a new learner, at 40, 80 and 160 columns:
   - Stage 7: `buffer_pool` (LRU with pins and dirty pages), `bloom` (a Bloom filter's false-positive rate) and `hash_join` (100,000 rows each);
   - Stage 8: `routes` (longest-prefix match), `retry` (backoff with jitter) and `ring` (consistent hashing).
 
-  That makes 57 in all. Checks can now give the program files in subfolders and examine the files it leaves behind.
+- **Checked exercises for Stages 9, 11 and 12.** Nine more: `git_blob`, `make_order` and `bisect`; `nfa_match`, `turing` and `dpll`; `higher_order`, `refcount` and `stack_vm`.
+
+  That makes 66 in all. Checks can now give the program files in subfolders and examine the files it leaves behind.
 - **Mastery counts real code.** A concept with a checked exercise reaches "mastered" only once that check has passed (with or without hints). Concepts you had mastered before stay at "retained" until you pass their check. Where checks cannot run (Windows), nothing changes.
-- **Concept prerequisites.** Concepts now list the earlier concepts they build on (225 links across 138 concepts in all 21 stages). The list sits at the top of each card, with a tick for each one you have marked as understood.
+- **Concept prerequisites.** Concepts now list the earlier concepts they build on (243 links across 147 concepts in all 21 stages). The list sits at the top of each card, with a tick for each one you have marked as understood.
   - **What's next and Today's workout** use them. When the next concept builds on one you have not marked yet, they send you to the first missing step and say which concept it leads to. They do not stop you reading anything.
   - **Tests check the graph:** every name is a real concept, every prerequisite comes earlier and agrees with the stage prerequisites (so there can be no cycle), and every concept from Stage 1 on lists at least one.
 - **Get hired: the career center** (`e`). It turns learning into the three things companies hire on: foundations, finished projects and interview skill.

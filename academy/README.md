@@ -200,7 +200,7 @@ Checked-exercise files live in `Documents/Academy Labs` (`$ACADEMY_LABS` chooses
 | | 19 | Network Defence & Monitoring |
 | | 20 | Incident Response, Forensics & Privacy |
 
-That is **143 concepts** and **429 exercises**, plus a glossary, a resource library, lab blueprints, a quiz and a mastery check for every stage. Start Here also lists electives for afterwards: graphics, quantum computing, embedded systems and bioinformatics.
+That is **152 concepts** and **456 exercises**, plus a glossary, a resource library, lab blueprints, a quiz and a mastery check for every stage. Start Here also lists electives for afterwards: graphics, quantum computing, embedded systems and bioinformatics.
 
 ## How computers work (Stage 0)
 
@@ -365,6 +365,15 @@ The later stages have checked exercises too, written with C and POSIX only, so t
 | `routes` | 8: IP routing | longest-prefix match: the default route, /32 and /0 (a shift by 32 is undefined), host bits in a prefix, and 100,000 routes |
 | `retry` | 8: Timeouts & retries | backoff with jitter: permanent failures not retried, no wait after the last attempt, the cap, and 70 attempts (doubling a `long` overflows) |
 | `ring` | 8: Consistent hashing | keys placed on a ring of virtual nodes: wrapping past the largest point, and 100,000 points searched in sorted order |
+| `git_blob` | 9: Git | SHA-1 written by hand, matching `git hash-object`: the empty file, the 55-, 56- and 64-byte padding boundaries, a three-digit length, and 2 MB of every byte value |
+| `make_order` | 9: Build systems | the order make builds in: depth-first, each target once, cycles (exit 1), a missing rule (exit 2), and 100,000 rules |
+| `bisect` | 9: Debugging tools | git bisect as a function: at most ⌈log₂ n⌉ tests, never the known ends, and a midpoint that cannot overflow near `LONG_MAX` |
+| `nfa_match` | 11: Regex engines | a regex engine that never backtracks: precedence, whole-line matches, `(a+)+b` on 30 a's, 100,000-character lines, invalid patterns |
+| `turing` | 11: Turing machines | a Turing-machine simulator: the move into H counts, the 1s left on the tape, step limits, and the 5-state busy beaver's 47,176,870 steps |
+| `dpll` | 11: Reductions | a SAT solver for DIMACS CNF: clauses across lines, pigeonholes (UNSAT), and the Inkala Sudoku as 11,988 clauses |
+| `higher_order` | 12: Closures & higher-order functions | map, filter and fold with a `void *` context, C's closures: the context passed on, left-to-right folds, empty arrays |
+| `refcount` | 12: Memory management | reference-counted strings: shared holders, a copy of the text, no use after free, and nothing leaked |
+| `stack_vm` | 12: Interpreters | a bytecode VM: operand order, loops with JZ, 90 million instructions, and programs refused before they run |
 | `safe_join` | 17: Untrusted input | canonicalise, then check: `a/./b//c.txt` is fine, `a/../../etc/passwd` and `/etc/passwd` are refused, and the output buffer is never overrun |
 | `copy_string` | 17: Memory-safe code | an strlcpy of your own: always terminated, never past the buffer, size 0, and the full length returned |
 | `http_request` | 8: HTTP | parsing a request head: header names in any case, trimmed values, bare newlines, a 7,000-byte path, a missing Host, wrong versions, a head that never ends |
@@ -800,7 +809,7 @@ The tests check:
 - **The v1 → v2 migration and stage merging.**
 - **Retention:** the scheduler's intervals grow and reset on a lapse; deck unlocking and due cards; each step of the mastery ladder.
 - **Classic Mode:** every stage has a complete classic corner with HTTPS links; the struggle clock's thresholds and early unlock; notebook and type-in progress survive a save round trip.
-- **Checked exercises:** each check's reference solution passes every case, with gcc and with clang (57 checks, including a real loopback TCP server, forked processes and a write-ahead log the checker reads back). Mastery waits for a concept's check to pass. Typical mistakes fail with the right explanation:
+- **Checked exercises:** each check's reference solution passes every case, with gcc and with clang (66 checks, including a real loopback TCP server, forked processes and a write-ahead log the checker reads back). Mastery waits for a concept's check to pass. Typical mistakes fail with the right explanation:
   - the XOR swap;
   - `9 / 5` in integers;
   - an endless loop;
@@ -863,6 +872,7 @@ One package, one build target:
 | `checks_core.go` | checked exercises for Stages 2, 7 and 17: lists, hash maps, heaps, graphs, durable files, a write-ahead log, safe paths and strings |
 | `checks_systems.go` | checked exercises for Stages 5, 6 and 8: bits, a parser, processes, system calls, threads, sockets, HTTP |
 | `checks_foundations.go` | checked exercises added when Stages 2 to 8 were deepened, from Big-O and recursion to signals, Bloom filters and consistent hashing, with the generators of their big inputs |
+| `checks_software.go` | checked exercises for Stages 9 to 12: Git's object IDs, build order, bisection, a regex engine, a Turing machine, a SAT solver, closures, reference counting and a bytecode VM |
 | `runner.go`, `runner_*.go` | compile with the learner's C compiler, run each case with limits, explain failures |
 | `checklog.go` | the labs folder, starter files, and the append-only log of runs and hints |
 | `checksui.go` | checked-exercise screens and `-check` |

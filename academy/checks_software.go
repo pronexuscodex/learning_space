@@ -292,6 +292,213 @@ int main(int argc, char **argv) {
 			"Branch on a variable from the shortest clause that is not yet satisfied: it is the most constrained choice.",
 		},
 	},
+	{
+		ID: "higher_order", Stage: 12, Concept: "Recursion, Closures & Higher-Order Functions",
+		Title: "Closures in C: map, filter and fold with a context",
+		Task:  "Write map, filter and fold over int arrays, each taking a function pointer and a void *ctx that is passed, unchanged, to every call: C's way of giving a function its captured variables. map replaces each element with f(x, ctx); filter copies the elements for which keep(x, ctx) is non-zero into out, in order, and returns how many; fold returns f(…f(f(init, x0, ctx), x1, ctx)…, ctx), from left to right. Every function must be called exactly once per element. No main: the checker supplies the functions and contexts.",
+		File:  "higher_order.c",
+		Starter: `/* Checked exercise: higher_order
+ *   void   map(int *xs, size_t n, int (*f)(int x, void *ctx), void *ctx);
+ *   size_t filter(const int *in, size_t n, int *out,
+ *                 int (*keep)(int x, void *ctx), void *ctx);
+ *   long   fold(const int *xs, size_t n, long init,
+ *               long (*f)(long acc, int x, void *ctx), void *ctx);
+ * ctx is whatever the caller wants the function to remember: a
+ * threshold, a counter, a struct. Never look inside it; pass it on.
+ */
+#include <stddef.h>
+`,
+		Harness: `#include <stdio.h>
+#include <string.h>
+
+void map(int *xs, size_t n, int (*f)(int x, void *ctx), void *ctx);
+size_t filter(const int *in, size_t n, int *out, int (*keep)(int x, void *ctx), void *ctx);
+long fold(const int *xs, size_t n, long init, long (*f)(long acc, int x, void *ctx), void *ctx);
+
+struct counted { int calls; int by; };
+static int times(int x, void *ctx) { struct counted *c = ctx; c->calls++; return x * c->by; }
+static int above(int x, void *ctx) { struct counted *c = ctx; c->calls++; return x > c->by; }
+static long add(long acc, int x, void *ctx) { struct counted *c = ctx; c->calls++; return acc + x; }
+static long record(long acc, int x, void *ctx) { char *buf = ctx; char s[16]; snprintf(s, sizeof s, "%d ", x); strcat(buf, s); return acc * 10 + x; }
+static int null_ctx(int x, void *ctx) { return ctx == NULL ? x + 1 : -999; }
+
+static void show(const char *label, const int *xs, size_t n) {
+    printf("%s:", label);
+    for (size_t i = 0; i < n; i++) printf(" %d", xs[i]);
+    printf("\n");
+}
+
+int main(int argc, char **argv) {
+    if (argc < 2) return 2;
+    int xs[] = {5, -2, 9, 0, 14, 3}, out[6];
+    size_t n = 6;
+    struct counted c = {0, 0};
+    if (strcmp(argv[1], "map") == 0) {
+        c.by = 3; map(xs, n, times, &c);
+        show("times 3", xs, n); printf("calls: %d\n", c.calls);
+    } else if (strcmp(argv[1], "filter") == 0) {
+        for (int t = 2; t <= 10; t += 8) {
+            c.by = t; c.calls = 0;
+            size_t k = filter(xs, n, out, above, &c);
+            char label[32]; snprintf(label, sizeof label, "above %d", t);
+            show(label, out, k); printf("calls: %d\n", c.calls);
+        }
+    } else if (strcmp(argv[1], "fold") == 0) {
+        printf("sum: %ld\n", fold(xs, n, 100, add, &c)); printf("calls: %d\n", c.calls);
+        char order[64] = "";
+        int ds[] = {1, 2, 3};
+        printf("digits: %ld, order: %s\n", fold(ds, 3, 0, record, order), order);
+    } else if (strcmp(argv[1], "empty") == 0) {
+        c.by = 2;
+        map(xs, 0, times, &c);
+        size_t k = filter(xs, 0, out, above, &c);
+        printf("filtered %zu, fold %ld, calls %d\n", k, fold(xs, 0, 7, add, &c), c.calls);
+    } else if (strcmp(argv[1], "null") == 0) {
+        map(xs, n, null_ctx, NULL);
+        show("plus one", xs, n);
+    } else return 2;
+    return 0;
+}
+`,
+		Cases: []CheckCase{
+			{Name: "map", Args: []string{"map"}, Want: "times 3: 15 -6 27 0 42 9\ncalls: 6\n"},
+			{Name: "filter with a threshold chosen at run time", Args: []string{"filter"}, Want: "above 2: 5 9 14 3\ncalls: 6\nabove 10: 14\ncalls: 6\n",
+				Explain: "The threshold travels in ctx: keep(x, ctx) must receive the caller's ctx, and the kept elements stay in their original order."},
+			{Name: "fold, left to right", Args: []string{"fold"}, Want: "sum: 129\ncalls: 6\ndigits: 123, order: 1 2 3 \n",
+				Explain: "fold starts from init and goes left to right: ((0·10 + 1)·10 + 2)·10 + 3 = 123. Going right to left gives 321."},
+			{Name: "empty arrays", Args: []string{"empty"}, Want: "filtered 0, fold 7, calls 0\n",
+				Explain: "With n = 0 nothing is called: fold returns init, filter returns 0."},
+			{Name: "a NULL context is passed on too", Args: []string{"null"}, Want: "plus one: 6 -1 10 1 15 4\n"},
+		},
+		Hints: []string{
+			"Each is a single loop: for (size_t i = 0; i < n; i++) …, calling the function with xs[i] and ctx.",
+			"fold: long acc = init; then acc = f(acc, xs[i], ctx) for each element; return acc.",
+		},
+	},
+	{
+		ID: "refcount", Stage: 12, Concept: "Memory Management",
+		Title: "Reference-counted strings",
+		Task:  "Write reference-counted strings, the way Python and Swift manage objects. rc_new copies a string into a new object with a count of 1; rc_retain adds one to the count and returns the same pointer; rc_release subtracts one and frees the object when the count reaches 0; rc_text returns the text and rc_count the count. Define struct rcstr yourself. Nothing may leak, and nothing may be freed while anyone still holds a reference. No main.",
+		File:  "refcount.c",
+		Leaks: true,
+		Starter: `/* Checked exercise: refcount
+ *   struct rcstr *rc_new(const char *s);       count 1, a copy of s
+ *   struct rcstr *rc_retain(struct rcstr *p);  count + 1, returns p
+ *   void rc_release(struct rcstr *p);          count - 1; at 0, free it
+ *   const char *rc_text(const struct rcstr *p);
+ *   int rc_count(const struct rcstr *p);
+ * Put the count and the characters in one allocation:
+ *   struct rcstr { int count; char text[]; };   (a flexible array member)
+ *   malloc(sizeof(struct rcstr) + strlen(s) + 1)
+ */
+#include <stdlib.h>
+#include <string.h>
+`,
+		Harness: `#include <stdio.h>
+#include <string.h>
+
+struct rcstr;
+struct rcstr *rc_new(const char *s);
+struct rcstr *rc_retain(struct rcstr *p);
+void rc_release(struct rcstr *p);
+const char *rc_text(const struct rcstr *p);
+int rc_count(const struct rcstr *p);
+
+int main(int argc, char **argv) {
+    if (argc < 2) return 2;
+    if (strcmp(argv[1], "basic") == 0) {
+        struct rcstr *a = rc_new("hello");
+        printf("%s %d\n", rc_text(a), rc_count(a));
+        rc_release(a);
+        printf("released\n");
+    } else if (strcmp(argv[1], "copy") == 0) {
+        char buf[16] = "original";
+        struct rcstr *a = rc_new(buf);
+        strcpy(buf, "changed!");
+        printf("%s\n", rc_text(a));
+        rc_release(a);
+    } else if (strcmp(argv[1], "shared") == 0) {
+        struct rcstr *a = rc_new("shared");
+        struct rcstr *b = rc_retain(a);
+        struct rcstr *c = rc_retain(b);
+        printf("same object: %s, count %d\n", (a == b && b == c) ? "yes" : "no", rc_count(a));
+        rc_release(a);
+        rc_release(b);
+        printf("still alive: %s, count %d\n", rc_text(c), rc_count(c));
+        rc_release(c);
+    } else if (strcmp(argv[1], "many") == 0) {
+        struct rcstr *list[1000];
+        struct rcstr *one = rc_new("x");
+        for (int i = 0; i < 1000; i++) list[i] = rc_retain(one);
+        rc_release(one);
+        printf("count %d\n", rc_count(list[0]));
+        for (int i = 999; i > 0; i--) rc_release(list[i]);
+        printf("last holder sees %s, count %d\n", rc_text(list[0]), rc_count(list[0]));
+        rc_release(list[0]);
+    } else if (strcmp(argv[1], "empty") == 0) {
+        struct rcstr *e = rc_new("");
+        printf("[%s] %d\n", rc_text(e), rc_count(e));
+        rc_release(e);
+    } else return 2;
+    return 0;
+}
+`,
+		Cases: []CheckCase{
+			{Name: "new and release", Args: []string{"basic"}, Want: "hello 1\nreleased\n"},
+			{Name: "rc_new copies", Args: []string{"copy"}, Want: "original\n",
+				Explain: "Keep your own copy of the characters: the caller's buffer can change, or disappear, after rc_new returns."},
+			{Name: "three holders", Args: []string{"shared"}, Want: "same object: yes, count 3\nstill alive: shared, count 1\n",
+				Explain: "Freeing on every release frees the string while c still holds it: AddressSanitizer reports a heap-use-after-free."},
+			{Name: "a thousand holders", Args: []string{"many"}, Want: "count 1000\nlast holder sees x, count 1\n"},
+			{Name: "an empty string", Args: []string{"empty"}, Want: "[] 1\n"},
+		},
+		Hints: []string{
+			"rc_release: if (--p->count == 0) free(p);",
+			"Allocate the header and the characters together with a flexible array member, and copy with memcpy(p->text, s, len + 1).",
+		},
+	},
+	{
+		ID: "stack_vm", Stage: 12, Concept: "Interpreters, Compilers & Runtimes",
+		Title: "A bytecode virtual machine",
+		Task:  "Run a program for a stack machine read from standard input, one instruction per line: PUSH n, POP, DUP, SWAP, OVER (push a copy of the second value), ADD, SUB, MUL, DIV (the second value divided by the top, truncating), JMP i, JZ i (pop the top and jump if it is 0), PRINT (pop and print it) and HALT; i is an instruction number, from 0. Values are 64-bit integers; the program also stops after its last instruction. Translate the text into an array of instructions first, then run that array: one program runs 90 million instructions. An unknown instruction or a jump outside the program: a message on standard error, exit 2, before running anything. Popping an empty stack, or dividing by 0: a message on standard error, exit 1.",
+		File:  "stack_vm.c",
+		Starter: `/* Checked exercise: stack_vm
+ *   PUSH 2        stack: 2
+ *   PUSH 3        stack: 2 3
+ *   ADD           stack: 5
+ *   PRINT         prints 5
+ * 1. Load: read every line, turn it into struct insn { int op; long long arg; }.
+ *    Reject unknown names and jump targets outside 0 .. count - 1 (exit 2).
+ * 2. Run: pc = 0; loop: fetch code[pc], switch on its op, pc++ (or jump).
+ * Parsing text on every step would be tens of times slower: the big
+ * case runs 90 million instructions.
+ */
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+`,
+		Cases: []CheckCase{
+			{Name: "arithmetic", Stdin: "PUSH 2\nPUSH 3\nADD\nPUSH 4\nMUL\nPRINT\nPUSH 7\nPUSH 2\nSUB\nPRINT\nPUSH -7\nPUSH 2\nDIV\nPRINT\n", Want: "20\n5\n-3\n",
+				Explain: "SUB and DIV take the second value and the top in that order: 7 − 2, and −7 / 2 = −3 (C's division truncates toward zero)."},
+			{Name: "stack words", Stdin: "PUSH 1\nPUSH 2\nSWAP\nPRINT\nPRINT\nPUSH 5\nPUSH 6\nOVER\nPRINT\nPRINT\nPRINT\nPUSH 9\nDUP\nADD\nPRINT\n", Want: "1\n2\n5\n6\n5\n18\n"},
+			{Name: "a loop", Stdin: stackVMSum(10), Want: "55\n",
+				Explain: "JZ pops the value it tests: the program keeps a copy with DUP before testing it."},
+			{Name: "halt", Stdin: "PUSH 1\nPRINT\nHALT\nPUSH 2\nPRINT\n", Want: "1\n"},
+			{Name: "ninety million instructions", Stdin: stackVMSum(10000000), Want: "50000005000000\n",
+				Explain: "Run an array of decoded instructions: comparing instruction names or calling sscanf on every step is too slow."},
+			{Name: "an empty stack", Stdin: "PUSH 1\nADD\n", WantExit: 1, Stderr: true},
+			{Name: "division by zero", Stdin: "PUSH 1\nPUSH 0\nDIV\nPRINT\n", WantExit: 1, Stderr: true},
+			{Name: "an unknown instruction", Stdin: "PUSH 1\nPRINT\nFLY\n", WantExit: 2, Stderr: true,
+				Explain: "Check the whole program before running any of it: nothing may be printed for a program that does not load."},
+			{Name: "a jump outside the program", Stdin: "PUSH 0\nJZ 99\n", WantExit: 2, Stderr: true},
+		},
+		Timeout: 5 * time.Second,
+		Hints: []string{
+			"An enum for the operations, and a table of names to look them up while loading.",
+			"Keep the stack in an array with a top index; check top before every pop, and grow the array (or set a generous limit) when pushing.",
+			"Read each line with fgets and sscanf(line, \"%15s %lld\", name, &arg).",
+		},
+	},
 }
 
 // gitBlobID is the ID git hash-object gives a file with this content.
@@ -547,4 +754,23 @@ func solveSudoku(grid []byte) bool {
 		return false
 	}
 	return true
+}
+
+// stackVMSum is a stack_vm program that prints 1 + 2 + … + n.
+func stackVMSum(n int) string {
+	return fmt.Sprintf(`PUSH 0
+PUSH %d
+DUP
+JZ 11
+SWAP
+OVER
+ADD
+SWAP
+PUSH 1
+SUB
+JMP 2
+POP
+PRINT
+HALT
+`, n)
 }
