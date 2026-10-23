@@ -158,3 +158,33 @@ func TestFullScreenRedrawsOnResize(t *testing.T) {
 		t.Error("the resize hook must be removed when the pager closes")
 	}
 }
+
+// At 80 columns the page keeps its name on every page (it does not vanish
+// as the line numbers grow), narrow screens still name Space, and the last
+// page offers b back instead of a Space that goes nowhere.
+func TestFullScreenStatusIsSteady(t *testing.T) {
+	t.Setenv("LINES", "30")
+	t.Setenv("COLUMNS", "80")
+	p := &fullPager{a: &App{con: &console{}}, lines: make([]string, 269), home: true, title: "START HERE · how to learn wi…"}
+	p.find.current = -1
+	for _, top := range []int{0, 116, 240} {
+		p.top = top
+		s := stripANSI(p.status())
+		if !strings.HasPrefix(s, " START HERE · lines") && !strings.HasPrefix(s, " START HERE · (END)") {
+			t.Errorf("top %d: the page's name is missing: %q", top, s)
+		}
+		if strings.Contains(s, "how to") {
+			t.Errorf("top %d: a cut-off subtitle: %q", top, s)
+		}
+		if end := strings.Contains(s, "(END)"); end == strings.Contains(s, "Space next") {
+			t.Errorf("top %d: Space next must be offered on every page but the last: %q", top, s)
+		}
+	}
+	for _, cols := range []int{40, 50, 60} {
+		t.Setenv("COLUMNS", fmt.Sprint(cols))
+		p.top = 116
+		if s := stripANSI(p.status()); !strings.Contains(s, "Space next") {
+			t.Errorf("%d columns: Space is not named: %q", cols, s)
+		}
+	}
+}

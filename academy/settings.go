@@ -113,7 +113,7 @@ func (a *App) settingsScreen() error {
 			"Ask how sure I am before review answers: " + onOff(!st.NoConfidence),
 			"Classic Mode: " + onOff(classic) + sty.Gray(" · struggle clock, notebook, type-ins"),
 			"Tidy screen: " + onOff(tidy) + sty.Gray(" · each action on a clean screen"),
-			"Home screen: " + sty.Bold(homeName) + sty.Gray(" · simple, or every number and menu item"),
+			"Home screen: " + sty.Bold(homeName) + sty.Gray(" · simple shows the daily essentials, detailed every menu item"),
 			"Back",
 		})
 		if err != nil || choice == 6 {

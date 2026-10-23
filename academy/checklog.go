@@ -188,7 +188,8 @@ type CheckStatus struct {
 	Hints     int  // hints revealed
 	Last      time.Time
 	LastOK    bool
-	LastCount int // cases passed in the latest run
+	LastCount int  // cases passed in the latest run
+	LastBuilt bool // the latest run compiled
 }
 
 // checkStatuses sums up the log, check by check.
@@ -203,7 +204,7 @@ func checkStatuses(events []CheckEvent) map[string]CheckStatus {
 			s.Runs++
 			s.Best = max(s.Best, e.Passed)
 			s.Total = e.Total
-			s.Last, s.LastOK, s.LastCount = e.At, e.OK, e.Passed
+			s.Last, s.LastOK, s.LastCount, s.LastBuilt = e.At, e.OK, e.Passed, e.Built
 			if e.OK {
 				s.Passed = true
 				s.OnOwn = s.OnOwn || e.HintsSeen == 0

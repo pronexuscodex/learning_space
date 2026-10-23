@@ -624,7 +624,7 @@ situations.
 WHAT IT COVERS
 Twenty-one stages in five tracks, covering the core of a computer
 science degree, modern AI and defensive security:
-- Track F, Foundations: programming, data structures and algorithms, discrete maths, digital logic and computer architecture.
+- Track F, Foundations: how computers work, programming, data structures and algorithms, discrete maths, digital logic and computer architecture.
 - Track A, Systems: compilers and the machine, operating systems, databases and storage, networks and the web.
 - Track S, Software, Security & Theory: software engineering, security and cryptography, theory of computation, programming languages.
 - Track B, AI: linear algebra and calculus, statistics and classical ML, neural networks, AI infrastructure and GPUs.
@@ -761,8 +761,8 @@ A SIMPLE STUDY RHYTHM
 IF IT FEELS HARD
 That is normal and means you are learning. Re-read the analogy, look at
 the real-life example, then try one resource from the library. Nobody
-understands this material on the first pass. You have unlimited time and
-no exams.
+understands this material on the first pass. There are no deadlines, and a
+Mastery Check can be retaken as often as you like.
 
 BEYOND THE CORE
 Once the twenty-one stages feel comfortable, these electives build on them:

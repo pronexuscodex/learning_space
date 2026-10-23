@@ -27,7 +27,7 @@ func (a *App) hintLadder(stageID int, c Concept, e Exercise, key string, opened 
 	for rung < 3 {
 		next := rung + 1
 		opts := []string{
-			"Back to work: I'll keep thinking",
+			"I've worked on it: no more help",
 			fmt.Sprintf("Rung %d · %s", next, rungNames[next]),
 		}
 		choice, err := a.con.promptChoice("Your move", opts)

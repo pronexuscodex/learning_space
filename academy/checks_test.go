@@ -1748,3 +1748,16 @@ func TestStartersCompile(t *testing.T) {
 		}
 	}
 }
+
+// An empty starter (no main yet) explains the linker's message in plain
+// words, and the status says it does not compile rather than "0/1 passing".
+func TestMissingMainIsExplained(t *testing.T) {
+	needCompiler(t)
+	run := runSource(t, "hello", "#include <stdio.h>\n")
+	if run.Built || !strings.Contains(run.BuildLog, "no main function yet") {
+		t.Fatalf("built=%v, log:\n%s", run.Built, run.BuildLog)
+	}
+	if _, text := checkMark(CheckStatus{Runs: 1, Total: 1}); text != "does not compile yet" {
+		t.Errorf("status after a failed build: %q", text)
+	}
+}

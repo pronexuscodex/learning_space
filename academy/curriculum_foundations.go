@@ -11,10 +11,10 @@ var foundationsGuides = map[int]StageGuide{
 do. This stage teaches the building blocks every language shares
 (values, variables, decisions, loops, functions and collections) in C,
 then what real C programs are made of: structs, memory you allocate and
-free yourself, files, and programs split across several files,
-the language that lets you see what is really happening underneath:
-every variable has a size and an address, nothing is hidden, and the
-compiler turns your text into real machine instructions you can run.
+free yourself, files, and programs split across several files. C is the
+language that lets you see what is really happening underneath: every
+variable has a size and an address, nothing is hidden, and the compiler
+turns your text into real machine instructions you can run.
 
 Why start with C? It is small (you can learn the whole language), it is
 where operating systems, databases, language runtimes and embedded

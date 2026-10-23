@@ -163,7 +163,14 @@ func (a *App) reviewCard(card Card, n, total int) (int, error) {
 		}
 	}
 
-	a.printf("  %s\n", sty.Bold(sty.Cyan("Answer")))
+	// A warm-up exercise has a hint, not a model answer: say so, so the
+	// learner checks their working with it rather than looking for the
+	// numbers they wrote.
+	answer := "Answer"
+	if card.Kind == CardWarmUp {
+		answer = "How to check your answer"
+	}
+	a.printf("  %s\n", sty.Bold(sty.Cyan(answer)))
 	for _, l := range wrap(card.A, w-6, "    ") {
 		a.println(sty.Cyan(l))
 	}

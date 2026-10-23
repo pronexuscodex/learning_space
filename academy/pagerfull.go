@@ -296,9 +296,9 @@ func (p *fullPager) draw() {
 // status is the bottom line, in reverse video like man's. It has longer
 // and shorter forms for the width of the terminal.
 func (p *fullPager) status() string {
-	cols := max(20, termWidth()) - 1
+	cols := max(20, min(termWidth(), screenWidth()-1)) // never the last column
 	end := min(p.top+p.bodyRows(), len(p.lines))
-	where := fmt.Sprintf("lines %d–%d of %d %d%%", p.top+1, end, len(p.lines), end*100/max(1, len(p.lines)))
+	where := fmt.Sprintf("lines %d–%d of %d", p.top+1, end, len(p.lines))
 	if end == len(p.lines) {
 		where = fmt.Sprintf("(END) lines %d–%d of %d", p.top+1, end, len(p.lines))
 	}
@@ -312,6 +312,7 @@ func (p *fullPager) status() string {
 		"Space next page · ↑↓ scroll · b back · / find · h help · q quit",
 		"Space next · b back · / find · h help · q quit",
 		"Space next · h help · q quit",
+		"Space next · q quit",
 		"q quit",
 	}
 	if p.home {
@@ -319,6 +320,7 @@ func (p *fullPager) status() string {
 			"Space next page · ↑↓ scroll · / find · q quit · or press a menu key",
 			"Space next · b back · q quit · or a menu key",
 			"Space next · q quit · or a menu key",
+			"Space next · q quit",
 			"q quit",
 		}
 	}
@@ -326,31 +328,72 @@ func (p *fullPager) status() string {
 		keys[0] = "Space next page · n/N next/previous match · h help · q quit"
 		keys[1] = "n next · N previous · h help · q quit"
 		keys[2] = "n next · h help · q quit"
+		keys[3] = "n next · q quit"
+	}
+	if end == len(p.lines) && p.top > 0 {
+		// Space has nowhere to go on the last page: offer the way back.
+		for i, k := range keys {
+			k = strings.Replace(k, "Space next page · ↑↓ scroll", "b back · ↑↓ scroll", 1)
+			k = strings.Replace(k, "Space next", "b back", 1)
+			keys[i] = strings.Replace(k, "b back · b back", "b back", 1)
+		}
+	} else if end == len(p.lines) {
+		// It all fits on one page: neither Space nor b goes anywhere.
+		for i, k := range keys {
+			k = strings.Replace(k, "Space next page · ↑↓ scroll · ", "", 1)
+			k = strings.Replace(k, "Space next · ", "", 1)
+			keys[i] = strings.Replace(k, "b back · ", "", 1)
+		}
 	}
 	text := " " + where
 	// Like man, name the page when there is room for it with at least the
-	// short keys; otherwise the keys come first.
+	// short keys; otherwise the keys come first. Whether it fits is judged
+	// with the widest position this page can show, so the title does not
+	// vanish halfway through as the line numbers grow.
+	n := len(p.lines)
+	widest := max(visibleLen(where),
+		visibleLen(fmt.Sprintf("lines %d–%d of %d", n, n, n)),
+		visibleLen(fmt.Sprintf("(END) lines %d–%d of %d", n, n, n)))
 	titled := false
 	if p.title != "" && p.msg == "" {
-		for _, k := range keys[:3] {
+		// The page's short name (before " · ") must fit whole, never cut
+		// ("ALL SCREENS …"): fewer keys are tried first, then no name.
+		head, _, _ := strings.Cut(p.title, " · ")
+		for _, k := range keys[:len(keys)-1] { // every form that still names a key besides q
 			tail := " · " + where + " · " + k + " "
-			if room := cols - 1 - visibleLen(tail); room >= 12 {
-				t := truncate(p.title, min(28, room))
-				if head, _, ok := strings.Cut(p.title, " · "); ok && visibleLen(t) <= visibleLen(head)+4 {
-					t = truncate(head, room) // "START HERE", not "START HERE · …"
-				}
-				text, titled = " "+t+tail, true
-				break
+			room := cols - 1 - visibleLen(tail) - (widest - visibleLen(where))
+			if room < visibleLen(head) {
+				continue
 			}
+			// The whole title if it fits uncut, else its short name:
+			// "START HERE", not "START HERE · how to…".
+			t := p.title
+			if visibleLen(t) > min(room, 32) {
+				t = head
+			}
+			text, titled = " "+t+tail, true
+			break
 		}
 	}
-	for _, k := range keys {
-		if titled {
-			break
+	// Narrow terminals: a compact position ("117–139/269") before giving
+	// up on naming Space, the key that matters most.
+	short := where
+	if p.find.current < 0 && p.msg == "" {
+		short = fmt.Sprintf("%d–%d/%d", p.top+1, end, len(p.lines))
+		if end == len(p.lines) {
+			short = "(END) " + short
 		}
-		if t := " " + where + " · " + k + " "; visibleLen(t) <= cols {
-			text = t
-			break
+	}
+fit:
+	for _, w := range []string{where, short} {
+		for _, k := range keys {
+			if titled {
+				break fit
+			}
+			if t := " " + w + " · " + k + " "; visibleLen(t) <= cols && (k != "q quit" || w == short) {
+				text = t
+				break fit
+			}
 		}
 	}
 	text = truncate(text, cols)
@@ -446,13 +489,14 @@ func renderLines(a *App, render func()) []string {
 	return strings.Split(strings.TrimRight(buf.String(), "\n"), "\n")
 }
 
-// pageTitle is a page's heading: its first line of text, without frames,
-// shortened for the status line ("START HERE · how to learn wi…").
+// pageTitle is a page's heading: its first line of text, without frames.
+// The status line shows it whole when it fits, else its short name, the
+// part before " · " ("START HERE").
 func pageTitle(lines []string) string {
 	for _, l := range lines {
 		t := strings.Trim(stripANSI(l), " ┏┃━╭│─═")
 		if t != "" {
-			return truncate(t, 28)
+			return t
 		}
 	}
 	return ""

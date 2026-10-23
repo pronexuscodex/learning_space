@@ -19,7 +19,7 @@ var workoutInfo = map[string]struct{ Title, Why string }{
 	StepLearn: {"Learn one new idea",
 		"Read one concept, then explain it in your own words. Producing an explanation is what makes it stick."},
 	StepPractice: {"Mixed practice",
-		"An exercise from a different topic. Mixing topics feels harder, and that difficulty is what teaches."},
+		"An exercise picked from everything you have understood so far, mixing topics once you have several. Mixing feels harder, and that difficulty is what teaches."},
 	StepReflect: {"Reflect",
 		"Two honest questions. Noticing how you learn is how you get better at learning."},
 }
@@ -65,9 +65,12 @@ func (a *App) dailyWorkout() error {
 		if empty := a.emptyStep(step); empty != "" {
 			// Nothing to do in this step today: say so and move on,
 			// rather than asking "Ready?" first.
+			// Recorded as skipped too: the checklist shows it as "–", not
+			// as work done, and it does not count towards the streak.
 			a.mutate(func(r *Registry) {
 				if day := r.workoutFor(time.Now()); !day.has(step) {
 					day.Done = append(day.Done, step)
+					day.Skipped = append(day.Skipped, step)
 				}
 			})
 			a.con.say(sty.Gray("✓"), fmt.Sprintf("%s · %s: %s", fmt.Sprintf("Step %d", n+1), info.Title, empty), sty.Gray)

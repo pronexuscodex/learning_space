@@ -407,11 +407,20 @@ func (r *Registry) stats(now time.Time, activityDays int) campusStats {
 	cs.hours = roundHours(cs.hours)
 	cs.due = len(r.dueCards(now))
 
-	// Streak: consecutive days with logged hours or reviews, ending today
-	// (or yesterday, so the streak survives until you study today).
+	// Streak: consecutive days with logged hours, reviews or real work in
+	// the Daily Workout (a step done, not skipped), ending today (or
+	// yesterday, so the streak survives until you study today).
+	worked := map[string]bool{}
+	for _, w := range r.Workouts {
+		for _, step := range []string{StepLearn, StepPractice, StepReflect} {
+			if w.has(step) && !contains(w.Skipped, step) {
+				worked[w.Date] = true
+			}
+		}
+	}
 	active := func(i int) bool {
 		day := today.AddDate(0, 0, i-(activityDays-1)).Format("2006-01-02")
-		return cs.activity[i] > 0 || r.ReviewHistory[day] > 0
+		return cs.activity[i] > 0 || r.ReviewHistory[day] > 0 || worked[day]
 	}
 	i := activityDays - 1
 	if i >= 0 && !active(i) {
