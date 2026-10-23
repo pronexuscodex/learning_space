@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"math/rand/v2"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -39,9 +40,11 @@ var foundationsChecks = []Check{
 			{Name: "no numbers", Stdin: "0\n", Want: "none\n"},
 			{Name: "extremes and negatives", Stdin: "6\n-5 2147483647 -2147483648 7 -2147483648 -5\n", Want: "-2147483648\n",
 				Explain: "A comparison function that returns a - b overflows for numbers this far apart: return (a > b) - (a < b)."},
-			{Name: "200,000 different numbers", Stdin: duplicatesInput(200000, -1, -1), Want: "none\n",
+			{Name: "200,000 different numbers", Gen: generated(func() (string, string) { return duplicatesInput(200000, -1, -1), "none\n" }),
 				Explain: "Comparing every pair is 20 billion comparisons. Sort (value, position) pairs with qsort, so equal values sit side by side."},
-			{Name: "a late repeat", Stdin: duplicatesInput(200000, 199998, 199999), Want: fmt.Sprintln(duplicatesValue(199998))},
+			{Name: "a late repeat", Gen: generated(func() (string, string) {
+				return duplicatesInput(200000, 199998, 199999), fmt.Sprintln(duplicatesValue(199998))
+			})},
 		},
 		Hints: []string{
 			"Make an array of structs { int value; int pos; } and qsort it by value, then by position.",
@@ -73,7 +76,7 @@ var foundationsChecks = []Check{
 			{Name: "three disks", Stdin: "3\n", Want: hanoiMoves(3)},
 			{Name: "no disks", Stdin: "0\n", Want: "",
 				Explain: "With 0 disks there is nothing to do: the base case prints nothing."},
-			{Name: "sixteen disks", Stdin: "16\n", Want: hanoiMoves(16),
+			{Name: "sixteen disks", Gen: generated(func() (string, string) { return "16\n", hanoiMoves(16) }),
 				Explain: "65,535 moves: 2¹⁶ − 1. The recursion is only 16 calls deep, however many moves it prints."},
 		},
 		Hints: []string{
@@ -107,7 +110,7 @@ var foundationsChecks = []Check{
 			{Name: "empty array", Stdin: "0\n2\n5 -5\n", Want: "-1\n-1\n"},
 			{Name: "all the same", Stdin: "6\n9 9 9 9 9 9\n2\n9 10\n", Want: "0\n-1\n",
 				Explain: "A plain binary search returns whichever 9 it meets first, often index 2: after a match, keep searching to the left."},
-			{Name: "200,000 numbers, 100,000 lookups", Stdin: bsearchInput(), Want: bsearchWant(),
+			{Name: "200,000 numbers, 100,000 lookups", Gen: generated(func() (string, string) { return bsearchInput(), bsearchWant() }),
 				Explain: "A linear scan per lookup is up to 20 billion comparisons; binary search needs about 18 per lookup."},
 		},
 		Hints: []string{
@@ -143,7 +146,7 @@ var foundationsChecks = []Check{
 			{Name: "the shortest is not the best", Stdin: "3\n0 6\n5 8\n7 12\n", Want: "2\n",
 				Explain: "The shortest meeting (5-8) overlaps both others; taking the one that ends first (0-6) leaves room for 7-12."},
 			{Name: "none", Stdin: "0\n", Want: "0\n"},
-			{Name: "200,000 meetings", Stdin: intervalsInput(), Want: fmt.Sprintln(intervalsWant()),
+			{Name: "200,000 meetings", Gen: generated(func() (string, string) { return intervalsInput(), fmt.Sprintln(intervalsWant()) }),
 				Explain: "Sort once with qsort (O(n log n)), then take meetings in a single pass."},
 		},
 		Hints: []string{
@@ -174,7 +177,7 @@ var foundationsChecks = []Check{
 			{Name: "several pairs", Stdin: "flaw\nlawn\nsame\nsame\nabc\n\n\nxyz\n", Want: "2\n0\n3\n3\n",
 				Explain: "An empty line is a word of length 0: its distance to any word is that word's length."},
 			{Name: "a sentence", Stdin: "the quick brown fox\nthe quack brown box\n", Want: "2\n"},
-			{Name: "2,000 characters each", Stdin: editDistanceInput(), Want: fmt.Sprintln(editDistanceWant()),
+			{Name: "2,000 characters each", Gen: generated(func() (string, string) { return editDistanceInput(), fmt.Sprintln(editDistanceWant()) }),
 				Explain: "The plain recursion tries every way to align the two lines: exponential. The table has 2,001 × 2,001 cells, each filled once."},
 		},
 		Hints: []string{
@@ -208,7 +211,7 @@ var foundationsChecks = []Check{
 				Explain: "A clause is true when at least one literal is true; with no literals it can never be true."},
 			{Name: "the last variable", Stdin: "16 1\n16 0\n", Want: "32768\n",
 				Explain: "Variables are numbered from 1: variable 16 is bit 15 of the row. Half of the 65,536 rows set it."},
-			{Name: "16 variables, 120 clauses", Stdin: satInput(), Want: fmt.Sprintln(satWant())},
+			{Name: "16 variables, 120 clauses", Gen: generated(func() (string, string) { return satInput(), fmt.Sprintln(satWant()) })},
 		},
 		Hints: []string{
 			"Store the clauses as one array of literals, with the 0s kept as separators.",
@@ -335,9 +338,9 @@ var foundationsChecks = []Check{
 			{Name: "nothing", Stdin: "0\n", Want: "0\n"},
 			{Name: "equal values", Stdin: "4\n2 2 1 1\n", Want: "4\n",
 				Explain: "Equal values are not out of order: only a[i] > a[j] counts. When merging, take from the left half on a tie."},
-			{Name: "200,000 in reverse", Stdin: reverseInput(200000), Want: "19999900000\n",
+			{Name: "200,000 in reverse", Gen: generated(func() (string, string) { return reverseInput(200000), "19999900000\n" }),
 				Explain: "n(n − 1)/2 inversions: about 2 × 10¹⁰, more than an int can hold."},
-			{Name: "200,000 random", Stdin: inversionsInput(), Want: fmt.Sprintln(inversionsWant()),
+			{Name: "200,000 random", Gen: generated(func() (string, string) { return inversionsInput(), fmt.Sprintln(inversionsWant()) }),
 				Explain: "Comparing every pair is 2 × 10¹⁰ comparisons; merge sort needs about 3.5 million."},
 		},
 		Hints: []string{
@@ -373,7 +376,7 @@ var foundationsChecks = []Check{
 			{Name: "lonely vertices", Stdin: "10 2\n3 7\n7 9\n", Want: "path 3 9\n",
 				Explain: "Vertices with no edges do not stop the drawing: check connectivity only among vertices that have edges."},
 			{Name: "no edges", Stdin: "3 0\n", Want: "circuit\n"},
-			{Name: "a big ring", Stdin: eulerRingInput(100000), Want: "circuit\n",
+			{Name: "a big ring", Gen: generated(func() (string, string) { return eulerRingInput(100000), "circuit\n" }),
 				Explain: "A recursive depth-first search 100,000 calls deep can overflow the stack: use a queue (BFS) or union-find."},
 		},
 		Hints: []string{
@@ -667,7 +670,7 @@ int main(int argc, char **argv) {
 			{Name: "not numbers", Stdin: "\n.\n+-1\n1.2.3\n12a\n 1\n1 \n-\n+.\n", Want: "invalid\ninvalid\ninvalid\ninvalid\ninvalid\ninvalid\ninvalid\ninvalid\ninvalid\n",
 				Explain: "An empty line, a lone sign or dot, two signs, two dots, letters and spaces are all invalid: only accepting states at the end of the line mean valid."},
 			{Name: "edge cases", Stdin: "+.5\n-0.0e-0\n00012\n.e1\n", Want: "valid\nvalid\nvalid\ninvalid\n"},
-			{Name: "many lines", Stdin: numberFSMInput(), Want: numberFSMWant(),
+			{Name: "many lines", Gen: generated(func() (string, string) { return numberFSMInput(), numberFSMWant() }),
 				Explain: "Every one of these lines was generated from the rules; compare the first mismatch with your arrows."},
 		},
 		Hints: []string{
@@ -744,7 +747,7 @@ int main(int argc, char **argv) {
 			{Name: "not ours", Stdin: "00311093\n00000000\n42008033\nffffffff\n",
 				Want:    "unknown\nunknown\nunknown\nunknown\n",
 				Explain: "slli (funct3 1), an all-zero word, an R-type with a funct7 that is neither 0 nor 0x20, and all ones: anything outside the nine instructions is unknown."},
-			{Name: "a thousand instructions", Stdin: rvInput(), Want: rvWant()},
+			{Name: "a thousand instructions", Gen: generated(func() (string, string) { return rvInput(), rvWant() })},
 		},
 		Hints: []string{
 			"Read each line with scanf(\"%x\", &w) into an unsigned int, or strtoul(line, NULL, 16).",
@@ -1228,7 +1231,7 @@ int main(int argc, char **argv) {
 			{Name: "a scan floods LRU", Stdin: "4 summary\n" + strings.Repeat("r 1\nr 2\nr 3\nr 4\nr 5\n", 20),
 				Want:    "hits 0, misses 100, writes 0\n",
 				Explain: "Scanning five pages in a loop through four frames always evicts exactly the page needed next: LRU's worst case."},
-			{Name: "a million accesses", Stdin: bufferPoolInput(), Want: bufferPoolWant(),
+			{Name: "a million accesses", Gen: generated(func() (string, string) { return bufferPoolInput(), bufferPoolWant() }),
 				Explain: "Use the same rules as the small cases: a hit refreshes the time of last use, and only a dirty page is written back."},
 		},
 		Hints: []string{
@@ -1380,7 +1383,7 @@ done:
 			{Name: "negative and huge keys", Stdin: "3\n-7 neg\n9223372036854775807 max\n-9223372036854775808 min\n3\n-9223372036854775808 m\n-7 n\n9223372036854775807 x\n",
 				Want:    "-9223372036854775808 min m\n-7 neg n\n9223372036854775807 max x\n",
 				Explain: "In C, key % buckets is negative for a negative key: an index before the start of the array. Convert the key to an unsigned type before hashing."},
-			{Name: "100,000 rows each", Stdin: hashJoinInput(), Want: hashJoinWant(),
+			{Name: "100,000 rows each", Gen: generated(func() (string, string) { return hashJoinInput(), hashJoinWant() }),
 				Explain: "Ten billion comparisons take minutes; building a hash table of A and probing it once per row of B takes milliseconds."},
 		},
 		Timeout: 5 * time.Second,
@@ -1423,7 +1426,7 @@ done:
 			{Name: "host bits in a prefix", Stdin: "1\n10.1.2.3/8 A\n10.9.9.9\n", Want: "A\n",
 				Explain: "Mask the prefix's address too: 10.1.2.3/8 is the network 10.0.0.0/8."},
 			{Name: "the later route wins", Stdin: "2\n10.0.0.0/8 A\n10.0.0.0/8 B\n10.1.1.1\n", Want: "B\n"},
-			{Name: "100,000 routes", Stdin: routesInput(), Want: routesWant(),
+			{Name: "100,000 routes", Gen: generated(func() (string, string) { return routesInput(), routesWant() }),
 				Explain: "Comparing every address with every route is ten billion comparisons. A trie finds the longest match in at most 32 steps."},
 		},
 		Timeout: 5 * time.Second,
@@ -1542,7 +1545,7 @@ int main(int argc, char **argv) {
 #include <stdio.h>
 #include <stdlib.h>
 
-static uint32_t fnv1a(const char *s) {
+uint32_t fnv1a(const char *s) {
     uint32_t h = 2166136261u;
     for (; *s; s++) {
         h ^= (unsigned char)*s;
@@ -1554,10 +1557,14 @@ static uint32_t fnv1a(const char *s) {
 		Cases: []CheckCase{
 			{Name: "three nodes", Stdin: ringInput(1, []string{"A", "B", "C"}, ringKeys(12, "user:")), Want: ringWant(1, []string{"A", "B", "C"}, ringKeys(12, "user:")),
 				Explain: "Hash each key, find the first point at or after it, and wrap to the smallest point when the key's hash is above every point."},
-			{Name: "virtual nodes", Stdin: ringInput(50, []string{"alpha", "beta", "gamma", "delta"}, ringKeys(40, "k")), Want: ringWant(50, []string{"alpha", "beta", "gamma", "delta"}, ringKeys(40, "k")),
+			{Name: "virtual nodes", Gen: generated(func() (string, string) {
+				return ringInput(50, []string{"alpha", "beta", "gamma", "delta"}, ringKeys(40, "k")), ringWant(50, []string{"alpha", "beta", "gamma", "delta"}, ringKeys(40, "k"))
+			}),
 				Explain: "Every node has v points, named node#0 to node#(v-1), with the number in decimal."},
 			{Name: "one node", Stdin: ringInput(3, []string{"solo"}, ringKeys(5, "x")), Want: ringWant(3, []string{"solo"}, ringKeys(5, "x"))},
-			{Name: "100,000 points", Stdin: ringInput(100, ringNodes(1000), ringKeys(100000, "key-")), Want: ringWant(100, ringNodes(1000), ringKeys(100000, "key-")),
+			{Name: "100,000 points", Gen: generated(func() (string, string) {
+				return ringInput(100, ringNodes(1000), ringKeys(100000, "key-")), ringWant(100, ringNodes(1000), ringKeys(100000, "key-"))
+			}),
 				Explain: "Scanning all 100,000 points for each of 100,000 keys is ten billion steps: sort the points once, then binary-search for each key."},
 		},
 		Timeout: 5 * time.Second,
@@ -2136,19 +2143,12 @@ func bufferPoolSim(frames int, ops []string) string {
 		used       int
 	}
 	var pool []*frame
-	find := func(page int) *frame {
-		for _, f := range pool {
-			if f.page == page {
-				return f
-			}
-		}
-		return nil
-	}
+	where := map[int]*frame{}
+	find := func(page int) *frame { return where[page] }
 	hits, misses, writes, clock := 0, 0, 0, 0
 	for _, op := range ops {
-		var kind string
-		var page int
-		fmt.Sscanf(op, "%s %d", &kind, &page)
+		kind, num, _ := strings.Cut(op, " ")
+		page, _ := strconv.Atoi(num)
 		if kind == "u" {
 			if f := find(page); f != nil && f.pins > 0 {
 				f.pins--
@@ -2177,9 +2177,11 @@ func bufferPoolSim(frames int, ops []string) string {
 				if victim.dirty {
 					writes++
 				}
+				delete(where, victim.page)
 				*victim = frame{page: page}
 				f = victim
 			}
+			where[page] = f
 		}
 		f.used = clock
 		if kind == "w" {

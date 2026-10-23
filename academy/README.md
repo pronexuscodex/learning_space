@@ -200,7 +200,7 @@ Checked-exercise files live in `Documents/Academy Labs` (`$ACADEMY_LABS` chooses
 | | 19 | Network Defence & Monitoring |
 | | 20 | Incident Response, Forensics & Privacy |
 
-That is **132 concepts** and **396 exercises**, plus a glossary, a resource library, lab blueprints, a quiz and a mastery check for every stage. Start Here also lists electives for afterwards: graphics, quantum computing, embedded systems and bioinformatics.
+That is **143 concepts** and **429 exercises**, plus a glossary, a resource library, lab blueprints, a quiz and a mastery check for every stage. Start Here also lists electives for afterwards: graphics, quantum computing, embedded systems and bioinformatics.
 
 ## How computers work (Stage 0)
 
@@ -348,12 +348,23 @@ The later stages have checked exercises too, written with C and POSIX only, so t
 | `rv_decode` | 4: Machine code | real RISC-V machine code (from LLVM's assembler): sign-extended immediates, add vs sub in bit 30, and unknown words |
 | `bits` | 5: Integers & floating point in bits | popcount, rotating by 0 (a shift by 32 is undefined), powers of two, and the raw IEEE 754 fields of 1.0, -2.5, 0.1 and -0.0 |
 | `calc` | 5: Parsing | a recursive-descent calculator: precedence, left-to-right order (10 - 4 - 3 is 3), unary minus, truncating division, malformed lines, division by zero, 500 levels of parentheses |
+| `linkage` | 5: Linking | three functions linked with the checker's own file, which already defines `count` and `total`: a global of yours clashes at link time (built with `-fno-common` everywhere) |
+| `checked_add` | 5: The optimizer | overflow checks for `+` and `*` that never overflow themselves: `INT_MIN * -1`, checks written after the overflow (the sanitizer stops them), a million random pairs |
 | `run` | 6: Processes | fork, execvp and waitpid: exit codes, death by a signal, arguments passed on, a program that does not exist (127) |
 | `rawcopy` | 6: System calls | a copy with `read` and `write` only: short writes, and half a megabyte of every byte value |
 | `counter` | 6: Synchronisation | threads sharing a counter: without a mutex, increments are lost |
+| `arena` | 6: Memory allocators | a bump allocator: 16-byte alignment, failed requests that use no space, `used + n` wrapping past `SIZE_MAX`, a million nodes, and the block freed |
+| `pipeline` | 6: File descriptors & pipes | `A \| B` with pipe, dup2, fork and execvp: a forgotten close (cat waits forever), more than the pipe's 64 KiB, `yes \| head`, B's exit status |
+| `graceful` | 6: Signals | SIGTERM and SIGINT recorded by a handler: sent by the program itself and by another process, and a blocking read interrupted (SA_RESTART must be off) |
 | `atomic_save` | 7: Durability | a temporary file in the same folder, fsync, rename, fsync the folder: exact bytes, nothing left behind, failure leaves nothing |
 | `wal_kv` | 7: Write-ahead logging | a key-value store that appends every change to `data.log` before answering, replays it at start, and cuts off a record torn by a crash (the checker reads the log afterwards) |
+| `buffer_pool` | 7: Pages & the buffer pool | LRU eviction with pins and dirty write-backs, frames that are all pinned, a scan that floods LRU, and a million accesses |
+| `bloom` | 7: LSM-trees | a Bloom filter: no false negatives, under 1.5% false positives at 10 bits per key, and 1,001 bits (`m / 8` bytes is one short) |
+| `hash_join` | 7: Query planning | a join of two 100,000-row tables (a nested loop runs out of time), duplicate keys on both sides in order, and negative keys (a negative bucket index) |
 | `upper_server` | 8: Sockets | a TCP server on a real 127.0.0.1 socket: partial reads of 300 KB, a client that sends nothing, bytes above 127 |
+| `routes` | 8: IP routing | longest-prefix match: the default route, /32 and /0 (a shift by 32 is undefined), host bits in a prefix, and 100,000 routes |
+| `retry` | 8: Timeouts & retries | backoff with jitter: permanent failures not retried, no wait after the last attempt, the cap, and 70 attempts (doubling a `long` overflows) |
+| `ring` | 8: Consistent hashing | keys placed on a ring of virtual nodes: wrapping past the largest point, and 100,000 points searched in sorted order |
 | `safe_join` | 17: Untrusted input | canonicalise, then check: `a/./b//c.txt` is fine, `a/../../etc/passwd` and `/etc/passwd` are refused, and the output buffer is never overrun |
 | `copy_string` | 17: Memory-safe code | an strlcpy of your own: always terminated, never past the buffer, size 0, and the full length returned |
 | `http_request` | 8: HTTP | parsing a request head: header names in any case, trimmed values, bare newlines, a 7,000-byte path, a missing Host, wrong versions, a head that never ends |
@@ -789,7 +800,7 @@ The tests check:
 - **The v1 → v2 migration and stage merging.**
 - **Retention:** the scheduler's intervals grow and reset on a lapse; deck unlocking and due cards; each step of the mastery ladder.
 - **Classic Mode:** every stage has a complete classic corner with HTTPS links; the struggle clock's thresholds and early unlock; notebook and type-in progress survive a save round trip.
-- **Checked exercises:** each check's reference solution passes every case, with gcc and with clang (46 checks, including a real loopback TCP server, forked processes and a write-ahead log the checker reads back). Mastery waits for a concept's check to pass. Typical mistakes fail with the right explanation:
+- **Checked exercises:** each check's reference solution passes every case, with gcc and with clang (57 checks, including a real loopback TCP server, forked processes and a write-ahead log the checker reads back). Mastery waits for a concept's check to pass. Typical mistakes fail with the right explanation:
   - the XOR swap;
   - `9 / 5` in integers;
   - an endless loop;
@@ -851,6 +862,7 @@ One package, one build target:
 | `checks.go` | checked exercises: tasks, test cases, hints, harnesses |
 | `checks_core.go` | checked exercises for Stages 2, 7 and 17: lists, hash maps, heaps, graphs, durable files, a write-ahead log, safe paths and strings |
 | `checks_systems.go` | checked exercises for Stages 5, 6 and 8: bits, a parser, processes, system calls, threads, sockets, HTTP |
+| `checks_foundations.go` | checked exercises added when Stages 2 to 8 were deepened, from Big-O and recursion to signals, Bloom filters and consistent hashing, with the generators of their big inputs |
 | `runner.go`, `runner_*.go` | compile with the learner's C compiler, run each case with limits, explain failures |
 | `checklog.go` | the labs folder, starter files, and the append-only log of runs and hints |
 | `checksui.go` | checked-exercise screens and `-check` |

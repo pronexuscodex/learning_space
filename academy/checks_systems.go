@@ -163,7 +163,7 @@ int main(int argc, char **argv) {
 		Cases: []CheckCase{
 			{Name: "a line of text", Stdin: "hello, system calls\n", Want: "hello, system calls\n"},
 			{Name: "no input", Stdin: "", Want: ""},
-			{Name: "half a megabyte of every byte value", Stdin: allBytes(512 << 10), Want: allBytes(512 << 10),
+			{Name: "half a megabyte of every byte value", Gen: generated(func() (string, string) { return allBytes(512 << 10), allBytes(512 << 10) }),
 				Explain: "Write exactly as many bytes as read returned, not the buffer's size, and nothing stops at a zero byte."},
 		},
 		Hints: []string{

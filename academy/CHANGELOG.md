@@ -62,15 +62,28 @@ After a walk through the app as a new learner, at 40, 80 and 160 columns:
   - **Stage 3, Discrete Mathematics** (5 → 8): new *Modular Arithmetic & Number Theory*, *Recurrences: The Cost of Recursion* and *Graph Theory: Degrees, Trees & Paths*;
   - **Stage 4, Computer Architecture** (5 → 8): new *Building an ALU: Adders, Subtraction & Flags*, *Finite State Machines & Sequential Logic* and *Instruction Sets & Machine Code*.
 
-  Their glossaries, outcomes and quizzes grow with them (new quiz questions are added at the end, so your review cards keep their history). The academy now has 132 concepts and 396 exercises.
+  Their glossaries, outcomes and quizzes grow with them (new quiz questions are added at the end, so your review cards keep their history).
+- **Stages 5 to 8 completed, to the same depth.** Eleven new lessons, and every lesson in the four stages now has an *Under the hood* section measured on a real Linux machine, with C exercises instead of Python:
+  - **Stage 5, Computer Systems** (5 → 8 lessons): new *Linking, Loading & Shared Libraries*, *What the Optimizer Does* and *Profiling & Measuring Performance*; measured with `nm`, `readelf`, `objdump`, gcc at each `-O` level, Cachegrind and Callgrind;
+  - **Stage 6, Operating Systems** (5 → 8): new *Memory Allocators: How malloc Works*, *File Descriptors, Files & Pipes* and *Signals*; measured with strace and `/proc` (ASLR, lazy allocation and 262,143 page faults, brk against mmap, the cost of a system call and a context switch, a data race at `-O0` and `-O1`);
+  - **Stage 7, Storage Engines** (6 → 8): new *Pages, Records & the Buffer Pool* and *Query Planning & Join Algorithms*; measured with fsync timings and SQLite (its file header, B-tree depth from `dbstat`, commit cost per journal mode, an MVCC snapshot, `EXPLAIN QUERY PLAN` before and after an index, a nested loop against an automatic index);
+  - **Stage 8, Networks** (6 → 9): new *IP Addressing, Routing & NAT*, *Partitioning & Consistent Hashing* and *Timeouts, Retries & Idempotency*; packets captured on loopback and decoded byte by byte, the routing table, Nagle against delayed ACKs (43 ms against 0.07 ms), SYN retransmissions, and simulations of Raft elections, consistent hashing and retry storms.
+
+  The academy now has 143 concepts and 429 exercises.
 - **Checked exercises for Stages 2 to 4.** Eighteen more, each timed on inputs where only the efficient idea passes:
   - Stage 2: `duplicates` (O(n log n), not O(n²)), `hanoi`, `bsearch` (the first match, 100,000 lookups), `intervals` (greedy by end time) and `edit_distance` (a 2,000 × 2,000 table), so every Stage 2 lesson has one;
   - Stage 3: `sat_count`, `bitsets`, `binomial` (exact up to C(67, 33)), `modpow` (exponents up to 10¹⁸), `inversions`, `euler` and `birthday`;
   - Stage 4: `bases`, `nand_gates` (the checker counts your NAND gates), `alu` (zero, negative, carry and overflow flags), `number_fsm`, `cpu` (an emulator) and `rv_decode` (real RISC-V machine code).
 
-  That makes 46 in all. Checks can now give the program files in subfolders and examine the files it leaves behind.
+- **Checked exercises for Stages 5 to 8.** Eleven more:
+  - Stage 5: `linkage` (names kept private with `static`, linked against the checker's own) and `checked_add` (overflow checks that cannot overflow);
+  - Stage 6: `arena` (a bump allocator), `pipeline` (`A | B` with pipe, dup2 and fork) and `graceful` (SIGTERM and SIGINT, and a blocking read interrupted);
+  - Stage 7: `buffer_pool` (LRU with pins and dirty pages), `bloom` (a Bloom filter's false-positive rate) and `hash_join` (100,000 rows each);
+  - Stage 8: `routes` (longest-prefix match), `retry` (backoff with jitter) and `ring` (consistent hashing).
+
+  That makes 57 in all. Checks can now give the program files in subfolders and examine the files it leaves behind.
 - **Mastery counts real code.** A concept with a checked exercise reaches "mastered" only once that check has passed (with or without hints). Concepts you had mastered before stay at "retained" until you pass their check. Where checks cannot run (Windows), nothing changes.
-- **Concept prerequisites.** Concepts now list the earlier concepts they build on (198 links across 127 concepts in all 21 stages). The list sits at the top of each card, with a tick for each one you have marked as understood.
+- **Concept prerequisites.** Concepts now list the earlier concepts they build on (225 links across 138 concepts in all 21 stages). The list sits at the top of each card, with a tick for each one you have marked as understood.
   - **What's next and Today's workout** use them. When the next concept builds on one you have not marked yet, they send you to the first missing step and say which concept it leads to. They do not stop you reading anything.
   - **Tests check the graph:** every name is a real concept, every prerequisite comes earlier and agrees with the stage prerequisites (so there can be no cycle), and every concept from Stage 1 on lists at least one.
 - **Get hired: the career center** (`e`). It turns learning into the three things companies hire on: foundations, finished projects and interview skill.
@@ -100,6 +113,7 @@ After a walk through the app as a new learner, at 40, 80 and 160 columns:
   - On Windows, or with `ACADEMY_PAGER=inline`, the line pager is used as before.
 
 ### Fixed
+- **The academy starts at once again.** The checked exercises' big test inputs (a million buffer-pool accesses, 100,000-row tables, a 1000 × 1000 maze) were built every time the program started, which had grown to almost 3 seconds; they are now made the first time a check runs. A test keeps it that way, and another checks that every starter compiles as it is, so your first build fails only for what you have not written yet.
 - The link check (`-check-links` and the weekly Links workflow) failed whenever a site's own server was failing, such as Complexity Zoo answering 503 for hours. A server error (5xx) that persists after the retry is now a warning, like a site that does not answer; a 404, a moved page or a fake PDF still fails.
 - A full correctness pass over the teaching content. Every coding drill was solved, the reference solutions were checked, and every quiz answer, exercise hint, type-in program and number in the lessons was recomputed. Four wordings were fixed:
   - the dictionary's List example could be read as `append` returning the new list;

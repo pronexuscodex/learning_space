@@ -271,6 +271,7 @@ func writeCheckRun(w io.Writer, run CheckRun, width int) {
 
 // caseInput describes what a case gives the program, for the report.
 func caseInput(c CheckCase) string {
+	c = c.resolved()
 	var parts []string
 	if len(c.Args) > 0 {
 		parts = append(parts, "arguments "+strings.Join(c.Args, " "))
