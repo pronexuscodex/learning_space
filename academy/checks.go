@@ -40,6 +40,7 @@ type Check struct {
 	Leaks      bool          // also fail on memory never freed (where the leak checker works)
 	Timeout    time.Duration // per case, when the default 2 s is too short
 	Flags      []string      // extra compiler flags (such as -pthread)
+	Libs       []string      // libraries to link, after the sources (such as -lm)
 	BuildHints []BuildHint   // explanations for compiler messages this check tends to cause
 
 	Cases []CheckCase
@@ -688,6 +689,7 @@ func init() {
 	checks = append(checks, systemsChecks...)
 	checks = append(checks, foundationsChecks...)
 	checks = append(checks, softwareChecks...)
+	checks = append(checks, numericChecks...)
 	sort.SliceStable(checks, func(i, j int) bool { return checks[i].Stage < checks[j].Stage })
 }
 

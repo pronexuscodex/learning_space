@@ -200,7 +200,7 @@ Checked-exercise files live in `Documents/Academy Labs` (`$ACADEMY_LABS` chooses
 | | 19 | Network Defence & Monitoring |
 | | 20 | Incident Response, Forensics & Privacy |
 
-That is **155 concepts** and **465 exercises**, plus a glossary, a resource library, lab blueprints, a quiz and a mastery check for every stage. Start Here also lists electives for afterwards: graphics, quantum computing, embedded systems and bioinformatics.
+That is **158 concepts** and **474 exercises**, plus a glossary, a resource library, lab blueprints, a quiz and a mastery check for every stage. Start Here also lists electives for afterwards: graphics, quantum computing, embedded systems and bioinformatics.
 
 ## How computers work (Stage 0)
 
@@ -375,6 +375,9 @@ The later stages have checked exercises too, written with C and POSIX only, so t
 | `higher_order` | 12: Closures & higher-order functions | map, filter and fold with a `void *` context, C's closures: the context passed on, left-to-right folds, empty arrays |
 | `refcount` | 12: Memory management | reference-counted strings: shared holders, a copy of the text, no use after free, and nothing leaked |
 | `stack_vm` | 12: Interpreters | a bytecode VM: operand order, loops with JZ, 90 million instructions, and programs refused before they run |
+| `softmax` | 13: Softmax & cross-entropy | softmax and cross-entropy for logits of ±1000: subtracting the maximum, the loss from log-sum-exp (800, not infinity), classes counted from 0 |
+| `power_iter` | 13: Eigenvectors | the largest eigenvalue and its eigenvector by power iteration: negative eigenvalues, a start on the wrong eigenvector, slow convergence, a 300 × 300 matrix |
+| `kahan_sum` | 13: Floating point | plain, Kahan and double sums of up to 100 million floats: 0.1 ten million times, absorption above 2²⁴, and the cancellation Kahan cannot save |
 | `safe_join` | 17: Untrusted input | canonicalise, then check: `a/./b//c.txt` is fine, `a/../../etc/passwd` and `/etc/passwd` are refused, and the output buffer is never overrun |
 | `copy_string` | 17: Memory-safe code | an strlcpy of your own: always terminated, never past the buffer, size 0, and the full length returned |
 | `http_request` | 8: HTTP | parsing a request head: header names in any case, trimmed values, bare newlines, a 7,000-byte path, a missing Host, wrong versions, a head that never ends |
@@ -810,7 +813,7 @@ The tests check:
 - **The v1 → v2 migration and stage merging.**
 - **Retention:** the scheduler's intervals grow and reset on a lapse; deck unlocking and due cards; each step of the mastery ladder.
 - **Classic Mode:** every stage has a complete classic corner with HTTPS links; the struggle clock's thresholds and early unlock; notebook and type-in progress survive a save round trip.
-- **Checked exercises:** each check's reference solution passes every case, with gcc and with clang (67 checks, including a real loopback TCP server, forked processes and a write-ahead log the checker reads back). Mastery waits for a concept's check to pass. Typical mistakes fail with the right explanation:
+- **Checked exercises:** each check's reference solution passes every case, with gcc and with clang (70 checks, including a real loopback TCP server, forked processes and a write-ahead log the checker reads back). Mastery waits for a concept's check to pass. Typical mistakes fail with the right explanation:
   - the XOR swap;
   - `9 / 5` in integers;
   - an endless loop;

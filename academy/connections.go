@@ -281,6 +281,12 @@ var conceptLinks = map[string]links{
 		"The Rust Book: the chapter on fearless concurrency."},
 
 	// ---- Stage 13
+	"Vectors, Dot Products & Similarity": {[]string{"Matrices as Linear Maps", "Attention & the Transformer"},
+		"3Blue1Brown's Essence of Linear Algebra: the chapters on vectors and dot products. Mathematics for Machine Learning: the chapter Analytic Geometry."},
+	"Linear Systems, Least Squares & Conditioning": {[]string{"Linear & Logistic Regression", "Eigenvectors & the SVD"},
+		"Gilbert Strang's 18.06 lectures on elimination and least squares. Trefethen & Bau's Numerical Linear Algebra, the lectures on conditioning and stability."},
+	"Floating Point for Numerical Computing": {[]string{"Integers & Floating Point in Bits", "Probability, Softmax & Cross-Entropy"},
+		"David Goldberg's What Every Computer Scientist Should Know About Floating-Point Arithmetic. Nicholas Higham's Accuracy and Stability of Numerical Algorithms, the chapter on summation."},
 	"Matrices as Linear Maps": {[]string{"Attention & the Transformer", "Sets, Functions & Relations"},
 		"3Blue1Brown's Essence of Linear Algebra: the chapters on linear transformations and matrix multiplication."},
 	"Eigenvectors & the SVD": {[]string{"Matrices as Linear Maps", "Trees, Ensembles & Clustering"},
