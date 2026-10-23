@@ -181,6 +181,8 @@ var conceptLinks = map[string]links{
 	// ---- Stage 8
 	"The Layered Stack & Encapsulation": {[]string{"HTTP, DNS & How the Web Works", "Binary & Number Representation"},
 		"High Performance Browser Networking: the Networking 101 chapters on latency, TCP and UDP."},
+	"IP Addressing, Routing & NAT": {[]string{"Binary & Number Representation", "The Layered Stack & Encapsulation", "Network Attacks & Defences"},
+		"Computer Networking: A Top-Down Approach, the network-layer chapters. Cloudflare's Learning Center pages on BGP and NAT."},
 	"TCP: Handshake, Flow & Congestion Control": {[]string{"Sockets & I/O Multiplexing", "TLS & Authentication on the Web"},
 		"High Performance Browser Networking: Building Blocks of TCP. TCP/IP Illustrated for the full detail."},
 	"Sockets & I/O Multiplexing": {[]string{"System Calls & Privilege", "Concurrency Models"},
@@ -189,8 +191,12 @@ var conceptLinks = map[string]links{
 		"Lamport's Time, Clocks, and the Ordering of Events (on your reading list). The MIT 6.5840 lectures."},
 	"Consensus & Replication (Raft)": {[]string{"Write-Ahead Logging & Recovery", "Time, Clocks & Ordering"},
 		"The Raft paper and visualisation at raft.github.io. The MIT 6.5840 Raft labs."},
+	"Partitioning & Consistent Hashing": {[]string{"Hash Tables", "Consensus & Replication (Raft)", "B-Trees"},
+		"DDIA chapter 6 (Partitioning). The Dynamo paper (DeCandia et al., 2007), section 4.2."},
 	"HTTP, DNS & How the Web Works": {[]string{"TLS & Authentication on the Web", "Web Vulnerabilities: Injection & XSS", "The Layered Stack & Encapsulation"},
 		"High Performance Browser Networking: the HTTP chapters. Watch real requests in your browser's developer tools."},
+	"Timeouts, Retries & Idempotency": {[]string{"HTTP, DNS & How the Web Works", "Transactions, Isolation & MVCC", "Consensus & Replication (Raft)"},
+		"Marc Brooker's \"Exponential Backoff And Jitter\" on the AWS Architecture Blog. Stripe's documentation on idempotent requests."},
 
 	// ---- Stage 9
 	"The Command Line & Your Environment": {[]string{"Processes & the Address Space", "System Calls & Privilege"},

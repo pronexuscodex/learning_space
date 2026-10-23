@@ -102,11 +102,14 @@ var conceptPrereqs = map[string][]string{
 
 	// ---- Stage 8
 	"The Layered Stack & Encapsulation":         {"Networks: How Computers Talk"},
+	"IP Addressing, Routing & NAT":              {"The Layered Stack & Encapsulation", "Binary & Number Representation"},
 	"TCP: Handshake, Flow & Congestion Control": {"The Layered Stack & Encapsulation"},
 	"Sockets & I/O Multiplexing":                {"TCP: Handshake, Flow & Congestion Control", "System Calls & Privilege"},
 	"Time, Clocks & Ordering":                   {"The Layered Stack & Encapsulation"},
 	"Consensus & Replication (Raft)":            {"Time, Clocks & Ordering"},
+	"Partitioning & Consistent Hashing":         {"Consensus & Replication (Raft)", "Hash Tables"},
 	"HTTP, DNS & How the Web Works":             {"TCP: Handshake, Flow & Congestion Control"},
+	"Timeouts, Retries & Idempotency":           {"HTTP, DNS & How the Web Works", "Sockets & I/O Multiplexing"},
 
 	// ---- Stage 9
 	"The Command Line & Your Environment": {"The Operating System: The Machine's Manager"},

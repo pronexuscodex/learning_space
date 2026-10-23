@@ -1552,9 +1552,12 @@ tool for finding out which.`,
 	// -----------------------------------------------------------------
 	8: {
 		Overview: `Programs on different machines can only talk through an unreliable
-network with no shared clock. Learn the protocol stack, how to write
-servers that handle thousands of connections, and how replicated systems
-agree on anything at all.`,
+network with no shared clock. Learn the protocol stack byte by byte, how
+packets find their way and get through NAT, how to write servers that
+handle thousands of connections, how to survive timeouts and retries,
+and how replicated, partitioned systems agree on anything at all. The
+measurements come from packets captured on a real Linux machine's
+loopback interface, and from simulations you can rerun.`,
 		Concepts: []Concept{
 			{
 				Name:    "The Layered Stack & Encapsulation",
@@ -1567,13 +1570,108 @@ gives bare datagrams. Applications (HTTP, DNS, your own protocol) sit on
 top.
 
 On the wire, a packet is headers nested like envelopes, each read by
-one layer.`,
+one layer. Every header has a field naming what comes next: Ethernet's
+type field says IPv4, IP's protocol field says TCP, TCP's port says
+which program. That is how one machine's stack hands each packet up to
+the right layer and the right process.`,
 				Diagram: `┌──────────┬────────┬─────────┬────────────────────┬─────┐
 │ Ethernet │  IP    │  TCP    │  HTTP payload      │ FCS │
 │  header  │ header │ header  │                    │     │
 └──────────┴────────┴─────────┴────────────────────┴─────┘`,
+				UnderTheHood: `tcpdump was not installed, so a Python raw socket (AF_PACKET) captured
+the loopback interface while a client connected to a local server. The
+client's first packet, the SYN, byte by byte:
+
+  Ethernet  00 00 00 00 00 00  00 00 00 00 00 00  08 00
+            destination MAC    source MAC         type 0x0800: IPv4
+  IP        45 00 00 3c 75 5a 40 00 40 06 c7 5f
+            7f 00 00 01 7f 00 00 01
+            4: IPv4; 5 × 4 = 20-byte header; length 0x3c = 60;
+            40 00: don't fragment; 40: TTL 64; 06: TCP;
+            from 127.0.0.1 to 127.0.0.1
+  TCP       b3 42 1f a3  3c a4 3f 2e  00 00 00 00  a0 02 ff d7 …
+            port 45890 to 8099; sequence number 1017397038;
+            no ack yet; a0: header 10 × 4 = 40 bytes; 02: SYN
+
+(Loopback has no hardware, so its MAC addresses are zero.) The request
+that followed, "GET / HTTP/1.0" and a blank line, was 18 bytes of data
+in a 70-byte IP packet: 20 bytes of IP header and 32 of TCP header
+carried it.`,
 				MentalModel: "Reliability is built in software, on top of hardware that makes no promises.",
 				TryIt:       "Capture a curl request with tcpdump -X and label every header byte by hand.",
+			},
+			{
+				Name:    "IP Addressing, Routing & NAT",
+				Summary: "How a packet finds a machine among billions, and how your home network shares one public address.",
+				Body: `An IPv4 address is 32 bits, written as four bytes: 192.168.1.10. A
+prefix such as 192.168.1.0/24 names a network: the first 24 bits are the
+network, the last 8 the host, so it holds 256 addresses. The addresses
+10.0.0.0/8, 172.16.0.0/12 and 192.168.0.0/16 are private: reused inside
+countless homes and offices, never routed on the internet.
+
+Every machine and router has a routing table of prefixes, each with
+where to send matching packets: straight out of an interface, or to a
+gateway. A packet goes to the longest prefix that matches its
+destination; the default route, 0.0.0.0/0, matches everything and
+catches the rest. Each router decrements the packet's TTL and drops it
+at 0, so a routing loop cannot circulate forever (traceroute exploits
+exactly this).
+
+NAT (network address translation) lets a whole private network share
+one public address. The router rewrites each outgoing packet's source
+address and port to its own, remembers the mapping, and rewrites the
+replies back. Connections from the inside out work; connections from
+outside in fail, because no mapping exists yet. That is why servers at
+home need port forwarding, and why peer-to-peer apps need tricks such
+as STUN. IPv6 (128-bit addresses) has room for every device, but NAT
+remains everywhere in IPv4.`,
+				Diagram: `routing table                       destination 10.1.2.3
+ prefix          next hop
+ 10.0.0.0/8      router A          ✓ matches, 8 bits
+ 10.1.0.0/16     router B          ✓ matches, 16 bits  ◀ longest wins
+ 192.168.1.0/24  direct, eth0      ✗
+ 0.0.0.0/0       gateway           ✓ matches, 0 bits`,
+				UnderTheHood: `The test machine's routing table, from /proc/net/route:
+
+  Iface  Destination  Gateway   Mask
+  eth0   00000000     010200C0  00000000   default via 192.0.2.1
+  eth0   000200C0     00000000  00FFFFFF   192.0.2.0/24, direct
+
+The kernel prints addresses in hex, least significant byte first:
+010200C0 is C0.00.02.01 reversed, 192.0.2.1. So a packet for any
+address in 192.0.2.0/24 is sent straight onto eth0; everything else
+goes to the gateway 192.0.2.1. /proc/net/fib_trie showed the machine's
+own address, 192.0.2.2, and 127.0.0.1 on the loopback.
+
+The client in the previous lesson's capture used port 45890. The
+kernel picks such ephemeral ports from ip_local_port_range, here 32768
+to 60999: 28,232 ports. That caps the connections from one address to
+one server address and port, and a NAT router shares its ports among
+everyone behind it.`,
+				MentalModel: "Each hop asks one question: which of my prefixes matches this address most specifically?",
+				TryIt:       "Run ip route (or netstat -rn on macOS) and work out, by hand, the route for 8.8.8.8, for your router's address and for 127.0.0.1.",
+				Analogy: `Postal sorting. A letter for "12 Rose Street, Leeds, UK" is sent abroad
+by country, then to a city, then to a street: each sorting office only
+knows its next step, and the most specific rule it has wins. NAT is an
+office building's mailroom: every letter goes out with the building's
+address, and the mailroom remembers who sent what so it can hand the
+replies to the right desk. A stranger who writes to the building with
+no name on the letter gets nowhere.`,
+				Example: `Your laptop at home typically has an address like 192.168.1.23, given by
+your router with DHCP, while the whole house shares one public address.
+Mobile networks put thousands of phones behind a single address
+(carrier-grade NAT, using the 100.64.0.0/10 range). The October 2021
+Facebook outage was routing failing at internet scale: BGP, the
+protocol routers use to announce prefixes to each other, withdrew the
+routes to Facebook's networks.`,
+				Exercises: trio(
+					"How many addresses does 10.20.0.0/14 contain? Is 10.23.255.1 inside it? Is 10.24.0.1?",
+					"2^(32−14) = 262,144. /14 keeps the first 14 bits: 10.20 to 10.23 are inside, so 10.23.255.1 is and 10.24.0.1 is not.",
+					"In C, parse a dotted IPv4 address and a prefix such as 192.168.1.0/24 into 32-bit numbers, and write a function that says whether an address is inside the prefix, using a mask: (addr & mask) == (net & mask).",
+					"The mask of a /n prefix is n one-bits followed by zeros; take care with /0, since shifting a 32-bit value by 32 is undefined in C.",
+					"Run traceroute (tracert on Windows) to three distant websites, and identify where each path leaves your provider's network and roughly which country each hop is in. Explain how traceroute uses the TTL to discover the hops.",
+					"Each probe is sent with TTL 1, 2, 3 …; the router where it reaches 0 replies with an ICMP \"time exceeded\" message, revealing itself.",
+				),
 			},
 			{
 				Name:    "TCP: Handshake, Flow & Congestion Control",
@@ -1587,11 +1685,41 @@ control protects the network: slow start doubles the window every round
 trip, then additive-increase/multiplicative-decrease (Reno, CUBIC) or
 model-based pacing (BBR) takes over. Because everything is one ordered
 stream, a single lost packet stalls all the data behind it (head-of-line
-blocking), which is one reason QUIC exists.`,
+blocking), which is one reason QUIC exists.
+
+Two old optimisations can interact badly. Nagle's algorithm holds back a
+small write while earlier data is still unacknowledged, to avoid
+sending many tiny packets. Delayed ACKs make the receiver wait (up to
+about 40 ms on Linux) before acknowledging, hoping to piggyback the ACK
+on a reply. A client that sends a request in two small writes then
+waits, each side waiting for the other. TCP_NODELAY turns Nagle off.`,
 				Diagram: `client                       server
   │ ── SYN seq=x ────────────▶ │
   │ ◀──── SYN-ACK seq=y ack=x+1│
   │ ── ACK ack=y+1 ──────────▶ │   connection ESTABLISHED`,
+				UnderTheHood: `The captured handshake, on loopback:
+
+  45890 → 8099  SYN      seq=1017397038
+  8099 → 45890  SYN-ACK  seq=2394201815  ack=1017397039
+  45890 → 8099  ACK      seq=1017397039  ack=2394201816
+  45890 → 8099  data     18 bytes
+  8099 → 45890  ACK      ack=1017397057   = 1017397039 + 18
+
+Sequence numbers count bytes: the ACK says "I have everything before
+byte 1017397057". The SYN carried options: MSS 65,495 (the largest
+segment it accepts: 65,535, the most the 16-bit field holds, minus 40
+bytes of IP and TCP headers),
+SACK permitted, timestamps, and window scale 10, so the later window
+field of 64 meant 64 × 2^10 = 65,536 bytes.
+
+Nagle and delayed ACKs, measured: a C client sent each request as two
+10-byte writes, then read a 2-byte reply, 50 times.
+
+  default (Nagle on)   43.07 ms per request
+  TCP_NODELAY           0.07 ms per request
+
+Six hundred times slower, on a loopback with almost no delay: the
+second write waited for an ACK the server was deliberately delaying.`,
 				MentalModel: "TCP is a sliding window that grows until the network pushes back.",
 				TryIt:       "Use tc netem to add 2% loss and 100 ms delay, and measure the throughput of a bulk transfer.",
 			},
@@ -1604,10 +1732,38 @@ Non-blocking sockets plus a readiness API (epoll on Linux, kqueue on BSD)
 let one thread wait on many sockets and service whichever are ready.
 This is the event-loop design.
 
+A socket is a file descriptor (Stage 6): read, write, close and poll
+work on it like on a pipe. The kernel keeps a queue of completed
+handshakes for each listening socket (its size is listen's backlog,
+capped by somaxconn); accept takes the next one. A read that returns 0
+means the other side closed its end; a write to a closed connection
+fails with EPIPE, or raises SIGPIPE.
+
 io_uring goes further: you submit operations into a shared ring buffer
 and later collect completions, which avoids a syscall per operation.
 Go's runtime hides an epoll-based netpoller behind blocking-looking
 goroutines.`,
+				Diagram: `one thread per connection        one event loop
+  thread 1 ── read(c1) blocked     epoll_wait(c1 … c1000)
+  thread 2 ── read(c2) blocked       → c7 and c42 are ready
+  …                                  read(c7), read(c42)
+  thread 1000 ── read(c1000)         back to epoll_wait`,
+				UnderTheHood: `A C program started 1,000 threads, each blocked in read on its own
+socket, and compared its /proc/self/status before and after:
+
+  VmSize   +8,196,264 kB   8 GiB of address space reserved
+  VmRSS        +8,356 kB   about 8 KiB actually used per thread
+
+Each thread reserved an 8 MiB stack (ulimit -s said 8192 kB) but
+touched only a couple of pages of it, so the memory cost is smaller
+than it looks. The real costs are elsewhere: each thread is scheduled,
+and handing work between threads costs a context switch (the pipe
+ping-pong in Stage 6 measured 2.85 to 36 µs each). An epoll loop keeps
+one thread and a small kernel structure per socket.
+
+On loopback, connect plus close took 44 µs; connecting to a port with
+no listener failed in 19 µs: the kernel answered the SYN with a reset,
+and connect returned ECONNREFUSED.`,
 				MentalModel: "Do not wait on one socket; ask the kernel which of all of them are ready.",
 				TryIt:       "Build an echo server with epoll and load it with 10k connections.",
 			},
@@ -1622,7 +1778,35 @@ A happened before B, then clock(A) < clock(B). The converse does not
 hold.
 
 Vector clocks keep one counter per node, and they can tell whether two
-events are causally ordered or truly concurrent.`,
+events are causally ordered or truly concurrent.
+
+Even on one machine there are two clocks. The real-time clock
+(CLOCK_REALTIME, time()) says what time it is, and can jump backwards
+or forwards when it is corrected. The monotonic clock (CLOCK_MONOTONIC)
+only ever moves forward, from an arbitrary start. Measure durations and
+timeouts with the monotonic clock: a timeout computed from wall-clock
+time fires early, or never, when the clock is adjusted.`,
+				Diagram: `node A  ●a1 ──────────────────▶ (msg, L=1)
+                                       ╲
+node B         ●b1 (L=1)                ●b2 (L = max(1, 1) + 1 = 2)
+node C                   ●c1 (L=1)          concurrent with a1, b1, b2`,
+				UnderTheHood: `Timed in C on Linux:
+
+  clock_gettime(CLOCK_MONOTONIC)                21 ns per call
+  the same, forced through syscall()           128 ns per call
+  smallest step between two readings            16 ns
+
+Under strace, a run made 10 million calls through the library and a
+million through syscall(), and strace counted exactly 1,000,000
+clock_gettime system calls. The other 10 million never entered the
+kernel: the vDSO, a page of kernel code mapped into every process,
+reads the CPU's time-stamp counter (the clock source here was "tsc")
+in user mode. That is why programs can afford to read the time
+constantly.
+
+CLOCK_REALTIME read 1,792,710,617 seconds since 1970; CLOCK_MONOTONIC
+read 3,130 seconds: the time since the machine booted, a value with no
+meaning outside it.`,
 				MentalModel: "Causality is carried by messages, not by wall clocks.",
 				TryIt:       "Simulate three nodes exchanging messages and show vector clocks detecting a concurrent write.",
 			},
@@ -1638,9 +1822,102 @@ three parts:
 
 A cluster of 2f+1 nodes survives f failures. During a partition, the
 minority side cannot make progress. That is the CAP trade-off in
-practice.`,
+practice.
+
+"Stores it" means durably: a follower must write the entry to its log
+and fsync it before acknowledging, or a crash and restart could make it
+forget an entry the leader already counted as committed. So a commit
+costs a network round trip to a majority plus an fsync on each.`,
+				Diagram: `client ─▶ leader: append x=5 ─▶ followers (fsync, ack)
+           log: … [7: x=5]
+           acks from 2 of 4 followers + itself = 3 of 5
+           ─▶ entry 7 committed ─▶ apply ─▶ reply to client`,
+				UnderTheHood: `Why randomised election timeouts? A simulation of 100,000 elections in a
+five-node cluster, each node's timeout drawn at random:
+
+  timeouts 150–300 ms   the second node timed out within 10 ms
+                        of the first in 29.2% of elections
+  timeouts 150–151 ms   … in 100% of them
+
+With timeouts spread over 150 ms, the first candidate usually has its
+votes back before anyone else even starts, and wins at once. With
+nearly equal timeouts, several candidates start together, split the
+votes, and the election repeats: the cluster has no leader, and accepts
+no writes, until the timeouts happen to differ.
+
+The fsync measured in Stage 7, about 200 µs on this machine's virtual
+disk, is paid on every node for every commit; batching many client
+requests into one log append is Raft's group commit.`,
 				MentalModel: "A value is decided the moment a majority has written it down.",
 				TryIt:       "Explore raft.github.io's visualisation: kill the leader and watch the election.",
+			},
+			{
+				Name:    "Partitioning & Consistent Hashing",
+				Summary: "Spread data over many machines so that adding one moves only a fair share of it.",
+				Body: `When data or traffic outgrows one machine, it is split into partitions
+(shards), each held by one node (and replicated for safety). Two classic
+ways to choose a key's partition:
+- by range: keys a–f on node 1, g–m on node 2 …: range scans are cheap,
+  but a popular range becomes a hot spot;
+- by hash: node = hash(key) mod N: load spreads evenly, but ranges are
+  scattered, and changing N moves almost every key.
+
+Consistent hashing fixes the resize problem. Nodes and keys are hashed
+onto the same circle of numbers; each key belongs to the first node
+clockwise from it. Adding a node takes over only the keys between it
+and its neighbour: about 1/N of them, the least any scheme can move. To
+even out the arcs, each node is placed at many points (virtual nodes),
+so that it owns many small arcs instead of one large one. Replicas go
+to the next distinct nodes clockwise.
+
+Rebalancing is never free: moving keys copies data over the network
+while the system keeps serving, so designs aim to move as little as
+possible and in the background.`,
+				Diagram: `              node A
+           ·      ●      ·
+       k1 ◆               ◆ k2 ─▶ owned by B (next clockwise)
+      ·                       ·
+  node D ●                     ● node B
+      ·                       ·
+       k4 ◆               ·
+           ·      ●      ◆ k3 ─▶ owned by C
+              node C`,
+				UnderTheHood: `A simulation in Python placed 100,000 keys on 4 nodes, then added a fifth
+(an ideal scheme would move one key in five: 20%):
+
+  scheme             keys moved   keys per node with 5 nodes
+  hash mod N           79.9%      even
+  ring, 1 point        15.6%      7,486 to 38,793
+  ring, 10 points      26.3%      12,777 to 29,368
+  ring, 100 points     21.6%      18,503 to 21,593
+  ring, 1,000 points   20.6%      18,998 to 20,972   (ideal 20,000)
+
+hash mod N moved four keys in five: almost the whole dataset would
+cross the network to add one machine. The ring with one point per node
+moved few keys but left one node with five times the keys of another.
+With a hundred virtual nodes each, the ring moved close to the ideal
+fifth and balanced the load within 10%.`,
+				MentalModel: "Hash keys and nodes onto the same circle; each key walks clockwise to its owner.",
+				TryIt:       "Implement hash mod N and a consistent-hash ring with virtual nodes, place 100,000 keys on 4 nodes, add a fifth, and count how many keys move with each.",
+				Analogy: `Seats around a round table at a wedding, with guests sitting at the
+next free host clockwise. When a new host sits down, only the guests
+between them and the previous host change tables; everyone else stays
+put. Dealing guests to tables by "seat number mod number of tables"
+would send nearly everyone to a new table as soon as one is added.`,
+				Example: `Amazon's Dynamo paper (2007) made consistent hashing with virtual nodes
+famous, and Cassandra and Riak followed it. Content delivery networks
+and caches (memcached client libraries, load balancers such as
+HAProxy's consistent-hash mode) use it so that adding a server does not
+empty every cache at once. Discord, MongoDB and most large databases
+shard their data, by hash or by range, across many machines.`,
+				Exercises: trio(
+					"A cache of 10 servers uses hash(key) mod 10. One server is added. Roughly what fraction of keys now map to a different server? And with consistent hashing?",
+					"With mod N, a key stays only if hash mod 10 = hash mod 11, about 1 in 11: roughly 90% move. With consistent hashing, about 1/11, 9%.",
+					"In C, build a consistent-hash ring: hash each node name with a suffix (\"A#0\" … \"A#99\") onto 32-bit points, sort them, and find a key's owner by binary search for the first point at or after its hash, wrapping around. Measure the load per node and the keys moved when a node joins.",
+					"Use FNV-1a for the hash; sort an array of (point, node) pairs with qsort.",
+					"Design the sharding of a chat service's message history: choose the partition key (user, channel, or time), and explain what happens to a very busy channel, to queries over a channel's history, and to adding servers.",
+					"A hot key needs a further split, for example channel plus time bucket; then a history query reads several partitions in order.",
+				),
 			},
 			{
 				Name:    "HTTP, DNS & How the Web Works",
@@ -1662,6 +1939,30 @@ browser ── TCP + TLS handshake ───────────────
 browser ── GET /index.html ─────────────────────▶ server
 browser ◀── 200 OK + HTML ─────────────────────── server
 browser ── GET /style.css, /app.js, images … ───▶ often a CDN`,
+				UnderTheHood: `curl -v against Python's built-in web server on the same machine:
+
+  > GET /index.html HTTP/1.1
+  > Host: 127.0.0.1:8123
+  > User-Agent: curl/8.5.0
+  > Accept: */*
+  >
+  < HTTP/1.0 200 OK
+  < Server: SimpleHTTP/0.6 Python/3.11.15
+  < Content-type: text/html
+  < Content-Length: 12
+  <                          (Date headers left out)
+  <h1>hi</h1>
+
+The request is plain text: a request line, headers, and an empty line.
+The response's Content-Length (12) tells the client where the body
+ends; this HTTP/1.0 server then closed the connection, where HTTP/1.1
+would keep it open for the next request. curl -w timed it: connected
+after 0.15 ms, first byte after 1.13 ms.
+
+Name resolution is configured in files: getent hosts localhost answered
+127.0.0.1 from /etc/hosts without any network traffic, and
+/etc/resolv.conf named the DNS servers used for everything else
+(8.8.8.8 and 8.8.4.4, with a 2-second timeout and 3 attempts).`,
 				MentalModel: "Name → address → connection → request → response, repeated for every resource on the page.",
 				TryIt:       "Open your browser's developer tools (F12), go to the Network tab, reload a page and count the requests.",
 				Analogy: `Looking up a friend's number in your contacts (DNS), calling them (the
@@ -1680,6 +1981,78 @@ traffic.`,
 					"curl -v https://example.com prints every step.",
 					"Write a tiny HTTP server from raw sockets (no web framework) that serves files from a folder with correct status codes and Content-Type headers, and open it in your browser.",
 					`Read the request line ("GET /path HTTP/1.1"), then send "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n" followed by the file.`,
+				),
+			},
+			{
+				Name:    "Timeouts, Retries & Idempotency",
+				Summary: "Every network call can fail without saying whether it happened, so design for retries.",
+				Body: `A request that times out is ambiguous: it may never have arrived, or
+it may have been carried out and only the reply lost. The caller cannot
+tell which. Three habits follow:
+- put a timeout on every network operation (connect, each read, and an
+  overall deadline), because the defaults wait for minutes or forever;
+- retry only operations that are safe to repeat;
+- make operations safe to repeat: idempotent.
+
+An operation is idempotent if doing it twice has the same effect as
+doing it once. "Set the balance to 50" is; "add 10 to the balance" is
+not. HTTP defines GET, PUT and DELETE as idempotent and POST as not.
+For the rest, the client sends an idempotency key, a unique ID per
+logical request; the server records the keys it has handled and
+returns the stored result for a repeat instead of acting again.
+
+Retries must not make an overload worse. Exponential backoff doubles the
+wait after each failure (up to a cap), and jitter randomises each wait,
+so that clients that failed together do not all retry together. Retry
+budgets and circuit breakers stop retrying altogether when a service is
+clearly down.`,
+				Diagram: `client ── charge £10, key=7f3a ──▶ server: charges, stores result for 7f3a
+client ◀─────── reply lost ───────
+client ── charge £10, key=7f3a ──▶ server: 7f3a seen: returns stored result
+                                     (charged once, not twice)`,
+				UnderTheHood: `A Linux listening socket whose accept queue was full silently dropped
+new SYNs. A raw-socket capture recorded the client's attempts:
+
+  SYN sent at 0, then again at 1.0, 2.1, 3.1, 4.1, 5.1 and 7.1 s
+
+The kernel retransmits the SYN on a timer: since Linux 6.6 the first
+retries are 1 s apart (tcp_syn_linear_timeouts = 4), then the interval
+doubles, for tcp_syn_retries = 6 retries in all. Here the client's own
+8-second timeout ended the wait. On kernels before 6.6 the interval
+doubled from the start (1, 2, 4 … 32 s, then a last 64 s wait), so a
+connect to an unresponsive server took over two minutes to fail.
+
+Why jitter? A simulation of 1,000 clients that all failed at the same
+moment and retried 6 times:
+
+  fixed 1 s between retries        1,000 retries in the busiest 100 ms
+  exponential backoff, no jitter   1,000 in the busiest 100 ms
+  exponential with full jitter       161 in the busiest 100 ms
+
+Backoff alone keeps the clients in lockstep: they all wait 1 s, then 2,
+then 4, and hit the recovering server at the same instants. Only the
+random part (each wait drawn between 0 and the backoff) spreads them out.`,
+				MentalModel: "A timeout tells you nothing about whether the request happened, so make repeating it harmless.",
+				TryIt:       "With curl, fetch a URL from a server that accepts connections but never answers (nc -l 9000), first with no options and then with --max-time 2, and compare what happens.",
+				Analogy: `Ordering by post and hearing nothing back. Did the shop get your letter?
+Send the order again, and you may receive two sofas. Write "order number
+1234: ignore if already received" on it, and the shop can safely act on
+whichever copy arrives first. Backoff with jitter is a crowd leaving a
+stadium through staggered exits instead of all rushing one gate at the
+final whistle.`,
+				Example: `Stripe's API accepts an Idempotency-Key header on every payment request,
+so that a mobile app with a flaky connection can retry without charging
+anyone twice. AWS's SDKs retry with exponential backoff and jitter by
+default, after AWS's own analysis showed that backoff without jitter
+still overloads services. Many large outages were made worse by retry
+storms: clients retrying all at once kept a recovering system down.`,
+				Exercises: trio(
+					"Which are idempotent: \"set the user's email to x\", \"append x to the log\", \"delete order 42\", \"send a welcome email\", \"increment the visit counter\"?",
+					"Setting the email and deleting order 42 are; appending, sending and incrementing are not, unless they carry an idempotency key.",
+					"In C, write a client that connects with a timeout: make the socket non-blocking, call connect, wait with poll for at most 2 seconds, then read SO_ERROR with getsockopt. Test it against a closed port, a listening port, and an address that never answers.",
+					"connect returns -1 with errno EINPROGRESS at once; poll for POLLOUT tells you it finished, and SO_ERROR whether it succeeded.",
+					"Add idempotency keys to a small HTTP API that creates orders: store each key with its response, return the stored response for a repeated key, and test it by sending the same request twice concurrently. What must happen if the second arrives while the first is still in progress?",
+					"Insert the key first, in a transaction, with a unique constraint: the second request then fails to insert and must wait for (or report) the first one's result.",
 				),
 			},
 		},
@@ -1704,6 +2077,14 @@ traffic.`,
 			{"How many Raft nodes do you need to tolerate 2 failures?", "Five (2f+1), so that a majority of 3 remains."},
 			{"Why does epoll scale better than one thread per connection?", "One thread waits on thousands of sockets. There is no per-connection stack memory and no context switch for each idle connection."},
 			{"What does a Lamport clock guarantee, and what does it not?", "If A happened before B, then L(A) < L(B). But L(A) < L(B) does not imply that A happened before B; they may be concurrent."},
+			{"A routing table has 10.0.0.0/8, 10.1.0.0/16 and 0.0.0.0/0. Which route does a packet for 10.1.2.3 take, and one for 8.8.8.8?", "10.1.2.3 matches all three; the longest prefix, 10.1.0.0/16, wins. 8.8.8.8 matches only the default route, 0.0.0.0/0."},
+			{"Why can't a server at home behind NAT be reached from the internet without port forwarding?", "The NAT router only has mappings for connections started from inside. An incoming connection matches no mapping, so the router does not know which machine to send it to."},
+			{"Why can two small writes followed by a read take 40 ms on a TCP connection?", "Nagle's algorithm holds the second write until the first is acknowledged, while the receiver delays its ACK hoping to piggyback it on a reply. TCP_NODELAY disables Nagle."},
+			{"Why measure timeouts with CLOCK_MONOTONIC rather than the time of day?", "The time of day can jump when the clock is corrected, making a timeout fire early or never; the monotonic clock only moves forward."},
+			{"Why are Raft's election timeouts randomised?", "So that one node usually times out well before the others and wins the election alone; equal timeouts make candidates start together and split the vote."},
+			{"Why does hash(key) mod N partitioning move most keys when a node is added, and how does consistent hashing avoid it?", "Changing N changes almost every key's remainder. With consistent hashing, a new node takes over only the keys on the arc before it, about 1/N of them."},
+			{"What is an idempotency key?", "A unique ID the client sends with a request. The server remembers the keys it has handled and returns the stored result for a repeat, so a retried request takes effect only once."},
+			{"Why add jitter to exponential backoff?", "Clients that failed together would otherwise retry together, at the same doubling intervals, hitting the server in synchronized waves. Random waits spread them out."},
 		},
 	},
 

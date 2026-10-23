@@ -152,10 +152,10 @@ var conceptExercises = map[string][]Exercise{
 	"Sockets & I/O Multiplexing": trio(
 		"What do bind, listen, accept and connect each do? Which are used by the server and which by the client?",
 		"Only the client calls connect.",
-		"Write a chat server where several clients connect with nc or telnet and every message is broadcast to everyone, first with one thread per client, then with select or asyncio.",
-		"Keep a list of the connected sockets.",
-		"Load-test your chat server with 1,000 simulated clients, measure memory use and latency for the threaded and event-loop versions, and explain the difference.",
-		"Write the load generator with asyncio so it can open many connections cheaply.",
+		"In C, write a chat server where several clients connect with nc and every message is broadcast to everyone, first with one thread per client (pthreads), then with one thread and poll.",
+		"Keep an array of the connected sockets; with poll, the listening socket is ready when a new connection is waiting for accept.",
+		"Load-test your chat server with 1,000 simulated clients, measure memory use (VmRSS) and latency for the threaded and poll versions, and explain the difference.",
+		"Write the load generator in C with non-blocking sockets and poll too, so that it can open many connections from one thread.",
 	),
 	"Time, Clocks & Ordering": trio(
 		"A sends m1 to B; after receiving it, B sends m2 to C. Meanwhile C performs an event e without talking to anyone. Which pairs of events are causally ordered?",

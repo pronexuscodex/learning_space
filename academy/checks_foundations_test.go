@@ -817,6 +817,150 @@ int main(void) {
     return 0;
 }
 `,
+	"routes": `#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+struct node { int child[2]; int hop; };
+
+static struct node *trie;
+static int nodes, capacity;
+static char (*hops)[64];
+
+static int new_node(void) {
+    if (nodes == capacity) {
+        capacity = capacity ? capacity * 2 : 1024;
+        trie = realloc(trie, (size_t)capacity * sizeof *trie);
+        if (trie == NULL) exit(1);
+    }
+    trie[nodes].child[0] = trie[nodes].child[1] = -1;
+    trie[nodes].hop = -1;
+    return nodes++;
+}
+
+static int parse(const char *s, uint32_t *addr, int *len) {
+    unsigned a, b, c, d;
+    int n = sscanf(s, "%u.%u.%u.%u/%d", &a, &b, &c, &d, len);
+    if (n < 4 || a > 255 || b > 255 || c > 255 || d > 255) return 0;
+    *addr = (uint32_t)a << 24 | (uint32_t)b << 16 | (uint32_t)c << 8 | d;
+    return n;
+}
+
+int main(void) {
+    int n;
+    char line[128], hop[64];
+    if (fgets(line, sizeof line, stdin) == NULL || sscanf(line, "%d", &n) != 1 || n < 0) return 1;
+    hops = malloc(((size_t)n + 1) * sizeof *hops);
+    if (hops == NULL) return 1;
+    new_node();
+    for (int i = 0; i < n; i++) {
+        uint32_t addr;
+        int len;
+        char prefix[64];
+        if (fgets(line, sizeof line, stdin) == NULL || sscanf(line, "%63s %63s", prefix, hop) != 2) return 1;
+        if (parse(prefix, &addr, &len) != 5 || len < 0 || len > 32) return 1;
+        int at = 0;
+        for (int bit = 0; bit < len; bit++) {
+            int b = addr >> (31 - bit) & 1;
+            if (trie[at].child[b] == -1) {
+                int fresh = new_node();
+                trie[at].child[b] = fresh;
+            }
+            at = trie[at].child[b];
+        }
+        strcpy(hops[i], hop);
+        trie[at].hop = i;
+    }
+    while (fgets(line, sizeof line, stdin) != NULL) {
+        uint32_t addr;
+        int len;
+        if (parse(line, &addr, &len) != 4) continue;
+        int at = 0, best = trie[0].hop;
+        for (int bit = 0; bit < 32 && at != -1; bit++) {
+            at = trie[at].child[addr >> (31 - bit) & 1];
+            if (at != -1 && trie[at].hop != -1) best = trie[at].hop;
+        }
+        puts(best == -1 ? "unreachable" : hops[best]);
+    }
+    free(trie);
+    free(hops);
+    return 0;
+}
+`,
+	"retry": `int attempt(void *op);
+long jitter(long max);
+void wait_ms(long ms);
+
+int with_retries(void *op, int max_attempts, long base_ms, long cap_ms) {
+    long d = base_ms < cap_ms ? base_ms : cap_ms;
+    for (int i = 1; i <= max_attempts; i++) {
+        int r = attempt(op);
+        if (r != 1) return r;
+        if (i == max_attempts) break;
+        wait_ms(jitter(d));
+        d = d > cap_ms / 2 ? cap_ms : d * 2;
+    }
+    return 1;
+}
+`,
+	"ring": `#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+
+static uint32_t fnv1a(const char *s) {
+    uint32_t h = 2166136261u;
+    for (; *s; s++) {
+        h ^= (unsigned char)*s;
+        h *= 16777619u;
+    }
+    return h;
+}
+
+struct point { uint32_t hash; int node; };
+
+static int by_hash(const void *x, const void *y) {
+    const struct point *a = x, *b = y;
+    if (a->hash != b->hash) return a->hash < b->hash ? -1 : 1;
+    return a->node - b->node;
+}
+
+int main(void) {
+    int v, n, keys;
+    if (scanf("%d %d", &v, &n) != 2 || v < 1 || n < 1) return 1;
+    char (*names)[64] = malloc((size_t)n * sizeof *names);
+    struct point *pts = malloc((size_t)n * v * sizeof *pts);
+    if (names == NULL || pts == NULL) return 1;
+    int count = 0;
+    for (int i = 0; i < n; i++) {
+        if (scanf("%63s", names[i]) != 1) return 1;
+        for (int j = 0; j < v; j++) {
+            char buf[96];
+            snprintf(buf, sizeof buf, "%s#%d", names[i], j);
+            pts[count].hash = fnv1a(buf);
+            pts[count].node = i;
+            count++;
+        }
+    }
+    qsort(pts, (size_t)count, sizeof *pts, by_hash);
+    if (scanf("%d", &keys) != 1) return 1;
+    char key[64];
+    for (int k = 0; k < keys && scanf("%63s", key) == 1; k++) {
+        uint32_t h = fnv1a(key);
+        int lo = 0, hi = count;
+        while (lo < hi) {
+            int mid = lo + (hi - lo) / 2;
+            if (pts[mid].hash < h) lo = mid + 1;
+            else hi = mid;
+        }
+        if (lo == count) lo = 0;
+        puts(names[pts[lo].node]);
+    }
+    free(names);
+    free(pts);
+    return 0;
+}
+`,
 }
 
 // Each Foundations check fails the typical wrong answer, for the reason
@@ -1062,4 +1206,73 @@ int main(void) {
 	if run := runSource(t, "hash_join", mutate("hash_join", "    return (size_t)(((uint64_t)key * 0x9E3779B97F4A7C15u) >> 46);", "    return (size_t)(long long)(key % BUCKETS);")); run.OK() {
 		t.Error("hash_join: a negative bucket index must not pass")
 	}
+
+	// Only the deepest node reached counts, not the last route passed.
+	failsWith(t, "routes", mutate("routes", "            if (at != -1 && trie[at].hop != -1) best = trie[at].hop;", "            if (at != -1) best = trie[at].hop;"), "the most specific route wins", "")
+	// The first route for a prefix wins instead of the later one.
+	failsWith(t, "routes", mutate("routes", "        trie[at].hop = i;", "        if (trie[at].hop == -1) trie[at].hop = i;"), "the later route wins", "")
+	// Comparing every address with every route.
+	linear := `#include <stdint.h>
+#include <stdio.h>
+
+static uint32_t net[100000], mask[100000];
+static int len[100000];
+static char hop[100000][64];
+
+int main(void) {
+    int n;
+    char line[128], prefix[64];
+    unsigned a, b, c, d;
+    if (fgets(line, sizeof line, stdin) == NULL || sscanf(line, "%d", &n) != 1) return 1;
+    for (int i = 0; i < n; i++) {
+        if (fgets(line, sizeof line, stdin) == NULL || sscanf(line, "%63s %63s", prefix, hop[i]) != 2) return 1;
+        sscanf(prefix, "%u.%u.%u.%u/%d", &a, &b, &c, &d, &len[i]);
+        mask[i] = len[i] == 0 ? 0 : 0xFFFFFFFFu << (32 - len[i]);
+        net[i] = ((uint32_t)a << 24 | (uint32_t)b << 16 | (uint32_t)c << 8 | d) & mask[i];
+    }
+    while (fgets(line, sizeof line, stdin) != NULL) {
+        if (sscanf(line, "%u.%u.%u.%u", &a, &b, &c, &d) != 4) continue;
+        uint32_t addr = (uint32_t)a << 24 | (uint32_t)b << 16 | (uint32_t)c << 8 | d;
+        int best = -1;
+        for (int i = 0; i < n; i++)
+            if ((addr & mask[i]) == net[i] && (best == -1 || len[i] >= len[best])) best = i;
+        puts(best == -1 ? "unreachable" : hop[best]);
+    }
+    return 0;
+}
+`
+	if run := runSource(t, "routes", linear); !run.Built {
+		t.Fatalf("routes: the linear version did not build\n%s", run.BuildLog)
+	} else {
+		for _, c := range run.Cases {
+			if c.Case.Name != "100,000 routes" && !c.Pass {
+				t.Errorf("routes: the linear version should pass %q: %s", c.Case.Name, c.Problem)
+			}
+		}
+	}
+	failsWith(t, "routes", linear, "100,000 routes", "did not finish")
+	// /0 with a 32-bit shift: undefined, and on x86 a mask of all ones.
+	failsWith(t, "routes", strings.Replace(linear, "len[i] == 0 ? 0 : 0xFFFFFFFFu << (32 - len[i])", "0xFFFFFFFFu << (32 - len[i])", 1), "/32 and /0", "")
+
+	// Computing base × 2^(i-1) afresh each time overflows a long.
+	overflow := mutate("retry", "        wait_ms(jitter(d));", "        long e = base_ms * (1L << (i - 1));\n        if (e > cap_ms) e = cap_ms;\n        wait_ms(jitter(e));")
+	if run := runSource(t, "retry", overflow); run.Sanitizers {
+		for _, c := range run.Cases {
+			if c.Case.Name == "seventy attempts" && (c.Pass || !strings.Contains(c.Problem, "UndefinedBehaviorSanitizer")) {
+				t.Errorf("retry: doubling past LONG_MAX must be reported as undefined behaviour: pass=%v problem=%q", c.Pass, c.Problem)
+			}
+		}
+	}
+	// Waiting after the last attempt too.
+	failsWith(t, "retry", mutate("retry", "        if (i == max_attempts) break;\n", ""), "out of attempts", "")
+	// Retrying permanent failures.
+	failsWith(t, "retry", mutate("retry", "        if (r != 1) return r;", "        if (r == 0) return r;"), "a permanent failure is not retried", "")
+	// Backoff without jitter.
+	failsWith(t, "retry", mutate("retry", "        wait_ms(jitter(d));", "        wait_ms(d);"), "two failures, then success", "")
+
+	// No wrap-around past the largest point.
+	failsWith(t, "ring", mutate("ring", "        if (lo == count) lo = 0;\n", ""), "three nodes", "")
+	// A linear scan for each key.
+	failsWith(t, "ring", mutate("ring", "        int lo = 0, hi = count;\n        while (lo < hi) {\n            int mid = lo + (hi - lo) / 2;\n            if (pts[mid].hash < h) lo = mid + 1;\n            else hi = mid;\n        }",
+		"        int lo = 0;\n        while (lo < count && pts[lo].hash < h) lo++;"), "100,000 points", "did not finish")
 }

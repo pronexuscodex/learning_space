@@ -524,6 +524,8 @@ var extras = map[int]stageExtras{
 			"Trace exactly what happens when you open a web page",
 			"Write servers that handle thousands of users at once",
 			"Explain how systems such as Kubernetes stay running when machines fail",
+			"Read a packet's headers byte by byte, and a routing table",
+			"Design retries that are safe, and spread data across machines",
 		},
 		Glossary: []Term{
 			{"Packet", "A small chunk of data sent across a network with an address label on it."},
@@ -538,6 +540,14 @@ var extras = map[int]stageExtras{
 			{"DNS", "Domain Name System: the internet's phone book, turning names like example.com into IP addresses."},
 			{"HTTP", "The request/response protocol browsers and apps use to fetch web pages and data."},
 			{"CDN", "Content Delivery Network: servers around the world that keep copies of content close to users."},
+			{"Prefix (CIDR)", "A block of addresses written as address/length, such as 192.168.1.0/24: the first 24 bits name the network."},
+			{"Routing table", "A machine's list of prefixes and where to send packets for each; the longest matching prefix wins."},
+			{"NAT", "Network Address Translation: a router rewriting private addresses to its own public one, so a whole network shares it."},
+			{"Timeout", "The longest a program waits for an answer before giving up and treating the call as failed."},
+			{"Idempotent", "Safe to repeat: doing it twice has the same effect as doing it once."},
+			{"Exponential backoff", "Waiting twice as long after each failed attempt, usually with random jitter, before retrying."},
+			{"Partition (shard)", "One slice of a dataset that is too big for one machine, held by one node."},
+			{"Consistent hashing", "Placing keys and nodes on a ring of hash values, so that adding a node moves only about 1/N of the keys."},
 		},
 	},
 	13: {

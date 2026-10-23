@@ -3,7 +3,8 @@ package main
 // Checked exercises added when Stages 2 to 8 were deepened: data
 // structures and algorithms (Stage 2), discrete mathematics (Stage 3),
 // computer architecture (Stage 4), computer systems (Stage 5) and
-// operating systems (Stage 6) and storage engines (Stage 7). Most read standard input and are timed on
+// operating systems (Stage 6), storage engines (Stage 7) and networks
+// (Stage 8). Most read standard input and are timed on
 // inputs big enough that only the efficient idea passes.
 
 import (
@@ -755,6 +756,10 @@ int main(int argc, char **argv) {
 		Title: "Keep your names to yourself",
 		Task:  "Write a tick counter: void tick(void) adds one, int ticks(void) returns the count, void reset(void) sets it back to 0. The checker links your file with its own, which already has a global variable named count and a function named total, so every other name in your file must be private to it. No main.",
 		File:  "linkage.c",
+		// Some toolchains (Apple's among them) still merge an uninitialised
+		// global with another file's definition as a "common" symbol, hiding
+		// the clash; -fno-common makes every platform report it, as C requires.
+		Flags: []string{"-fno-common"},
 		Starter: `/* Checked exercise: linkage
  * Write these three functions; no main:
  *   void tick(void);    add one to the counter
@@ -1383,6 +1388,183 @@ done:
 			"Read with scanf(\"%lld %15s\", &key, word); store A's rows in an array, and the hash table as bucket heads plus a next index per row.",
 			"To keep A's order within a bucket, insert A's rows in reverse order at the head of each chain, or keep a tail pointer per bucket.",
 			"Choose more buckets than rows (a power of two, such as 262,144) and mix the key's bits: (uint64_t)key * 0x9E3779B97F4A7C15 >> 46 for 2^18 buckets.",
+		},
+	},
+	{
+		ID: "routes", Stage: 8, Concept: "IP Addressing, Routing & NAT",
+		Title: "Longest-prefix match",
+		Task:  "Route packets. The first line of input is the number of routes; each route is a prefix such as 10.1.0.0/16 and a next-hop name. Every line after the routes is an IPv4 address: print the next hop of the longest prefix that contains it, or unreachable if none does. A prefix's host bits do not matter (10.1.2.3/8 means 10.0.0.0/8), /0 matches every address, and if one prefix appears twice the later route wins. There can be 100,000 routes and 100,000 addresses.",
+		File:  "routes.c",
+		Starter: `/* Checked exercise: routes
+ * Input:   3                   number of routes
+ *          10.0.0.0/8 A
+ *          10.1.0.0/16 B
+ *          0.0.0.0/0 D
+ *          10.1.2.3            addresses, until the end of input
+ *          8.8.8.8
+ * Output:  B                   10.1.0.0/16 is the longest match
+ *          D
+ * An address is 32 bits: (a << 24) | (b << 16) | (c << 8) | d, as a
+ * uint32_t. The mask of a /n prefix is n one-bits, then zeros. Careful:
+ * shifting a 32-bit value by 32 is undefined in C, so /0 needs its own case.
+ * Comparing each address with every route is 10^10 steps for the big case:
+ * use a binary trie (one level per bit), or a hash table per length.
+ */
+#include <stdint.h>
+#include <stdio.h>
+`,
+		Cases: []CheckCase{
+			{Name: "the most specific route wins", Stdin: "4\n10.0.0.0/8 A\n10.1.0.0/16 B\n192.168.1.0/24 C\n0.0.0.0/0 D\n10.1.2.3\n10.200.0.1\n192.168.1.77\n8.8.8.8\n192.168.2.1\n",
+				Want:    "B\nA\nC\nD\nD\n",
+				Explain: "10.1.2.3 matches 10.0.0.0/8, 10.1.0.0/16 and the default; the longest, /16, wins. 192.168.2.1 is outside 192.168.1.0/24."},
+			{Name: "no default route", Stdin: "1\n10.0.0.0/8 A\n11.0.0.1\n10.255.255.255\n", Want: "unreachable\nA\n"},
+			{Name: "/32 and /0", Stdin: "2\n0.0.0.0/0 X\n1.2.3.4/32 Y\n1.2.3.4\n1.2.3.5\n255.255.255.255\n0.0.0.0\n", Want: "Y\nX\nX\nX\n",
+				Explain: "A /0 mask is 0, and a /32 mask is all ones. 0xFFFFFFFFu << 32 is undefined in C, not 0: handle /0 separately."},
+			{Name: "host bits in a prefix", Stdin: "1\n10.1.2.3/8 A\n10.9.9.9\n", Want: "A\n",
+				Explain: "Mask the prefix's address too: 10.1.2.3/8 is the network 10.0.0.0/8."},
+			{Name: "the later route wins", Stdin: "2\n10.0.0.0/8 A\n10.0.0.0/8 B\n10.1.1.1\n", Want: "B\n"},
+			{Name: "100,000 routes", Stdin: routesInput(), Want: routesWant(),
+				Explain: "Comparing every address with every route is ten billion comparisons. A trie finds the longest match in at most 32 steps."},
+		},
+		Timeout: 5 * time.Second,
+		Hints: []string{
+			"Parse with sscanf(line, \"%u.%u.%u.%u/%d\", &a, &b, &c, &d, &len) and check the result is 5 (4 for an address).",
+			"A binary trie: each node has two children and an optional next hop. Insert walks the first len bits from the top bit down; lookup walks the address's bits, remembering the last next hop it passed.",
+			"The mask of /n, for n from 1 to 32: 0xFFFFFFFFu << (32 - n). For n = 0 it is 0.",
+		},
+	},
+	{
+		ID: "retry", Stage: 8, Concept: "Timeouts, Retries & Idempotency",
+		Title: "Retry with backoff and jitter",
+		Task:  "Write int with_retries(void *op, int max_attempts, long base_ms, long cap_ms). It calls attempt(op), which returns 0 for success, 1 for a temporary failure and 2 for a permanent one, up to max_attempts times. Return at once on success (0) or a permanent failure (2); after a temporary failure, if attempts remain, wait jitter(d) milliseconds with wait_ms, where d is base_ms for the first retry and doubles for each one after it, never above cap_ms, then try again. If every attempt failed temporarily, return 1. The checker supplies attempt, jitter and wait_ms, and records every call. No main.",
+		File:  "retry.c",
+		Starter: `/* Checked exercise: retry
+ * Supplied by the checker:
+ *   int  attempt(void *op);    0 success, 1 temporary failure, 2 permanent
+ *   long jitter(long max);     a random wait between 0 and max
+ *   void wait_ms(long ms);     sleep (the checker only records it)
+ * Write:
+ *   int with_retries(void *op, int max_attempts, long base_ms, long cap_ms);
+ * Retry only temporary failures, and never wait after the last attempt.
+ * Waits: jitter(d) with d = base, 2 x base, 4 x base, ... at most cap.
+ * Doubling a long 60 times overflows it: stop doubling once d reaches cap.
+ */
+int attempt(void *op);
+long jitter(long max);
+void wait_ms(long ms);
+`,
+		Harness: `#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+int with_retries(void *op, int max_attempts, long base_ms, long cap_ms);
+
+static const char *script;   /* one letter per attempt: S, T or P; the last repeats */
+static int calls, waits;
+static long last_jitter = -1;
+static int bad_wait;
+
+int attempt(void *op) {
+    (void)op;
+    int n = (int)strlen(script);
+    char c = script[calls < n ? calls : n - 1];
+    if (calls > waits) printf("tried again without waiting\n");
+    calls++;
+    return c == 'S' ? 0 : c == 'P' ? 2 : 1;
+}
+
+long jitter(long max) {
+    printf("jitter(%ld) ", max);
+    last_jitter = max / 3;
+    return last_jitter;
+}
+
+void wait_ms(long ms) {
+    if (ms != last_jitter) bad_wait = 1;
+    printf("wait %ld\n", ms);
+    last_jitter = -1;
+    waits++;
+}
+
+int main(int argc, char **argv) {
+    if (argc < 5) return 2;
+    script = argv[1];
+    int r = with_retries(&calls, atoi(argv[2]), atol(argv[3]), atol(argv[4]));
+    if (bad_wait) printf("wait_ms must be given the value jitter returned\n");
+    if (waits >= calls && calls > 0) printf("waited after the last attempt\n");
+    printf("%d attempts, result %d\n", calls, r);
+    return 0;
+}
+`,
+		Cases: []CheckCase{
+			{Name: "success at once", Args: []string{"S", "5", "100", "10000"}, Want: "1 attempts, result 0\n"},
+			{Name: "two failures, then success", Args: []string{"TTS", "5", "100", "10000"},
+				Want:    "jitter(100) wait 33\njitter(200) wait 66\n3 attempts, result 0\n",
+				Explain: "The first retry waits jitter(base), the next jitter(2 × base). Pass jitter's result to wait_ms."},
+			{Name: "a permanent failure is not retried", Args: []string{"TP", "5", "100", "10000"},
+				Want:    "jitter(100) wait 33\n2 attempts, result 2\n",
+				Explain: "2 means retrying cannot help (a bad request, say): return it at once."},
+			{Name: "out of attempts", Args: []string{"T", "4", "100", "10000"},
+				Want:    "jitter(100) wait 33\njitter(200) wait 66\njitter(400) wait 133\n4 attempts, result 1\n",
+				Explain: "Four attempts need only three waits: there is no point waiting after the last one."},
+			{Name: "the cap", Args: []string{"T", "6", "100", "500"},
+				Want:    "jitter(100) wait 33\njitter(200) wait 66\njitter(400) wait 133\njitter(500) wait 166\njitter(500) wait 166\n6 attempts, result 1\n",
+				Explain: "The doubling stops at cap_ms: 100, 200, 400, then 500 instead of 800."},
+			{Name: "seventy attempts", Args: []string{"T", "70", "1000", "60000"}, Want: retryWant(70, 1000, 60000),
+				Explain: "1000 × 2^63 does not fit in a long: signed overflow is undefined behaviour. Stop doubling once d reaches the cap (if d > cap / 2, d = cap)."},
+			{Name: "one attempt only", Args: []string{"T", "1", "100", "1000"}, Want: "1 attempts, result 1\n"},
+		},
+		Hints: []string{
+			"Loop for i from 1 to max_attempts: r = attempt(op); if r != 1 return r; if i == max_attempts return 1; wait, then double d.",
+			"wait_ms(jitter(d)) passes the random value straight on.",
+			"Double safely: d = (d > cap_ms / 2) ? cap_ms : d * 2;",
+		},
+	},
+	{
+		ID: "ring", Stage: 8, Concept: "Partitioning & Consistent Hashing",
+		Title: "A consistent-hash ring",
+		Task:  "Place keys on a consistent-hash ring. Input: the number of virtual nodes per node, v; the number of nodes and their names; the number of keys and the keys, one per line. Node name N has v points on the ring, the hashes of the strings N#0, N#1 … N#(v-1). A key belongs to the node of the first point whose hash is at least the key's hash, wrapping around to the smallest point if there is none. Print each key's node, in order. The hash is 32-bit FNV-1a, given in the starter; when two points have the same hash, the node listed first wins. There can be 100,000 points and 100,000 keys.",
+		File:  "ring.c",
+		Starter: `/* Checked exercise: ring
+ * Input:   2            virtual nodes per node
+ *          3 A B C      nodes
+ *          2            keys
+ *          user:1
+ *          user:2
+ * Output:  the node of each key, one per line.
+ * Points: fnv1a("A#0"), fnv1a("A#1"), fnv1a("B#0") ... Sort them, then
+ * for each key binary-search for the first point >= fnv1a(key); past the
+ * end, wrap around to the first point. Equal hashes: the node listed
+ * first in the input wins (sort by hash, then by node position).
+ * Names and keys are at most 63 characters.
+ */
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+
+static uint32_t fnv1a(const char *s) {
+    uint32_t h = 2166136261u;
+    for (; *s; s++) {
+        h ^= (unsigned char)*s;
+        h *= 16777619u;
+    }
+    return h;
+}
+`,
+		Cases: []CheckCase{
+			{Name: "three nodes", Stdin: ringInput(1, []string{"A", "B", "C"}, ringKeys(12, "user:")), Want: ringWant(1, []string{"A", "B", "C"}, ringKeys(12, "user:")),
+				Explain: "Hash each key, find the first point at or after it, and wrap to the smallest point when the key's hash is above every point."},
+			{Name: "virtual nodes", Stdin: ringInput(50, []string{"alpha", "beta", "gamma", "delta"}, ringKeys(40, "k")), Want: ringWant(50, []string{"alpha", "beta", "gamma", "delta"}, ringKeys(40, "k")),
+				Explain: "Every node has v points, named node#0 to node#(v-1), with the number in decimal."},
+			{Name: "one node", Stdin: ringInput(3, []string{"solo"}, ringKeys(5, "x")), Want: ringWant(3, []string{"solo"}, ringKeys(5, "x"))},
+			{Name: "100,000 points", Stdin: ringInput(100, ringNodes(1000), ringKeys(100000, "key-")), Want: ringWant(100, ringNodes(1000), ringKeys(100000, "key-")),
+				Explain: "Scanning all 100,000 points for each of 100,000 keys is ten billion steps: sort the points once, then binary-search for each key."},
+		},
+		Timeout: 5 * time.Second,
+		Hints: []string{
+			"Build the point string with snprintf(buf, sizeof buf, \"%s#%d\", name, i).",
+			"Store points as structs { uint32_t hash; int node; } and sort with qsort; break ties on node so the first-listed node comes first.",
+			"Binary search: lo = 0, hi = n; while lo < hi, mid = lo + (hi - lo) / 2, and keep the half that contains the first hash >= h. If lo == n, use point 0.",
 		},
 	},
 }
@@ -2048,6 +2230,182 @@ func hashJoinWant() string {
 		for _, i := range rows[k] {
 			fmt.Fprintf(&sb, "%d a%d b%d\n", k, i, j)
 		}
+	}
+	return sb.String()
+}
+
+// ipString formats a 32-bit IPv4 address.
+func ipString(a uint32) string {
+	return fmt.Sprintf("%d.%d.%d.%d", a>>24, a>>16&255, a>>8&255, a&255)
+}
+
+type route struct {
+	net  uint32
+	bits int
+	hop  string
+}
+
+// routesData is the big routes case: 100,000 random prefixes from /8 to
+// /32, most of them inside a few busy blocks so that they nest, and
+// 100,000 addresses, a third of them inside a route on purpose.
+func routesData() ([]route, []uint32) {
+	r := rand.New(rand.NewPCG(12, 12))
+	var routes []route
+	for i := 0; i < 100000; i++ {
+		bits := 8 + r.IntN(25)
+		addr := r.Uint32()
+		if r.IntN(4) != 0 {
+			addr = 10<<24 | addr&0x00FFFFFF // nested routes inside 10.0.0.0/8
+		}
+		routes = append(routes, route{addr, bits, fmt.Sprintf("r%d", i)})
+	}
+	var addrs []uint32
+	for i := 0; i < 100000; i++ {
+		a := r.Uint32()
+		if i%3 == 0 {
+			rt := routes[r.IntN(len(routes))]
+			m := ^uint32(0) << (32 - rt.bits) // bits is 8 to 32
+			a = rt.net&m | a&^m               // inside rt, at a random host
+		} else if i%3 == 1 {
+			a = 10<<24 | a&0x00FFFFFF
+		}
+		addrs = append(addrs, a)
+	}
+	return routes, addrs
+}
+
+func routesInput() string {
+	routes, addrs := routesData()
+	var sb strings.Builder
+	fmt.Fprintf(&sb, "%d\n", len(routes))
+	for _, rt := range routes {
+		fmt.Fprintf(&sb, "%s/%d %s\n", ipString(rt.net), rt.bits, rt.hop)
+	}
+	for _, a := range addrs {
+		sb.WriteString(ipString(a) + "\n")
+	}
+	return sb.String()
+}
+
+func routesWant() string {
+	routes, addrs := routesData()
+	mask := func(bits int) uint32 {
+		if bits == 0 {
+			return 0
+		}
+		return ^uint32(0) << (32 - bits)
+	}
+	table := make([]map[uint32]string, 33)
+	for i := range table {
+		table[i] = map[uint32]string{}
+	}
+	for _, rt := range routes {
+		table[rt.bits][rt.net&mask(rt.bits)] = rt.hop
+	}
+	var sb strings.Builder
+	for _, a := range addrs {
+		hop := "unreachable"
+		for bits := 32; bits >= 0; bits-- {
+			if h, ok := table[bits][a&mask(bits)]; ok {
+				hop = h
+				break
+			}
+		}
+		sb.WriteString(hop + "\n")
+	}
+	return sb.String()
+}
+
+// retryWant is the retry harness's output when every attempt fails
+// temporarily: waits of jitter(d), where the harness's jitter returns d / 3.
+func retryWant(attempts int, base, limit int64) string {
+	var sb strings.Builder
+	d := base
+	for i := 1; i < attempts; i++ {
+		fmt.Fprintf(&sb, "jitter(%d) wait %d\n", d, d/3)
+		if d > limit/2 {
+			d = limit
+		} else {
+			d *= 2
+		}
+	}
+	fmt.Fprintf(&sb, "%d attempts, result 1\n", attempts)
+	return sb.String()
+}
+
+func fnv1a32(s string) uint32 {
+	h := uint32(2166136261)
+	for i := 0; i < len(s); i++ {
+		h ^= uint32(s[i])
+		h *= 16777619
+	}
+	return h
+}
+
+func ringNodes(n int) []string {
+	var out []string
+	for i := 1; i <= n; i++ {
+		out = append(out, fmt.Sprintf("n%d", i))
+	}
+	return out
+}
+
+func ringKeys(n int, prefix string) []string {
+	var out []string
+	for i := 0; i < n; i++ {
+		out = append(out, fmt.Sprintf("%s%d", prefix, i*7919%1000003))
+	}
+	return out
+}
+
+func ringInput(v int, nodes, keys []string) string {
+	var sb strings.Builder
+	fmt.Fprintf(&sb, "%d\n%d %s\n%d\n", v, len(nodes), strings.Join(nodes, " "), len(keys))
+	for _, k := range keys {
+		sb.WriteString(k + "\n")
+	}
+	return sb.String()
+}
+
+func ringWant(v int, nodes, keys []string) string {
+	type point struct {
+		hash uint32
+		node int
+	}
+	var pts []point
+	for n, name := range nodes {
+		for i := 0; i < v; i++ {
+			pts = append(pts, point{fnv1a32(fmt.Sprintf("%s#%d", name, i)), n})
+		}
+	}
+	slices.SortStableFunc(pts, func(a, b point) int {
+		if a.hash != b.hash {
+			if a.hash < b.hash {
+				return -1
+			}
+			return 1
+		}
+		return a.node - b.node
+	})
+	var sb strings.Builder
+	for _, k := range keys {
+		h := fnv1a32(k)
+		i, _ := slices.BinarySearchFunc(pts, h, func(p point, h uint32) int {
+			if p.hash < h {
+				return -1
+			}
+			if p.hash > h {
+				return 1
+			}
+			return 0
+		})
+		for i > 0 && pts[i-1].hash == h { // the first of equal hashes
+			i--
+		}
+		if i == len(pts) {
+			i = 0
+		}
+		sb.WriteString(nodes[pts[i].node] + "\n")
 	}
 	return sb.String()
 }
