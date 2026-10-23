@@ -133,11 +133,14 @@ var conceptPrereqs = map[string][]string{
 	"Detection & Incident Response":                  {"Thinking Like an Attacker: Threat Modelling"},
 
 	// ---- Stage 11
-	"Finite Automata & Regular Expressions":     {"Sets, Functions & Relations"},
-	"Grammars & Pushdown Automata":              {"Finite Automata & Regular Expressions", "Arrays, Linked Lists, Stacks & Queues"},
-	"Turing Machines & Computability":           {"Grammars & Pushdown Automata"},
-	"The Halting Problem & Undecidability":      {"Turing Machines & Computability", "Proof & Induction"},
-	"Complexity Classes: P, NP & Hard Problems": {"Turing Machines & Computability", "Big-O: Measuring Growth"},
+	"Finite Automata & Regular Expressions":        {"Sets, Functions & Relations"},
+	"NFAs, DFAs & How Regex Engines Work":          {"Finite Automata & Regular Expressions", "Sets, Functions & Relations"},
+	"Grammars & Pushdown Automata":                 {"Finite Automata & Regular Expressions", "Arrays, Linked Lists, Stacks & Queues"},
+	"Turing Machines & Computability":              {"Grammars & Pushdown Automata"},
+	"The Halting Problem & Undecidability":         {"Turing Machines & Computability", "Proof & Induction"},
+	"Complexity Classes: P, NP & Hard Problems":    {"Turing Machines & Computability", "Big-O: Measuring Growth"},
+	"Reductions & NP-Completeness":                 {"Complexity Classes: P, NP & Hard Problems", "Logic & Boolean Algebra"},
+	"Approximation & Heuristics for Hard Problems": {"Complexity Classes: P, NP & Hard Problems", "Greedy Algorithms"},
 
 	// ---- Stage 12
 	"Paradigms: Imperative, Object-Oriented & Functional": {"Functions & Decomposition"},

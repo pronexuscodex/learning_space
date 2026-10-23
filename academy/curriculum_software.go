@@ -1090,12 +1090,19 @@ outgoing traffic.`,
 	11: {
 		Overview: `What can computers do at all, and what can they do efficiently? This
 stage explores the mathematical limits of computation: simple machines
-that recognise patterns, the Turing machine that models every computer,
-problems that no program can ever solve, and the famous P vs NP question.`,
+that recognise patterns and the regex engines built on them, grammars
+and stacks, the Turing machine that models every computer, problems that
+no program can ever solve, the famous P vs NP question, reductions
+between problems, and the heuristics that tame hard problems in
+practice. The theory is measured, too: a regex that takes exponential
+time, a DFA that is 2ⁿ times bigger than its NFA, a 5-state Turing
+machine that runs for 47 million steps, and a Sudoku solved as logic.`,
 		Outcomes: []string{
 			"Use regular expressions and grammars confidently, knowing their limits",
 			"Explain why some problems can never be solved by any program",
 			"Recognise hard (NP-complete) problems and choose practical approaches",
+			"Explain why some regex engines can hang and others cannot",
+			"Turn a puzzle into a SAT problem, and judge a heuristic's answer against the optimum",
 		},
 		Glossary: []Term{
 			{"Automaton", "An abstract machine that reads input and moves between states."},
@@ -1107,6 +1114,11 @@ problems that no program can ever solve, and the famous P vs NP question.`,
 			{"NP", "Problems whose proposed solutions can be checked quickly."},
 			{"NP-complete", "The hardest problems in NP; a fast solution to one would solve them all."},
 			{"Heuristic", "A practical rule of thumb that usually finds good answers, without guarantees."},
+			{"NFA", "A nondeterministic finite automaton: it may have several possible next states, and accepts if any path does."},
+			{"Backtracking", "Trying one choice, and undoing it to try the next when it fails; can take exponential time."},
+			{"Reduction", "Turning instances of one problem into instances of another, so a solver for the second solves the first."},
+			{"SAT", "The satisfiability problem: can the variables of a formula be set so that it is true? The first problem proved NP-complete."},
+			{"Approximation ratio", "How far, at worst, an algorithm's answer can be from the optimum, such as \"at most twice the best\"."},
 		},
 		Concepts: []Concept{
 			{
@@ -1127,6 +1139,22 @@ patterns take exponential time on hostile input.`,
           a            b
  ─▶ (S0) ───▶ (S1) ───▶ ((S2))      S0 on b → S0     S1 on a → S1
                                      S2 on a → S1     S2 on b → S0`,
+				UnderTheHood: `The pattern ^(a+)+$ matches strings of a's. Given a string of n a's
+followed by a b, which cannot match, Python's re module (a backtracking
+engine) tried every way of splitting the a's between the two +'s
+before giving up:
+
+  n = 16    0.004 s
+  n = 18    0.018 s
+  n = 20    0.064 s
+  n = 22    0.200 s
+  n = 24    0.847 s     about 4 times slower for every 2 more a's
+
+At that rate n = 40 would take years. GNU grep -E, which runs the
+pattern as an automaton, answered in 2.7 ms for n = 24, and still 2.7 ms
+for n = 100,000: it reads each character once, keeping track of every
+state the pattern could be in. Same pattern, same answer; the
+difference is the algorithm, and it is the subject of the next lesson.`,
 				MentalModel: "If you only need to remember a fixed amount, a finite automaton (or a regex) can do it.",
 				TryIt:       "Write a regex for UK postcodes or US ZIP+4 codes and test it on regex101.com.",
 				Analogy: `A turnstile is either locked or unlocked. A coin unlocks it, and pushing
@@ -1139,10 +1167,76 @@ by driving its servers' CPUs to 100% (catastrophic backtracking).`,
 				Exercises: trio(
 					"Draw a finite automaton that accepts binary strings containing an even number of 1s.",
 					`Two states are enough: "even so far" and "odd so far".`,
-					`Implement a DFA simulator (states, transitions, accepting states) and run both the "ends in ab" machine and your even-1s machine on 20 test strings.`,
-					"A dictionary from (state, symbol) to the next state.",
-					"Write a log scanner that uses regular expressions to extract timestamps, IP addresses and status codes from a web-server log, and reports the number of errors per hour.",
-					`Named groups such as (?P<ip>\d+\.\d+\.\d+\.\d+) keep the code readable.`,
+					`In C, implement a DFA simulator (a transition table int next[STATES][2], and an array of accepting states) and run both the "ends in ab" machine and your even-1s machine on 20 test strings.`,
+					"The whole simulation is one loop: state = next[state][symbol] for each character.",
+					"Write a log scanner that uses regular expressions to extract timestamps, IP addresses and status codes from a web-server log, and reports the number of errors per hour, with grep -E and awk, or in C with regcomp and regexec from regex.h.",
+					"In regex.h, regexec fills an array of regmatch_t with the start and end of each parenthesised group.",
+				),
+			},
+			{
+				Name:    "NFAs, DFAs & How Regex Engines Work",
+				Summary: "Nondeterminism is free in theory and costs either memory or time in practice; good engines never backtrack.",
+				Body: `A nondeterministic finite automaton (NFA) may have several possible next
+states for a symbol, or none, and may jump without reading anything (an
+ε-move). It accepts if any path through it ends in an accepting state.
+Thompson's construction (1968) turns any regular expression into an NFA
+with at most about two states per symbol of the pattern.
+
+There are two honest ways to run an NFA:
+- simulate it: keep the set of states it could be in, and update the
+  whole set for each input character. Time is O(pattern × text), never
+  more, whatever the input. RE2, Go's regexp, Rust's regex crate and
+  grep work this way.
+- convert it to a DFA with the subset construction: each DFA state is a
+  set of NFA states. Matching is then one table lookup per character,
+  but the DFA can have up to 2ⁿ states for an n-state NFA, so engines
+  build it lazily, only the states the text actually reaches.
+
+Backtracking engines (Perl, Python, Java, JavaScript) instead try one
+path at a time and back up on failure. That supports backreferences
+like (a+)\1, which no automaton can, at the price of exponential worst
+cases.`,
+				Diagram: `regex a(b|c)*  ─Thompson─▶  NFA  ─subset construction─▶  DFA
+                                                 {each DFA state =
+simulate the NFA: a set of states per character   a set of NFA states}
+backtrack:        one path at a time, undo on failure`,
+				UnderTheHood: `The language "the n-th symbol from the end is 1" has an NFA with n + 1
+states: wait in state 0, guess that this 1 is the one, then count n − 1
+more symbols. A short program ran the subset construction on it and
+counted the DFA states it produced:
+
+  n =  1      2 NFA states      2 DFA states
+  n =  3      4                 8
+  n =  5      6                32
+  n = 10     11             1,024
+  n = 16     17            65,536
+
+Exactly 2ⁿ: the DFA must remember the last n symbols, every one of the
+2ⁿ combinations, because any of them could turn out to be the n-th from
+the end. This is not an accident of the construction; it is proven that
+no smaller DFA exists. The NFA simulation stays at 17 states for n = 16,
+and that is why engines simulate, or build only the part of the DFA
+they need.`,
+				MentalModel: "Track every possible state at once, and the input can never make you go back.",
+				TryIt:       "Draw the Thompson NFA for (a|b)*abb, then run the subset construction by hand and count the DFA states you get.",
+				Analogy: `Searching a maze. A backtracking engine sends one explorer, who walks
+down a corridor and, at a dead end, walks all the way back to try the
+next one. An NFA simulation floods the maze with water: every corridor
+fills at once, step by step, and you only watch where the water has
+reached.`,
+				Example: `Google built RE2 so that users could type regular expressions into Code
+Search without being able to hang its servers, and Go's regexp package
+and Rust's regex crate follow its design. Cloudflare's 2019 outage was
+a backtracking regex; after it, the company moved its firewall rules to
+an engine with guaranteed linear time. Lexer generators such as lex
+and flex compile token patterns into DFAs ahead of time.`,
+				Exercises: trio(
+					"How many states does the Thompson NFA for a|b have? And for (a|b)*?",
+					"Each symbol gets two states joined by its edge; | adds a new start and end with ε-moves to both branches (6 states); * adds two more with a loop back (8).",
+					"In C, simulate an NFA for a pattern you build by hand: store the states and their transitions in arrays, keep the current set as a bool array, and update it for each input character, following ε-moves. Run it on the input that makes ^(a+)+$ hang and time it.",
+					"Compute the ε-closure (every state reachable by ε-moves) each time you add a state to the set.",
+					"Write a lazy DFA: start from the NFA, create each DFA state (a set of NFA states) only when the input first reaches it, cache it in a hash table, and count how many of the possible states a real text actually creates.",
+					"Represent a set of NFA states as a bitmask (or a sorted list) so that equal sets hash to the same DFA state.",
 				),
 			},
 			{
@@ -1156,11 +1250,31 @@ remember how many brackets are open. Parsers (Stage 5 builds one) are
 practical pushdown automata.
 
 The Chomsky hierarchy orders these classes of languages from the
-simplest to the most powerful.`,
+simplest to the most powerful.
+
+A recursive-descent parser uses the call stack as its pushdown stack:
+each level of nesting is one more function call. That makes nesting
+depth a real limit, and a hostile input that is nothing but opening
+brackets can crash a parser that does not set one.`,
 				Diagram: `recursively enumerable     ◀ Turing machines
   └ context-sensitive
       └ context-free         ◀ pushdown automata (code, JSON, HTML)
           └ regular          ◀ finite automata, regexes`,
+				UnderTheHood: `How deep can real JSON parsers nest? Each was given n "[" followed by
+n "]":
+
+  Python json    depth 990 ok, depth 1,000: RecursionError
+                 (its recursion limit is 1,000 calls)
+  Go json        depth 10,000 ok, depth 10,001:
+                 "exceeded max depth"
+  Node.js        depth 100,000 ok
+
+Three parsers, three limits, and each one is a pushdown automaton
+running out of stack, or refusing to before it does. Go's limit is a
+deliberate rule against stack exhaustion from hostile input; Python's
+is its general recursion limit. No regular expression could check
+these inputs at all, at any depth, because matching [ to ] needs to
+count, and a finite automaton cannot.`,
 				MentalModel: "Finite memory handles patterns; a stack handles nesting.",
 				TryIt:       `Write a grammar for arithmetic with +, * and parentheses, and derive "2 * (3 + 4)" by hand.`,
 				Analogy: `Russian nesting dolls: to know that every doll is closed again, you must
@@ -1172,8 +1286,8 @@ generate parsers from grammars, for compilers and for code editors.`,
 				Exercises: trio(
 					`Using the rule S → ( S ) S | ε, derive "(()())".`,
 					`ε means "empty". Expand the leftmost S each time.`,
-					"Write a recursive-descent parser and evaluator for: Expr → Term (('+'|'-') Term)*, Term → Factor (('*'|'/') Factor)*, Factor → number | '(' Expr ')'.",
-					"One function per rule, each consuming tokens.",
+					"In C, write a recursive-descent parser and evaluator for: Expr → Term (('+'|'-') Term)*, Term → Factor (('*'|'/') Factor)*, Factor → number | '(' Expr ')'. Give it a depth limit, and test it on 100,000 opening brackets.",
+					"One function per rule, each consuming tokens; pass the depth down and fail cleanly when it passes the limit.",
 					"Write a checker that validates brackets, braces and quotes in a JSON-like config file and reports the line and column of the first error, as editors do when they underline a missing bracket.",
 					"A stack of open symbols, each stored with its position.",
 				),
@@ -1195,6 +1309,28 @@ stored-program computer: programs are just data.`,
                  ▲
                 head        state: q2
 rule:  (q2, reads 1) → write 0, move right, go to state q3`,
+				UnderTheHood: `How long can a tiny Turing machine run before it stops? The "busy
+beaver" question asks, for machines with n states and two symbols,
+started on a blank tape, which halting one runs longest. This
+5-state machine, found by Marxen and Buntrock in 1989:
+
+  A: 0 → 1 R B    1 → 1 L C
+  B: 0 → 1 R C    1 → 1 R B
+  C: 0 → 1 R D    1 → 0 L E
+  D: 0 → 1 L A    1 → 1 L D
+  E: 0 → 1 R halt 1 → 0 L A
+
+was simulated in C, its tape an array:
+
+  halted after 47,176,870 steps, 4,098 ones, 12,289 cells visited
+  0.21 s at gcc -O2; 1.59 s with sanitizers
+
+Ten rules, 47 million steps. In 2024 a collaborative project proved
+with the Coq proof assistant that no 5-state machine that halts runs
+longer: BB(5) = 47,176,870. For 6 states the known champion runs for
+more steps than could be written in decimal with every atom in the
+observable universe, and the general question is undecidable, which is
+the next lesson.`,
 				MentalModel: "Every computer is the same machine in different clothes; only speed and memory differ.",
 				TryIt:       "Run a Turing-machine simulator online and watch a binary-increment machine add 1 to 1011.",
 				Analogy: `A clerk with an endless paper strip, a pencil and a rulebook that says
@@ -1208,7 +1344,7 @@ to be Turing-complete.`,
 				Exercises: trio(
 					"Trace, by hand, a Turing machine that flips every bit (0 ↔ 1) until it reaches a blank, on the input 1010.",
 					"One working state plus a halt state is enough.",
-					"Write a Turing-machine simulator (the tape as a dictionary, the rules as a table) and program it to increment a binary number.",
+					"In C, write a Turing-machine simulator (the tape as an array with the head starting in the middle, the rules as a table rule[state][symbol]) and program it to increment a binary number.",
 					"Move to the rightmost bit, then carry leftwards: 1 → 0 and continue; 0 → 1 and halt; blank → 1 and halt.",
 					`Research one "accidentally Turing-complete" system (PowerPoint, Magic: The Gathering, Minecraft…) and explain in half a page which of its features provide memory and which provide conditional branching, the two ingredients of computation.`,
 					"Look for something that stores state and something that chooses what happens next.",
@@ -1235,6 +1371,27 @@ problem) and complete (never raising a false alarm).`,
         return
 
 trouble(trouble)  →  if it halts, it loops; if it loops, it halts.  Contradiction.`,
+				UnderTheHood: `Undecidability is not only about contrived programs. This loop:
+
+  while (x != 1) x = x % 2 ? 3 * x + 1 : x / 2;
+
+halts for every starting x anyone has ever tried, but nobody can prove
+it halts for all of them: that is the Collatz conjecture, open since
+1937. A C program ran it for every x below 10 million in 3.2 seconds:
+
+  longest:  8,400,511 takes 685 steps to reach 1
+  highest:  starting from 6,631,675, x climbs to 60,342,610,919,632
+
+Testing more numbers can never settle it, and a perfect halting checker
+would. Real tools therefore approximate. gcc -fanalyzer, given a
+function that frees a pointer only when argc > 5 and then uses it:
+
+  warning: use after 'free' of 'p' [CWE-416]
+  warning: dereference of possibly-NULL 'p' [CWE-690]
+
+It reasoned about both paths without running them, and also pointed
+out the unchecked malloc. On other programs it will miss bugs or raise
+false alarms: no tool can avoid both.`,
 				MentalModel: "Programs cannot fully predict programs, so tools must approximate.",
 				TryIt:       "Explain the halting proof to a friend, using only the 'trouble' program above.",
 				Analogy: `"This sentence is false." If it is true, it is false; if it is false, it
@@ -1247,9 +1404,9 @@ trade some precision for usefulness.`,
 				Exercises: trio(
 					`Which can a program decide, and which not in general: "does this file contain the word print?", "does this program ever print anything?", "does this program have more than 100 lines?"`,
 					"Questions about behaviour are undecidable in general; questions about text are easy.",
-					`Write a "loop detector" that runs a function with a time limit and reports "probably infinite". Construct a function it wrongly flags, and explain why no time limit can be right for all programs.`,
+					`Write a "loop detector" in C that runs a function in a child process with a time limit (fork, alarm, waitpid) and reports "probably infinite". Construct a function it wrongly flags, and explain why no time limit can be right for all programs.`,
 					"A long but finite computation beats any fixed limit.",
-					"Run a static analyser on one of your projects (pylint, mypy, go vet or clippy) and classify three of its warnings as a true bug, a false alarm or style. Explain why the tool cannot be perfect.",
+					"Run a static analyser on one of your projects (gcc -fanalyzer or clang --analyze for C, go vet, or clippy) and classify three of its warnings as a true bug, a false alarm or style. Explain why the tool cannot be perfect.",
 					"Undecidability forces a trade-off between missed bugs and false alarms.",
 				),
 			},
@@ -1275,6 +1432,21 @@ hard to solve but are easy to check.`,
 │ └──────────────────────────┘   graph colouring      │
 └─────────────────────────────────────────────────────┘
   if P = NP, the two boxes would be the same`,
+				UnderTheHood: `The travelling-salesperson problem by brute force in C: random cities,
+the first one fixed, every order of the others tried:
+
+  cities   tours          time
+       8        5,040     under 1 ms
+      10      362,880     0.025 s
+      11    3,628,800     0.197 s
+      12   39,916,800     2.27 s
+
+Each extra city multiplies the time by the number of cities: about 17.6
+million tours a second, so 20 cities (19! ≈ 1.2 × 10¹⁷ tours) would
+take around 220 years. Checking a proposed tour, adding up n distances
+and comparing with a target length, takes microseconds at any size.
+That gap, between finding and checking, is exactly the difference
+between P and NP, if they are different.`,
 				MentalModel: "Checking an answer is often easy even when finding it is hard.",
 				TryIt:       "Solve a Sudoku by backtracking and count how many positions the search tries.",
 				Analogy: `Finding a four-digit lock combination by trying every option is slow;
@@ -1288,10 +1460,141 @@ crew scheduling and chip layout rely on solvers for NP-hard problems.`,
 				Exercises: trio(
 					"For a Sudoku, explain why checking a filled grid is fast, while solving a blank one may require trying many possibilities.",
 					"Checking means looking at each row, column and box once.",
-					"Solve the travelling-salesperson problem for 8 cities by brute force (all permutations) and with the nearest-neighbour heuristic. Compare route lengths and running times, then try 11 cities.",
+					"In C, solve the travelling-salesperson problem for 8 cities by brute force (all permutations) and with the nearest-neighbour heuristic. Compare route lengths and running times, then try 11 and 12 cities.",
 					"With the start fixed, 11 cities give 10! = 3,628,800 routes.",
 					"Plan a delivery route through 15 real addresses in your town (approximate coordinates are fine). Implement nearest-neighbour plus 2-opt improvement, and compare it with the order you would intuitively drive.",
 					"2-opt repeatedly reverses a segment of the route whenever that makes the route shorter.",
+				),
+			},
+			{
+				Name:    "Reductions & NP-Completeness",
+				Summary: "Solve a new problem by translating it into one you already have a solver for.",
+				Body: `A reduction turns any instance of problem A into an instance of problem
+B, quickly, so that the answers agree. Then a solver for B also solves
+A, and B is at least as hard as A. Reductions are how hardness is
+proved and how hard problems are solved in practice.
+
+In 1971 Stephen Cook (and independently Leonid Levin) proved that every
+problem in NP reduces to SAT, the question of whether a Boolean formula
+can be made true. SAT was the first NP-complete problem; since then
+thousands more have been shown NP-complete by reducing a known one to
+them: 3-SAT, graph colouring, clique, Hamiltonian cycle, subset sum,
+Sudoku of any size.
+
+The practical side is just as important. SAT solvers based on DPLL and
+its modern descendant, conflict-driven clause learning (CDCL), solve
+real formulas with millions of variables. So translating a scheduling,
+verification or puzzle problem into SAT is often the fastest way to
+solve it, even though the worst case is exponential.`,
+				Diagram: `Sudoku grid ──encode──▶ SAT formula ──solver──▶ true/false assignment
+                 │                                          │
+ variable x(r,c,d) = "cell (r,c) holds digit d"     decode ──▶ filled grid
+ each cell holds one digit; each row, column and box holds each digit once`,
+				UnderTheHood: `A Sudoku becomes SAT with one variable per (row, column, digit): 729
+variables. The rules become clauses:
+
+  every cell holds at least one digit            81 clauses
+  … and at most one (no two digits together)  2,916
+  every row, column and box has each digit       243
+  … and at most once                           8,748
+  total                                       11,988, plus one per given
+
+A short DPLL solver in Python (unit propagation, then branch on a
+literal from the shortest clause) took the puzzle Arto Inkala published
+in 2012 as "the world's hardest Sudoku", 21 givens:
+
+  solved in 3.1 s: 863 decisions, 30,771 unit propagations
+  812753649 943682175 675491283 154237896 369845721 …
+
+the published solution. The 60 empty cells allow 9⁶⁰ ≈ 1.8 × 10⁵⁷ grids
+to brute-force; unit propagation, which fills in every forced value
+for free, cut the search to 863 choices.`,
+				MentalModel: "If you can translate it into SAT, a SAT solver can probably solve it.",
+				TryIt:       "Write the clauses that say \"exactly one of x1, x2, x3 is true\" in CNF, and check them against all 8 assignments.",
+				Analogy: `Translating a letter into a language that has an excellent translator,
+rather than learning to write that letter yourself. The reduction is
+the translation; the SAT solver is the expert. Proving hardness works
+the same way in reverse: if your new problem can be used to answer a
+problem everyone already knows is hard, yours is hard too.`,
+				Example: `Hardware companies verify chip designs by reducing "can this circuit
+ever reach a bad state?" to SAT. Linux package managers such as
+openSUSE's zypper (libsolv) and Fedora's dnf solve package
+dependencies as SAT problems. In 2016 a SAT solver settled the Boolean
+Pythagorean triples problem, open for decades, with a proof 200
+terabytes long.`,
+				Exercises: trio(
+					"Encode \"A and B cannot both be on duty, and at least one of A, B, C must be\" as clauses in conjunctive normal form.",
+					"(¬A ∨ ¬B) ∧ (A ∨ B ∨ C).",
+					"In C, write a DPLL SAT solver that reads a formula in the DIMACS CNF format, with unit propagation and backtracking, and test it on small satisfiable and unsatisfiable formulas, then on a Sudoku you encode yourself.",
+					"Keep the assignment in an array indexed by variable, and undo the assignments of a branch when it fails.",
+					"Reduce a real scheduling problem you care about (exam timetables, a sports league, shifts at work) to SAT: choose the variables, write the constraints as clauses, solve it with your solver or a free one such as MiniSat or CaDiCaL, and decode the answer.",
+					"\"At most one of n\" takes n(n−1)/2 pairwise clauses; for large n, look up the sequential-counter encoding.",
+				),
+			},
+			{
+				Name:    "Approximation & Heuristics for Hard Problems",
+				Summary: "When the exact answer costs centuries, take a provably close one, or a usually excellent one, in milliseconds.",
+				Body: `For NP-hard optimisation problems, three practical strategies:
+- approximation algorithms, with a guarantee: the answer is never worse
+  than some factor of the optimum. Picking both ends of any uncovered
+  edge gives a vertex cover at most twice the smallest; Christofides'
+  algorithm gives a metric TSP tour at most 1.5 times the shortest.
+- heuristics and local search, with no guarantee but often excellent
+  results: start from a reasonable answer (nearest neighbour for TSP)
+  and keep making small improvements (2-opt: reverse a segment if that
+  shortens the tour) until none helps.
+- exact solvers that are fast in practice: branch and bound,
+  integer-programming and SAT solvers, which prune most of the search
+  on real inputs.
+
+Some problems resist all three: for some, even approximating within any
+constant factor is NP-hard. And when a problem must be solved exactly,
+problem size is the lever: an exponential algorithm is fine for 20
+items and hopeless for 60.`,
+				Diagram: `cost                                        exact search
+  ▲                                       ╱
+  │                                    ╱
+  │                              ╱ ─ ─ ─ ─ ─   heuristic: fast, good,
+  │                   ╱ ─ ─ ─ ─                no guarantee
+  │        ╱ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─   approximation: fast,
+  └───────────────────────────────────────▶      within a factor
+                                     problem size`,
+				UnderTheHood: `The same random 11-city instances solved exactly (3,628,800 tours each)
+and with two heuristics, six layouts:
+
+  nearest neighbour        +0.0% to +17.6% above the optimum
+  nearest neighbour, 2-opt +0.0% to +1.0%, optimal in 5 of 6
+
+Nearest neighbour alone was once 17.6% too long; 2-opt then fixed
+almost all of it. On 1,000 cities, where no exact answer is known:
+
+  nearest neighbour   289,951
+  after 2-opt         251,417   13.3% shorter, 7 passes, 0.145 s
+
+A brute-force search of 1,000 cities would need 999! tours, a number
+with 2,565 digits. A heuristic answer in a seventh of a second, close
+to optimal on every case that could be checked, is why routing,
+scheduling and chip design are solved problems in practice and open
+problems in theory.`,
+				MentalModel: "Good enough, fast, and with a known bound beats perfect and never.",
+				TryIt:       "Draw five points on paper, find the shortest tour by trying them all, then run nearest neighbour from each starting point and compare.",
+				Analogy: `Packing a car boot. Nobody computes the optimal arrangement of every
+bag; you put the big ones in first, then fill the gaps, then swap two
+bags if that makes room. You end up close to the best packing in a
+minute instead of the perfect one next year.`,
+				Example: `UPS's ORION routes its drivers with heuristics, not exact optimisation,
+and airlines plan crews with integer programming solvers that are
+exponential in the worst case but fast on their data. The Concorde TSP
+solver has found exact optimal tours for instances with 85,900 cities,
+using branch and cut, while 2-opt and Lin–Kernighan heuristics get
+within a few percent in seconds.`,
+				Exercises: trio(
+					"The greedy vertex cover takes any edge with neither end covered and adds both ends. Why is the result at most twice the size of the smallest cover?",
+					"The chosen edges share no vertices, and any cover must contain at least one end of each of them; greedy takes two.",
+					"In C, implement nearest neighbour and 2-opt for TSP, and compare both with the exact answer from brute force on 50 random instances of 10 cities: report the average and the worst ratio.",
+					"Fix the random seed for each instance so that both methods see the same cities.",
+					"Take a real knapsack-style decision (packing for a trip by weight and value, or a budget across projects), solve it exactly with dynamic programming, and compare with the greedy \"best value per kilogram first\" heuristic. Find an instance where greedy is far from the optimum.",
+					"Greedy fails when one heavy, valuable item would fit only if a few lighter ones were left out.",
 				),
 			},
 		},
@@ -1314,6 +1617,15 @@ crew scheduling and chip layout rely on solvers for NP-hard problems.`,
 			{"What does the halting problem say?", "No program can correctly decide, for every program and input, whether it halts."},
 			{"What makes a problem NP-complete?", "It is in NP (solutions can be checked quickly), and every NP problem reduces to it."},
 			{"What do we do in practice with NP-hard problems?", "Use heuristics, approximation algorithms, or solvers that work well on real inputs."},
+			{"Why can ^(a+)+$ take exponential time in Python but not in grep?", "Python's engine backtracks through every way of splitting the a's between the two +'s; grep runs the pattern as an automaton, tracking all possible states at once, one pass over the text."},
+			{"Why can converting an NFA to a DFA blow up, and how do engines avoid it?", "Each DFA state is a set of NFA states, and there can be 2ⁿ sets. Engines simulate the NFA directly, or build only the DFA states the text reaches."},
+			{"What can a backtracking regex engine do that an automaton cannot?", "Backreferences such as (a+)\\1, which need to remember an unbounded amount of text."},
+			{"Why does a recursive-descent parser need a nesting limit?", "Each level of nesting is a function call; an input of nothing but opening brackets would exhaust the stack and crash it."},
+			{"What is BB(5), and why can't BB(n) be computed in general?", "47,176,870: the most steps any halting 5-state, 2-symbol Turing machine takes from a blank tape. Computing it in general would solve the halting problem."},
+			{"What does it mean to reduce problem A to problem B?", "Translate every instance of A, quickly, into an instance of B with the same answer, so a solver for B solves A, and B is at least as hard as A."},
+			{"Why was SAT the first NP-complete problem?", "The Cook–Levin theorem (1971) showed that any problem in NP can be translated into a Boolean formula that is satisfiable exactly when the answer is yes."},
+			{"What does unit propagation do in a SAT solver?", "When a clause has only one unassigned literal left and the rest are false, that literal must be true: it is set at once, often triggering more forced values."},
+			{"What is the difference between an approximation algorithm and a heuristic?", "An approximation algorithm guarantees its answer is within a proven factor of the optimum; a heuristic usually does well but promises nothing."},
 		},
 	},
 

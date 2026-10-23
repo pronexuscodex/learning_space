@@ -7,6 +7,7 @@ import (
 	"crypto/sha1"
 	"fmt"
 	"math/rand/v2"
+	"regexp"
 	"strings"
 	"time"
 )
@@ -171,6 +172,126 @@ int main(int argc, char **argv) {
 			"good and bad themselves are known: testing them wastes a test, and the checker counts it as outside the range.",
 		},
 	},
+	{
+		ID: "nfa_match", Stage: 11, Concept: "NFAs, DFAs & How Regex Engines Work",
+		Title: "A regex engine that never backtracks",
+		Task:  "./nfa_match PATTERN reads lines from standard input and prints match or no for each, depending on whether the whole line matches PATTERN. Patterns use letters, digits and other printable characters as literals, . for any character, postfix *, + and ?, | for alternation (lowest precedence) and parentheses for grouping. Run the pattern as an NFA, keeping the set of states it could be in, so that no pattern and no input takes exponential time: lines can be 100,000 characters long. An invalid pattern (an unmatched parenthesis, or *, + or ? with nothing before it) gets a message on standard error and exit status 2.",
+		File:  "nfa_match.c",
+		Starter: `/* Checked exercise: nfa_match
+ * ./nfa_match 'ab*c'  <  lines   prints match / no for each line.
+ * The whole line must match, as if the pattern were ^(PATTERN)$.
+ * One way, after Thompson (1968) and Russ Cox's "Regular Expression
+ * Matching Can Be Simple And Fast":
+ *   1. Rewrite the pattern in postfix with explicit concatenation:
+ *      a(b|c)*d  ->  a b c | * . d .
+ *   2. Build an NFA from the postfix with a stack of fragments: each
+ *      operator pops one or two fragments and pushes a new one.
+ *   3. Simulate: a list of current states; for each input character,
+ *      the list of next states (follow split states at once). Use a
+ *      "last seen" mark per state so each state is added once per step.
+ * The line matches if the match state is in the list at the end.
+ */
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+`,
+		Cases: []CheckCase{
+			{Name: "stars", Args: []string{"ab*c"}, Stdin: "ac\nabc\nabbbbc\nabd\n\nxabc\n", Want: "match\nmatch\nmatch\nno\nno\nno\n",
+				Explain: "The whole line must match: \"xabc\" contains abc but does not match ab*c from its first character."},
+			{Name: "alternation and grouping", Args: []string{"(cat|dog)s?"}, Stdin: "cat\ndogs\ncats\ncow\ncatdog\n", Want: "match\nmatch\nmatch\nno\nno\n"},
+			{Name: "precedence", Args: []string{"ab|cd"}, Stdin: "ab\ncd\nabd\nacd\n", Want: "match\nmatch\nno\nno\n",
+				Explain: "| binds loosest: ab|cd is (ab)|(cd), not a(b|c)d."},
+			{Name: "plus, question mark and dot", Args: []string{"(ab)+.?"}, Stdin: "\nab\nababX\naba\nabXY\n", Want: "no\nmatch\nmatch\nmatch\nno\n"},
+			{Name: "nested repetition", Gen: generated(func() (string, string) { return nfaMatchCase("(a+)+b", 30) }), Args: []string{"(a+)+b"},
+				Explain: "A backtracking matcher tries every way to split the a's between the two +'s: 2³⁰ tries. Tracking the set of possible states reads each character once."},
+			{Name: "long lines", Gen: generated(func() (string, string) { return nfaMatchCase("(a|b)*a(a|b)(a|b)(a|b)", 100000) }), Args: []string{"(a|b)*a(a|b)(a|b)(a|b)"}},
+			{Name: "an unmatched parenthesis", Args: []string{"(ab"}, Stdin: "ab\n", WantExit: 2, Stderr: true},
+			{Name: "a star with nothing before it", Args: []string{"*a"}, Stdin: "a\n", WantExit: 2, Stderr: true},
+		},
+		Timeout: 5 * time.Second,
+		Hints: []string{
+			"In the postfix conversion, track for each open parenthesis how many atoms and alternatives you have seen; an operator with zero atoms before it is an error.",
+			"An NFA state: a character to match (or ANY, SPLIT or MATCH) and one or two out-pointers. A fragment is a start state plus the list of dangling out-pointers to patch.",
+			"Adding a state to a list: if it is a SPLIT, add both of its outs instead (recursively); skip a state already added in this step.",
+		},
+	},
+	{
+		ID: "turing", Stage: 11, Concept: "Turing Machines & Computability",
+		Title: "Run a Turing machine",
+		Task:  "./turing LIMIT reads a two-symbol Turing machine from standard input, one rule per line: STATE READ WRITE MOVE NEXT, such as A 0 1 R B (MOVE is L or R; the state named H means halt). Start in the state of the first rule, on a blank tape of 0s. Run until the machine halts or LIMIT steps have been taken, then print halted after N steps, K ones, or still running after LIMIT steps. Moving into H counts as a step. The head stays within 100,000 cells of where it started; LIMIT can be 100 million.",
+		File:  "turing.c",
+		Starter: `/* Checked exercise: turing
+ * ./turing 1000  <  machine
+ *   A 0 1 R B        in state A reading 0: write 1, move right, go to B
+ *   A 1 1 L B
+ *   B 0 1 L A
+ *   B 1 1 R H        H: halt
+ * prints:  halted after 6 steps, 4 ones
+ * A table rule[state][symbol] with the write, the move and the next
+ * state; states are single letters. The tape: an array of 200,001
+ * cells with the head starting in the middle.
+ * LIMIT can be 100,000,000: keep the inner loop simple.
+ */
+#include <stdio.h>
+#include <stdlib.h>
+`,
+		Cases: []CheckCase{
+			{Name: "the two-state busy beaver", Args: []string{"1000"}, Stdin: "A 0 1 R B\nA 1 1 L B\nB 0 1 L A\nB 1 1 R H\n", Want: turingWant("A 0 1 R B\nA 1 1 L B\nB 0 1 L A\nB 1 1 R H\n", 1000),
+				Explain: "The move into H is the last step: 6 steps in all, leaving four 1s on the tape."},
+			{Name: "the three-state busy beaver", Args: []string{"1000"}, Stdin: turingBB3, Want: turingWant(turingBB3, 1000)},
+			{Name: "the four-state busy beaver", Args: []string{"1000"}, Stdin: turingBB4, Want: turingWant(turingBB4, 1000),
+				Explain: "A rule may write 0 over a 1: count the 1s left on the tape at the end, not the times a 1 was written."},
+			{Name: "a machine that never halts", Args: []string{"1000"}, Stdin: "A 0 1 R A\nA 1 1 R A\n", Want: "still running after 1000 steps\n",
+				Explain: "Stop after LIMIT steps: some machines run forever, and no program can tell in general which ones."},
+			{Name: "a limit hit exactly", Args: []string{"5"}, Stdin: "A 0 1 R B\nA 1 1 L B\nB 0 1 L A\nB 1 1 R H\n", Want: "still running after 5 steps\n"},
+			{Name: "the five-state champion", Args: []string{"100000000"}, Stdin: turingBB5, Want: "halted after 47176870 steps, 4098 ones\n",
+				Explain: "47 million steps: an inner loop that looks rules up by searching the list, or that resizes the tape on every step, runs out of time."},
+		},
+		Timeout: 10 * time.Second,
+		Hints: []string{
+			"Map the state letter to an index (c - 'A'), and H to a special value; store rule[state][symbol] as three small numbers.",
+			"Count the steps in a long: the four-state machine is small, but limits can exceed 2³¹ for other machines.",
+			"Count the ones at the end by scanning the tape once.",
+		},
+	},
+	{
+		ID: "dpll", Stage: 11, Concept: "Reductions & NP-Completeness",
+		Title: "A SAT solver",
+		Task:  "Read a formula in DIMACS CNF from standard input (comment lines start with c; the header p cnf VARIABLES CLAUSES; then each clause as non-zero integers, a negative one meaning NOT, ending with 0) and decide whether it can be satisfied. Print UNSAT, or SAT followed by a line listing the variables that are true, in increasing order, separated by spaces (an empty line if none). Every satisfiable formula in the tests has exactly one solution. One formula is a Sudoku with 729 variables: trying all assignments is hopeless, so use DPLL with unit propagation.",
+		File:  "dpll.c",
+		Starter: `/* Checked exercise: dpll
+ * DPLL(formula, assignment):
+ *   repeat unit propagation: a clause with every literal false but one
+ *     unassigned literal forces that literal true; a clause with every
+ *     literal false is a conflict: return UNSAT for this branch
+ *   if every clause has a true literal, return SAT
+ *   pick an unassigned variable v; try v = true, then v = false
+ *   (undo the assignments made in a branch when it fails)
+ * Literal l is true when value[abs(l)] == (l > 0).
+ */
+#include <stdio.h>
+#include <stdlib.h>
+`,
+		Cases: []CheckCase{
+			{Name: "a chain of implications", Stdin: "c x1, x1 -> x2, not both x2 and x3\np cnf 3 3\n1 0\n-1 2 0\n-2 -3 0\n", Want: "SAT\n1 2\n",
+				Explain: "Unit propagation alone solves this: x1 is forced, then x2, and then x3 must be false."},
+			{Name: "a contradiction", Stdin: "p cnf 1 2\n1 0\n-1 0\n", Want: "UNSAT\n"},
+			{Name: "nothing true", Stdin: "p cnf 2 2\n-1 0\n-2 0\n", Want: "SAT\n\n"},
+			{Name: "clauses over several lines", Stdin: "p cnf 3 4\n-1\n0 2 3\n0 -3 -2 0\n2\n0\n", Want: "SAT\n2\n",
+				Explain: "A clause ends at its 0, not at the end of the line: read numbers, not lines."},
+			{Name: "four pigeons, three holes", Stdin: pigeonholeCNF(4, 3), Want: "UNSAT\n",
+				Explain: "No assignment works, so the search must try every branch and backtrack correctly out of each one."},
+			{Name: "the hardest Sudoku", Gen: generated(func() (string, string) { return sudokuCNF(sudokuInkala) }),
+				Explain: "2⁷²⁹ assignments cannot be tried one by one. Unit propagation fills in every forced cell; the search then needs only hundreds of decisions."},
+			{Name: "six pigeons, five holes", Stdin: pigeonholeCNF(6, 5), Want: "UNSAT\n"},
+		},
+		Timeout: 10 * time.Second,
+		Hints: []string{
+			"Store the clauses in one array of literals with a start index per clause; scan them all in each propagation round (simple, and fast enough here).",
+			"Keep a trail: every variable you assign, in order. To undo a branch, unassign everything after the trail position where it began.",
+			"Branch on a variable from the shortest clause that is not yet satisfied: it is the most constrained choice.",
+		},
+	},
 }
 
 // gitBlobID is the ID git hash-object gives a file with this content.
@@ -240,4 +361,190 @@ func makeOrderWant() string {
 	}
 	visit("all")
 	return sb.String()
+}
+
+// nfaMatchCase builds lines for a pattern: strings of a's of growing
+// length, some with a final b, and the matches Go's RE2 engine finds.
+func nfaMatchCase(pattern string, n int) (stdin, want string) {
+	re := regexp.MustCompile("^(?:" + pattern + ")$")
+	var in, out strings.Builder
+	r := rand.New(rand.NewPCG(14, 14))
+	for _, k := range []int{n, n - 1, n / 2, 1, n} {
+		line := strings.Repeat("a", k)
+		if k != n && r.IntN(2) == 0 { // the first line of n a's never matches (a+)+b
+			line += "b"
+		}
+		if pattern != "(a+)+b" { // mix in b's for the long-line pattern
+			b := []byte(line)
+			for i := range b {
+				if r.IntN(3) == 0 {
+					b[i] = 'b'
+				}
+			}
+			line = string(b)
+		}
+		in.WriteString(line + "\n")
+		if re.MatchString(line) {
+			out.WriteString("match\n")
+		} else {
+			out.WriteString("no\n")
+		}
+	}
+	return in.String(), out.String()
+}
+
+const (
+	turingBB3 = "A 0 1 R B\nA 1 1 R H\nB 0 0 R C\nB 1 1 R B\nC 0 1 L C\nC 1 1 L A\n"
+	turingBB4 = "A 0 1 R B\nA 1 1 L B\nB 0 1 L A\nB 1 0 L C\nC 0 1 R H\nC 1 1 L D\nD 0 1 R D\nD 1 0 R A\n"
+	turingBB5 = "A 0 1 R B\nA 1 1 L C\nB 0 1 R C\nB 1 1 R B\nC 0 1 R D\nC 1 0 L E\nD 0 1 L A\nD 1 1 L D\nE 0 1 R H\nE 1 0 L A\n"
+)
+
+// turingWant runs a machine in the turing check's format.
+func turingWant(machine string, limit int) string {
+	type rule struct {
+		write, move int
+		next        byte
+	}
+	rules := map[[2]byte]rule{}
+	var start byte
+	for _, line := range strings.Split(strings.TrimSpace(machine), "\n") {
+		f := strings.Fields(line)
+		if start == 0 {
+			start = f[0][0]
+		}
+		move := 1
+		if f[3] == "L" {
+			move = -1
+		}
+		rules[[2]byte{f[0][0], f[1][0]}] = rule{int(f[2][0] - '0'), move, f[4][0]}
+	}
+	tape := map[int]int{}
+	pos, state := 0, start
+	for steps := 1; steps <= limit; steps++ {
+		r := rules[[2]byte{state, byte('0' + tape[pos])}]
+		tape[pos] = r.write
+		pos += r.move
+		state = r.next
+		if state == 'H' {
+			ones := 0
+			for _, v := range tape {
+				ones += v
+			}
+			return fmt.Sprintf("halted after %d steps, %d ones\n", steps, ones)
+		}
+	}
+	return fmt.Sprintf("still running after %d steps\n", limit)
+}
+
+// pigeonholeCNF says that p pigeons sit in h holes, each in at least one
+// hole and no two in the same one: unsatisfiable when p > h.
+func pigeonholeCNF(p, h int) string {
+	v := func(i, j int) int { return i*h + j + 1 }
+	var cl []string
+	for i := 0; i < p; i++ {
+		var c []string
+		for j := 0; j < h; j++ {
+			c = append(c, fmt.Sprint(v(i, j)))
+		}
+		cl = append(cl, strings.Join(c, " ")+" 0")
+	}
+	for j := 0; j < h; j++ {
+		for a := 0; a < p; a++ {
+			for b := a + 1; b < p; b++ {
+				cl = append(cl, fmt.Sprintf("-%d -%d 0", v(a, j), v(b, j)))
+			}
+		}
+	}
+	return fmt.Sprintf("c %d pigeons, %d holes\np cnf %d %d\n%s\n", p, h, p*h, len(cl), strings.Join(cl, "\n"))
+}
+
+// sudokuInkala is the puzzle Arto Inkala published in 2012.
+const sudokuInkala = "800000000003600000070090200050007000000045700000100030001000068008500010090000400"
+
+// sudokuCNF encodes a Sudoku as SAT (variable 81r + 9c + d + 1 means
+// cell (r, c) holds digit d + 1) and lists the true variables of its
+// unique solution.
+func sudokuCNF(puzzle string) (stdin, want string) {
+	v := func(r, c, d int) int { return 81*r + 9*c + d + 1 }
+	var cl []string
+	add := func(lits ...int) {
+		var s []string
+		for _, l := range lits {
+			s = append(s, fmt.Sprint(l))
+		}
+		cl = append(cl, strings.Join(s, " ")+" 0")
+	}
+	var groups [][][2]int
+	for i := 0; i < 9; i++ {
+		var row, col, box [][2]int
+		for j := 0; j < 9; j++ {
+			row = append(row, [2]int{i, j})
+			col = append(col, [2]int{j, i})
+			box = append(box, [2]int{3*(i/3) + j/3, 3*(i%3) + j%3})
+		}
+		groups = append(groups, row, col, box)
+	}
+	for r := 0; r < 9; r++ {
+		for c := 0; c < 9; c++ {
+			var all []int
+			for d := 0; d < 9; d++ {
+				all = append(all, v(r, c, d))
+				for e := d + 1; e < 9; e++ {
+					add(-v(r, c, d), -v(r, c, e))
+				}
+			}
+			add(all...)
+		}
+	}
+	for _, g := range groups {
+		for d := 0; d < 9; d++ {
+			var all []int
+			for a := range g {
+				all = append(all, v(g[a][0], g[a][1], d))
+				for b := a + 1; b < 9; b++ {
+					add(-v(g[a][0], g[a][1], d), -v(g[b][0], g[b][1], d))
+				}
+			}
+			add(all...)
+		}
+	}
+	grid := []byte(puzzle)
+	for i, ch := range grid {
+		if ch != '0' {
+			add(v(i/9, i%9, int(ch-'1')))
+		}
+	}
+	solveSudoku(grid)
+	var trues []string
+	for i, ch := range grid {
+		trues = append(trues, fmt.Sprint(v(i/9, i%9, int(ch-'1'))))
+	}
+	return fmt.Sprintf("c Sudoku\np cnf 729 %d\n%s\n", len(cl), strings.Join(cl, "\n")),
+		"SAT\n" + strings.Join(trues, " ") + "\n"
+}
+
+// solveSudoku fills grid by backtracking; it reports whether it could.
+func solveSudoku(grid []byte) bool {
+	for i, ch := range grid {
+		if ch != '0' {
+			continue
+		}
+		r, c := i/9, i%9
+		for d := byte('1'); d <= '9'; d++ {
+			ok := true
+			for k := 0; k < 9 && ok; k++ {
+				br, bc := 3*(r/3)+k/3, 3*(c/3)+k%3
+				ok = grid[9*r+k] != d && grid[9*k+c] != d && grid[9*br+bc] != d
+			}
+			if ok {
+				grid[i] = d
+				if solveSudoku(grid) {
+					return true
+				}
+			}
+		}
+		grid[i] = '0'
+		return false
+	}
+	return true
 }

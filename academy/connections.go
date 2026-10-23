@@ -241,6 +241,8 @@ var conceptLinks = map[string]links{
 	// ---- Stage 11
 	"Finite Automata & Regular Expressions": {[]string{"Parsing: Recursive Descent & Pratt", "Logic & Boolean Algebra"},
 		"MIT 18.404J: the first lectures on finite automata and regular expressions. Practise on regex101."},
+	"NFAs, DFAs & How Regex Engines Work": {[]string{"Finite Automata & Regular Expressions", "Sets, Functions & Relations", "Finite State Machines & Sequential Logic"},
+		"Russ Cox's article series \"Regular Expression Matching Can Be Simple And Fast\" (swtch.com/~rsc/regexp/). Sipser, chapter 1."},
 	"Grammars & Pushdown Automata": {[]string{"Parsing: Recursive Descent & Pratt", "Arrays, Linked Lists, Stacks & Queues"},
 		"MIT 18.404J: the lectures on context-free grammars and pushdown automata. Simulate them in JFLAP."},
 	"Turing Machines & Computability": {[]string{"The CPU: Datapath & Instruction Cycle", "Interpreters, Compilers & Runtimes"},
@@ -249,6 +251,10 @@ var conceptLinks = map[string]links{
 		"MIT 18.404J: the lectures on decidability and undecidability."},
 	"Complexity Classes: P, NP & Hard Problems": {[]string{"Big-O: Measuring Growth", "Graphs, BFS/DFS & Shortest Paths", "Encryption: Symmetric & Public-Key"},
 		"MIT 18.404J: the lectures on time complexity and NP-completeness. The Complexity Zoo's Petting Zoo for a gentle tour."},
+	"Reductions & NP-Completeness": {[]string{"Complexity Classes: P, NP & Hard Problems", "Logic & Boolean Algebra", "Graph Theory: Degrees, Trees & Paths"},
+		"MIT 18.404J: the lectures on the Cook–Levin theorem and NP-completeness. Knuth's The Art of Computer Programming, volume 4B, on satisfiability."},
+	"Approximation & Heuristics for Hard Problems": {[]string{"Greedy Algorithms", "Dynamic Programming", "Complexity Classes: P, NP & Hard Problems"},
+		"Williamson and Shmoys, The Design of Approximation Algorithms (free online). The Concorde TSP pages at math.uwaterloo.ca/tsp."},
 
 	// ---- Stage 12
 	"Paradigms: Imperative, Object-Oriented & Functional": {[]string{"Functions & Decomposition", "Software Design & Abstraction"},

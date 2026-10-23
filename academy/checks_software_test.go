@@ -180,6 +180,283 @@ int main(int argc, char **argv) {
     return bad;
 }
 `,
+	"nfa_match": `#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+/* Thompson's construction and simulation, after Russ Cox. */
+enum { MATCH = 256, SPLIT = 257, ANY = 258 };
+
+struct state { int c; struct state *out, *out1; int lastlist; };
+
+static struct state *states;
+static int nstates, listid;
+
+static struct state *state(int c, struct state *out, struct state *out1) {
+    struct state *s = &states[nstates++];
+    s->c = c; s->out = out; s->out1 = out1; s->lastlist = 0;
+    return s;
+}
+
+/* A fragment: its start, and the dangling pointers to patch (a list
+   threaded through the pointers themselves). */
+union ptrlist { union ptrlist *next; struct state *s; };
+struct frag { struct state *start; union ptrlist *out; };
+
+static union ptrlist *list1(struct state **p) { union ptrlist *l = (union ptrlist *)p; l->next = NULL; return l; }
+static void patch(union ptrlist *l, struct state *s) {
+    for (union ptrlist *next; l; l = next) { next = l->next; l->s = s; }
+}
+static union ptrlist *append(union ptrlist *a, union ptrlist *b) {
+    union ptrlist *old = a;
+    while (a->next) a = a->next;
+    a->next = b;
+    return old;
+}
+
+/* Infix to postfix with '.' as explicit concatenation; NULL if invalid.
+   Literal '.' in the pattern becomes ANY, encoded as byte 1. */
+static int *postfix(const char *re) {
+    size_t n = strlen(re);
+    int *out = malloc((2 * n + 2) * sizeof *out), *o = out;
+    struct { int alt, atom; } paren[1000], *p = paren;
+    int alt = 0, atom = 0;
+    if (out == NULL) return NULL;
+    for (; *re; re++) {
+        switch (*re) {
+        case '(':
+            if (atom > 1) { --atom; *o++ = '.'; }
+            if (p >= paren + 1000) { free(out); return NULL; }
+            p->alt = alt; p->atom = atom; p++;
+            alt = 0; atom = 0;
+            break;
+        case '|':
+            if (atom == 0) { free(out); return NULL; }
+            while (--atom > 0) *o++ = '.';
+            alt++;
+            break;
+        case ')':
+            if (p == paren || atom == 0) { free(out); return NULL; }
+            while (--atom > 0) *o++ = '.';
+            for (; alt > 0; alt--) *o++ = '|';
+            --p; alt = p->alt; atom = p->atom; atom++;
+            break;
+        case '*': case '+': case '?':
+            if (atom == 0) { free(out); return NULL; }
+            *o++ = *re;
+            break;
+        default:
+            if (atom > 1) { --atom; *o++ = '.'; }
+            *o++ = *re == '.' ? ANY : (unsigned char)*re;
+            atom++;
+            break;
+        }
+    }
+    if (p != paren || atom == 0) { free(out); return NULL; }
+    while (--atom > 0) *o++ = '.';
+    for (; alt > 0; alt--) *o++ = '|';
+    *o = 0;
+    return out;
+}
+
+static struct state *compile(const int *post, size_t len) {
+    struct frag *stack = malloc((len + 1) * sizeof *stack), *sp = stack, e1, e2;
+    struct state *s;
+    for (; *post; post++) {
+        switch (*post) {
+        case '.': e2 = *--sp; e1 = *--sp; patch(e1.out, e2.start); *sp++ = (struct frag){e1.start, e2.out}; break;
+        case '|': e2 = *--sp; e1 = *--sp; s = state(SPLIT, e1.start, e2.start); *sp++ = (struct frag){s, append(e1.out, e2.out)}; break;
+        case '?': e1 = *--sp; s = state(SPLIT, e1.start, NULL); *sp++ = (struct frag){s, append(e1.out, list1(&s->out1))}; break;
+        case '*': e1 = *--sp; s = state(SPLIT, e1.start, NULL); patch(e1.out, s); *sp++ = (struct frag){s, list1(&s->out1)}; break;
+        case '+': e1 = *--sp; s = state(SPLIT, e1.start, NULL); patch(e1.out, s); *sp++ = (struct frag){e1.start, list1(&s->out1)}; break;
+        default: s = state(*post, NULL, NULL); *sp++ = (struct frag){s, list1(&s->out)}; break;
+        }
+    }
+    e1 = *--sp;
+    patch(e1.out, state(MATCH, NULL, NULL));
+    free(stack);
+    return e1.start;
+}
+
+struct list { struct state **s; int n; };
+
+static void addstate(struct list *l, struct state *s) {
+    if (s == NULL || s->lastlist == listid) return;
+    s->lastlist = listid;
+    if (s->c == SPLIT) { addstate(l, s->out); addstate(l, s->out1); return; }
+    l->s[l->n++] = s;
+}
+
+static int matches(struct state *start, const char *line, struct list *a, struct list *b) {
+    listid++; a->n = 0; addstate(a, start);
+    for (; *line; line++) {
+        int c = (unsigned char)*line;
+        listid++; b->n = 0;
+        for (int i = 0; i < a->n; i++)
+            if (a->s[i]->c == c || a->s[i]->c == ANY) addstate(b, a->s[i]->out);
+        struct list t = *a; *a = *b; *b = t;
+    }
+    for (int i = 0; i < a->n; i++) if (a->s[i]->c == MATCH) return 1;
+    return 0;
+}
+
+int main(int argc, char **argv) {
+    if (argc < 2) { fprintf(stderr, "usage: nfa_match PATTERN\n"); return 2; }
+    int *post = postfix(argv[1]);
+    if (post == NULL) { fprintf(stderr, "nfa_match: invalid pattern\n"); return 2; }
+    size_t len = 0;
+    while (post[len]) len++;
+    states = calloc(len + 2, sizeof *states);
+    struct state *start = compile(post, len);
+    struct list a = {malloc((len + 2) * sizeof(struct state *)), 0}, b = {malloc((len + 2) * sizeof(struct state *)), 0};
+    size_t cap = 1 << 16;
+    char *line = malloc(cap);
+    int c, n = 0;
+    while ((c = getchar()) != EOF) {
+        if ((size_t)n + 1 >= cap) { cap *= 2; line = realloc(line, cap); }
+        if (c != '\n') { line[n++] = (char)c; continue; }
+        line[n] = 0;
+        puts(matches(start, line, &a, &b) ? "match" : "no");
+        n = 0;
+    }
+    free(line); free(a.s); free(b.s); free(states); free(post);
+    return 0;
+}
+`,
+	"turing": `#include <stdio.h>
+#include <stdlib.h>
+
+#define CELLS 200001
+#define HALT 26
+
+struct rule { unsigned char write; signed char move; unsigned char next; };
+
+int main(int argc, char **argv) {
+    if (argc < 2) return 2;
+    long limit = atol(argv[1]);
+    struct rule rule[27][2] = {{{0, 0, 0}}};
+    char s[8], r[8], w[8], m[8], nx[8];
+    int start = -1;
+    while (scanf("%7s %7s %7s %7s %7s", s, r, w, m, nx) == 5) {
+        int st = s[0] - 'A', sym = r[0] - '0';
+        if (start < 0) start = st;
+        rule[st][sym].write = (unsigned char)(w[0] - '0');
+        rule[st][sym].move = m[0] == 'L' ? -1 : 1;
+        rule[st][sym].next = (unsigned char)(nx[0] == 'H' ? HALT : nx[0] - 'A');
+    }
+    unsigned char *tape = calloc(CELLS, 1);
+    long pos = CELLS / 2, steps = 0;
+    int state = start;
+    while (steps < limit) {
+        const struct rule *ru = &rule[state][tape[pos]];
+        tape[pos] = ru->write;
+        pos += ru->move;
+        state = ru->next;
+        steps++;
+        if (state == HALT) break;
+    }
+    if (state == HALT) {
+        long ones = 0;
+        for (long i = 0; i < CELLS; i++) ones += tape[i];
+        printf("halted after %ld steps, %ld ones\n", steps, ones);
+    } else {
+        printf("still running after %ld steps\n", limit);
+    }
+    free(tape);
+    return 0;
+}
+`,
+	"dpll": `#include <stdio.h>
+#include <stdlib.h>
+
+static int nvars, nclauses, *lits, *start, *value, *trail, ntrail;
+
+static int lit_value(int l) {   /* 1 true, 0 false, -1 unassigned */
+    int v = value[abs(l)];
+    if (v < 0) return -1;
+    return (l > 0) == v;
+}
+
+static void assign(int l) { value[abs(l)] = l > 0; trail[ntrail++] = abs(l); }
+
+/* Unit propagation; 0 on a conflict. */
+static int propagate(void) {
+    for (int changed = 1; changed;) {
+        changed = 0;
+        for (int c = 0; c < nclauses; c++) {
+            int unassigned = 0, last = 0, sat = 0;
+            for (int i = start[c]; i < start[c + 1]; i++) {
+                int v = lit_value(lits[i]);
+                if (v == 1) { sat = 1; break; }
+                if (v < 0) { unassigned++; last = lits[i]; }
+            }
+            if (sat) continue;
+            if (unassigned == 0) return 0;
+            if (unassigned == 1) { assign(last); changed = 1; }
+        }
+    }
+    return 1;
+}
+
+static int choose(void) {   /* a literal from the shortest open clause, or 0 */
+    int best = 0, bestlen = 1 << 30;
+    for (int c = 0; c < nclauses; c++) {
+        int len = 0, pick = 0, sat = 0;
+        for (int i = start[c]; i < start[c + 1]; i++) {
+            int v = lit_value(lits[i]);
+            if (v == 1) { sat = 1; break; }
+            if (v < 0) { len++; pick = lits[i]; }
+        }
+        if (!sat && len < bestlen) { bestlen = len; best = pick; }
+    }
+    return best;
+}
+
+static int solve(void) {
+    int mark = ntrail;
+    if (!propagate()) goto undo;
+    int l = choose();
+    if (l == 0) return 1;
+    for (int k = 0; k < 2; k++) {
+        int m = ntrail;
+        assign(k == 0 ? l : -l);
+        if (solve()) return 1;
+        while (ntrail > m) value[trail[--ntrail]] = -1;
+    }
+undo:
+    while (ntrail > mark) value[trail[--ntrail]] = -1;
+    return 0;
+}
+
+int main(void) {
+    int c;
+    while ((c = getchar()) == 'c' || c == '\n') {
+        if (c == 'c') while ((c = getchar()) != '\n' && c != EOF) {}
+    }
+    if (c != 'p' || scanf(" cnf %d %d", &nvars, &nclauses) != 2) return 1;
+    int cap = 1024, n = 0, k = 0, x;
+    lits = malloc((size_t)cap * sizeof *lits);
+    start = malloc(((size_t)nclauses + 1) * sizeof *start);
+    start[0] = 0;
+    while (k < nclauses && scanf("%d", &x) == 1) {
+        if (x == 0) { start[++k] = n; continue; }
+        if (n == cap) { cap *= 2; lits = realloc(lits, (size_t)cap * sizeof *lits); }
+        lits[n++] = x;
+    }
+    nclauses = k;
+    value = malloc(((size_t)nvars + 1) * sizeof *value);
+    trail = malloc(((size_t)nvars + 1) * sizeof *trail);
+    for (int i = 0; i <= nvars; i++) value[i] = -1;
+    if (!solve()) { puts("UNSAT"); return 0; }
+    puts("SAT");
+    const char *sep = "";
+    for (int i = 1; i <= nvars; i++)
+        if (value[i] == 1) { printf("%s%d", sep, i); sep = " "; }
+    printf("\n");
+    free(lits); free(start); free(value); free(trail);
+    return 0;
+}
+`,
 }
 
 // Each Stage 9 to 12 check fails the typical wrong answer, for the reason
@@ -228,4 +505,60 @@ func TestSoftwareChecksCatchTypicalMistakes(t *testing.T) {
 	failsWith(t, "bisect", "long first_bad(long good, long bad, int (*is_bad)(long)) {\n    for (long v = good + 1; v < bad; v++)\n        if (is_bad(v)) return v;\n    return bad;\n}\n", "a thousand commits", "")
 	// Testing the known endpoints too.
 	failsWith(t, "bisect", mutate("bisect", "    while (bad - good > 1) {", "    if (is_bad(good)) return good;\n    while (bad - good > 1) {"), "eight versions", "")
+
+	// A backtracking matcher: correct, but exponential on nested repetition.
+	backtrack := `#include <stdio.h>
+#include <string.h>
+
+/* Matches the subset without parentheses or |: c, ., c*, c+, c? */
+static int here(const char *re, const char *s) {
+    if (*re == 0) return *s == 0;
+    int one = *s && (re[0] == '.' || re[0] == *s);
+    if (re[1] == '*') return here(re + 2, s) || (one && here(re, s + 1));
+    if (re[1] == '+') return one && (here(re + 2, s + 1) || here(re, s + 1));
+    if (re[1] == '?') return here(re + 2, s) || (one && here(re + 2, s + 1));
+    return one && here(re + 1, s + 1);
+}
+
+int main(int argc, char **argv) {
+    char line[200000];
+    if (argc < 2) return 2;
+    while (fgets(line, sizeof line, stdin)) {
+        line[strcspn(line, "\n")] = 0;
+        puts(here(argv[1], line) ? "match" : "no");
+    }
+    return 0;
+}
+`
+	failsWith(t, "nfa_match", backtrack, "precedence", "")
+	// Matching anywhere in the line instead of the whole line.
+	failsWith(t, "nfa_match", mutate("nfa_match", "    for (int i = 0; i < a->n; i++) if (a->s[i]->c == MATCH) return 1;\n    return 0;", "    for (int i = 0; i < a->n; i++) if (a->s[i]->c == MATCH) return 1;\n    return a->n > 0;"), "stars", "")
+	// Accepting a star with nothing before it.
+	failsWith(t, "nfa_match", mutate("nfa_match", "        case '*': case '+': case '?':\n            if (atom == 0) { free(out); return NULL; }", "        case '*': case '+': case '?':\n            if (atom == 0) break;"), "a star with nothing before it", "")
+
+	// Not counting the move into H as a step.
+	failsWith(t, "turing", mutate("turing", "        steps++;\n        if (state == HALT) break;", "        if (state == HALT) break;\n        steps++;"), "the two-state busy beaver", "")
+	// Counting every 1 written instead of the 1s left on the tape.
+	failsWith(t, "turing", strings.NewReplacer(
+		"    long pos = CELLS / 2, steps = 0;", "    long pos = CELLS / 2, steps = 0, written = 0;",
+		"        tape[pos] = ru->write;", "        tape[pos] = ru->write;\n        written += ru->write;",
+		"        for (long i = 0; i < CELLS; i++) ones += tape[i];", "        ones = written;",
+	).Replace(ref["turing"]), "the four-state busy beaver", "")
+
+	// Trying every assignment and checking at the end: correct, but 2⁷²⁹ tries.
+	enumerate := strings.NewReplacer(
+		"    int mark = ntrail;\n    if (!propagate()) goto undo;\n    int l = choose();\n    if (l == 0) return 1;",
+		"    int mark = ntrail;\n    (void)choose;\n    if (ntrail == nvars) { if (!propagate()) goto undo; return 1; }\n    int l = 1;\n    while (value[l] >= 0) l++;",
+	).Replace(ref["dpll"])
+	if enumerate == ref["dpll"] {
+		t.Fatal("dpll: the enumeration mutation did not apply")
+	}
+	failsWith(t, "dpll", enumerate, "the hardest Sudoku", "did not finish")
+	// Forgetting to undo a failed branch.
+	failsWith(t, "dpll", strings.NewReplacer(
+		"        while (ntrail > m) value[trail[--ntrail]] = -1;\n", "        (void)m;\n",
+		"undo:\n    while (ntrail > mark) value[trail[--ntrail]] = -1;\n", "undo:\n    (void)mark;\n",
+	).Replace(ref["dpll"]), "four pigeons, three holes", "")
+	// Reading clauses line by line.
+	failsWith(t, "dpll", mutate("dpll", "        if (x == 0) { start[++k] = n; continue; }", "        if (x == 0) { start[++k] = n; while ((c = getchar()) != '\\n' && c != EOF) {} continue; }"), "clauses over several lines", "")
 }
