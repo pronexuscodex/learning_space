@@ -10,11 +10,16 @@ var softwareGuides = map[int]StageGuide{
 		Overview: `Writing code that works once is programming. Writing code that keeps
 working as it grows, alongside other people, for years, is software
 engineering. This stage covers the everyday professional toolkit: the
-command line, Git, testing, design and shipping to real users.`,
+command line and shell scripts, Git, build systems and dependencies,
+testing, debugging tools, design, and shipping to real users. Each lesson
+looks under the hood with strace, Git's own object files, make, gcov,
+gdb and Linux namespaces.`,
 		Outcomes: []string{
 			"Work comfortably in a terminal and automate chores with scripts",
 			"Collaborate through Git and pull requests like a professional team",
 			"Test, structure and deploy software that others can rely on",
+			"Explain what Git stores, and what a build system rebuilds and why",
+			"Find a bug with a debugger, a core dump or git bisect instead of guessing",
 		},
 		Glossary: []Term{
 			{"Terminal", "A text window where you type commands to the computer."},
@@ -26,6 +31,13 @@ command line, Git, testing, design and shipping to real users.`,
 			{"CI", "Continuous Integration: automatically building and testing every change."},
 			{"Container", "A package holding an app plus everything it needs to run, so it runs the same everywhere."},
 			{"Refactoring", "Improving code's structure without changing what it does."},
+			{"Exit status", "The number a program returns when it ends: 0 for success, anything else for failure."},
+			{"Hash (Git object ID)", "The SHA-1 of an object's content, which Git uses as its name: the same content always gets the same ID."},
+			{"Dependency graph", "Which files or packages each one needs; a build system walks it to decide what to rebuild."},
+			{"Lockfile", "A file recording the exact version of every dependency, so every build uses the same ones."},
+			{"Code coverage", "Which lines and branches of a program its tests actually ran."},
+			{"Backtrace", "The chain of function calls that led to the current point, as a debugger prints it."},
+			{"git bisect", "A binary search through history for the commit that introduced a bug."},
 		},
 		Concepts: []Concept{
 			{
@@ -41,7 +53,32 @@ Programs read standard input and write standard output, so the pipe |
 chains small tools together: cat log.txt | grep ERROR | wc -l counts the
 error lines. Environment variables such as PATH configure programs, and
 package managers (apt, brew, winget, pip, npm) install software
-reproducibly.`,
+reproducibly.
+
+Some commands are programs on disk (ls is /usr/bin/ls); others are
+built into the shell (cd, echo, export), because they must change the
+shell itself: a separate program cannot change its parent's current
+directory. type ls tells you which kind a command is.`,
+				Diagram: `you type:  ls -l | wc -l
+shell:     fork ─▶ child: search PATH for "ls" ─▶ exec /usr/bin/ls
+           fork ─▶ child: search PATH for "wc" ─▶ exec /usr/bin/wc
+           ls's standard output ──pipe──▶ wc's standard input`,
+				UnderTheHood: `strace shows the shell finding ls. With PATH set to
+/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/bin, bash checked each
+folder in order:
+
+  newfstatat("/usr/local/sbin/ls")   ENOENT, no such file
+  newfstatat("/usr/local/bin/ls")    ENOENT
+  newfstatat("/usr/sbin/ls")         ENOENT
+  newfstatat("/usr/bin/ls")          found: a 142,312-byte program
+  execve("/usr/bin/ls", ["ls"], … 4 vars …)
+
+That is all PATH is: a list of folders searched left to right, so an
+earlier folder wins. The environment travels with every execve: in a
+normal session here, 152 variables and 8,278 bytes were copied into
+each program started. The kernel caps arguments plus environment at
+getconf ARG_MAX, 2,097,152 bytes, which is why rm * fails with
+"Argument list too long" in a folder of a million files.`,
 				MentalModel: "Small tools, joined by pipes, do big jobs.",
 				TryIt:       "Use one pipeline to find the 10 most common words in a text file.",
 				Analogy: `A graphical interface is a menu with pictures. The command line is
@@ -62,6 +99,73 @@ logs that no spreadsheet can even open.`,
 				),
 			},
 			{
+				Name:    "Shell Scripting & Automation",
+				Summary: "A script is a recipe of commands: quoting, exit codes and failing loudly make it safe.",
+				Body: `A shell script is a text file of commands, run top to bottom, with
+variables, if, for and functions. It turns a chore you do by hand into
+one command that does it the same way every time.
+
+Three rules prevent most script bugs:
+- Quote every variable: "$file", not $file. Unquoted, the shell splits
+  the value at spaces and expands wildcards, so a file named "my
+  file.txt" becomes two arguments, "my" and "file.txt".
+- Check exit statuses. Every command returns a number: 0 means success,
+  anything else failure. if, && and || test it; $? holds the last one.
+- Fail loudly: start scripts with set -euo pipefail. -e stops at the
+  first failing command, -u treats an unset variable as an error
+  instead of an empty string, and pipefail makes a pipeline fail if
+  any part of it fails, not just the last.
+
+The classic disaster is rm -rf "$DIR/" with DIR unset: without -u it
+becomes rm -rf /. For anything longer than a page, or with real data
+structures, switch to a proper language; shell is glue.`,
+				Diagram: `#!/usr/bin/env bash
+set -euo pipefail          # stop on errors, unset variables, broken pipes
+src=$1                     # the first argument
+for f in "$src"/*.log; do  # quoted: names with spaces stay whole
+  gzip -- "$f" || echo "could not compress $f" >&2
+done`,
+				UnderTheHood: `Word splitting, measured in bash. With f="my file.txt" and that file
+present:
+
+  ls $f       ls: cannot access 'my': No such file or directory
+              ls: cannot access 'file.txt': No such file or directory
+              exit status 2
+  ls "$f"     my file.txt
+              exit status 0
+
+Exit statuses as bash saw them:
+
+  exit 0           → 0
+  exit 3           → 3
+  false            → 1
+  kill -9 $$       → 137   (128 + 9: killed by SIGKILL)
+  false | true     → 0, but 1 with set -o pipefail
+
+Without pipefail, a pipeline's status is only its last command's, so
+a script that runs "curl … | tar x" carries on happily when the
+download fails.`,
+				MentalModel: "Quote everything, check every status, and make the script stop at the first surprise.",
+				TryIt:       "Create a file whose name contains a space, then compare for f in $(ls) and for f in * with echo \"[$f]\" in each loop.",
+				Analogy: `A recipe for a kitchen assistant who follows it literally. "Add the
+contents of the box" means one thing if the box is labelled "flour" and
+quite another if the label is missing and the assistant grabs whatever
+is nearest. set -u is an assistant who stops and asks.`,
+				Example: `In 2015 a bug in Steam's Linux client ran rm -rf "$STEAMROOT/"* with
+STEAMROOT empty, deleting users' entire home folders. Shell scripts
+still run most build systems, CI pipelines, Docker images and server
+start-up, which is why tools such as ShellCheck exist to catch exactly
+these mistakes.`,
+				Exercises: trio(
+					"What does this print when name is unset: echo \"Hello, $name!\"? And with set -u at the top?",
+					"Without -u: \"Hello, !\". With -u, bash stops with \"name: unbound variable\".",
+					"Write a script that takes a folder as its argument, checks that it exists (exit 1 with a message on stderr otherwise), and renames every .jpeg file in it to .jpg, coping with spaces in names. Test it on files named \"a b.jpeg\" and \"-x.jpeg\".",
+					"Loop with for f in \"$dir\"/*.jpeg, use \"${f%.jpeg}.jpg\" for the new name, and mv -- so a name starting with - is not taken for an option.",
+					"Automate a real chore: a script, run daily by cron (or a systemd timer, or Task Scheduler), that fetches something you check by hand (a web page, a file listing, disk usage), compares it with yesterday's copy, and only tells you when it changed.",
+					"Save each day's copy with the date in its name; diff -q returns 1 when the files differ.",
+				),
+			},
+			{
 				Name:    "Version Control with Git",
 				Summary: "A time machine and collaboration tool for your code.",
 				Body: `Git records snapshots of your project called commits. Each has a
@@ -72,10 +176,45 @@ and a conflict happens when two people changed the same lines.
 
 Remotes (GitHub, GitLab) share repositories, and pull requests let
 teammates review changes before they are merged. Good habits: small
-commits with clear messages, and never commit passwords or keys.`,
+commits with clear messages, and never commit passwords or keys.
+
+Underneath, Git is a content-addressed store of three kinds of object,
+each named by the SHA-1 hash of its content: blobs (a file's bytes),
+trees (a folder: names pointing to blobs and other trees) and commits
+(a tree, its parents, the author and the message). A branch is just a
+file holding one commit's ID. Because names are hashes of content,
+identical files are stored once, and changing anything in history
+changes every ID after it.`,
 				Diagram: `main:     A ── B ─────────── E   (merge commit)
                 ╲           ╱
-feature:         C ──── D ─╯`,
+feature:         C ──── D ─╯
+
+commit ─▶ tree ─▶ blob "hello\n"
+  │        └────▶ tree src/ ─▶ blobs …
+  └─▶ parent commit`,
+				UnderTheHood: `A one-file repository, opened up. git hash-object hello.txt (holding
+"hello" and a newline) printed ce013625030ba8dba906f756967f9e9ca394464a,
+and so did a plain SHA-1 of the header "blob 6", a zero byte and the 6
+bytes of content:
+
+  printf 'blob 6\0hello\n' | sha1sum
+  ce013625030ba8dba906f756967f9e9ca394464a
+
+After the first commit, .git/objects held exactly three files: that
+blob, a tree ("100644 blob ce0136… hello.txt") and the commit:
+
+  tree aaa96ced2d9a1c8e72c56b253a0e2fe78393feb7
+  author Ana <ana@example.com> 1767225600 +0000
+  committer Ana <ana@example.com> 1767225600 +0000
+
+  First commit
+
+.git/refs/heads/main was a 41-byte file: the commit's ID and a newline.
+In a repository of 1,000 files, changing one added exactly 4 objects: the
+new blob, its folder's tree, the root tree and the commit; the other 999
+blobs were shared. After a third commit changed every file, the loose
+objects took 9,136 KB; git gc packed them, storing similar versions as
+deltas, into 172 KB.`,
 				MentalModel: "Commit early, commit often, and write messages for your future self.",
 				TryIt:       "Create a repository, make a branch, change the same line on both branches, and resolve the merge conflict.",
 				Analogy: `Save points in a video game, plus parallel universes. You can branch off
@@ -88,10 +227,71 @@ million developers.`,
 				Exercises: trio(
 					"Explain in your own words the difference between git add, git commit and git push.",
 					"Staging area → local history → remote server.",
-					"Put one of your earlier projects in a Git repository, make at least 5 meaningful commits, and use git log, git diff and git switch --detach to travel back to an old version and return.",
-					"git log --oneline --graph shows the history compactly.",
+					"Put one of your earlier projects in a Git repository, make at least 5 meaningful commits, and use git log, git diff and git switch --detach to travel back to an old version and return. Then use git cat-file -p on HEAD, its tree and one blob.",
+					"git log --oneline --graph shows the history compactly; git rev-parse HEAD^{tree} gives the tree's ID.",
 					`Make an open-source contribution: find a project with a "good first issue" or a typo in its documentation, fork it, fix it on a branch and open a pull request.`,
 					"Read the project's CONTRIBUTING file first and follow its conventions.",
+				),
+			},
+			{
+				Name:    "Build Systems & Dependencies",
+				Summary: "Rebuild only what changed, and pin exactly what you depend on.",
+				Body: `A build system turns source into programs and knows the dependency
+graph: which outputs come from which inputs. make, the classic, reads
+rules of the form "target: prerequisites" followed by a command, and
+rebuilds a target when any prerequisite is newer than it (by file
+modification time). Modern tools (Ninja, Bazel, Go's and Rust's own
+builders) compare content hashes instead, and run independent steps in
+parallel.
+
+Two mistakes break incremental builds: a missing dependency (a header
+not listed, so changing it rebuilds nothing and the program is a mix
+of old and new code), and a dependency cycle, which no order can
+satisfy.
+
+Libraries you use are dependencies too. Semantic versioning
+(MAJOR.MINOR.PATCH) promises that minor and patch releases do not break
+you; a lockfile (package-lock.json, Cargo.lock, go.sum) records the
+exact versions and their hashes, so every machine builds the same thing
+and a tampered download is refused.`,
+				Diagram: `app ◀── main.o ◀── main.c
+ ▲  ◀── f1.o   ◀── f1.c, util.h
+ └───── util.o ◀── util.c, util.h
+touch util.h  ⇒  every .o that lists util.h, then app`,
+				UnderTheHood: `A Makefile building 42 C files (each including util.h) into one
+program, timed on a 4-core machine:
+
+  full build                               1,165 ms
+  nothing changed     "'app' is up to date"    5 ms
+  one .c file touched   2 commands (compile, link)   62 ms
+  util.h touched        43 commands               1,112 ms
+  full build with make -j8                    302 ms
+
+make -n prints what would run without running it. Touching one source
+file rebuilt one object and relinked; touching the header that every
+file includes rebuilt everything, which is why widely included headers
+should change rarely. Running jobs in parallel made the full build four
+times faster on four cores: the dependency graph says which steps are
+independent.`,
+				MentalModel: "A build is a graph: rebuild a node only when one of its inputs changed.",
+				TryIt:       "Write a Makefile for a three-file C program, then run make, touch one file, run make -n, and predict what it will rebuild before you look.",
+				Analogy: `Cooking a meal from several dishes. If you change the sauce recipe, you
+remake the sauce and every dish that uses it, but not the salad. A
+lockfile is the shopping list that names the exact brand and size of
+every ingredient, so the dish tastes the same in any kitchen.`,
+				Example: `In 2016 the removal of left-pad, an 11-line npm package, broke the builds
+of thousands of projects, including React, within hours. In 2024 the
+xz-utils backdoor reached Linux distributions through a trusted
+dependency's release files. Google builds most of its code with Bazel,
+whose content hashes let it skip any step whose exact inputs were built
+before, even on another machine.`,
+				Exercises: trio(
+					"A Makefile says app: main.o util.o, and main.o: main.c. main.c includes util.h, which the Makefile does not mention. You change util.h. What does make rebuild, and what goes wrong?",
+					"Nothing that includes it: main.o is not rebuilt, so app mixes old and new definitions. Generate header dependencies with gcc -MMD.",
+					"Write a Makefile for a C project with three source files and one header, using pattern rules and automatic header dependencies (-MMD -MP and -include $(DEPS)). Show that touching the header rebuilds exactly the files that include it.",
+					"$(SRCS:.c=.o) builds the object list; $@ is the target and $< the first prerequisite.",
+					"Pick a project with a lockfile (package-lock.json, Cargo.lock or go.sum), find one dependency's exact version and hash in it, and check the hash against the registry. Then explain what would happen if the downloaded file were altered.",
+					"npm view <package>@<version> dist.integrity prints the same SHA-512 that package-lock.json records.",
 				),
 			},
 			{
@@ -105,7 +305,36 @@ cases (empty input, zero, huge values) and error cases.
 Automated test suites run on every change through continuous integration
 (CI), so bugs are caught before users see them. Test-driven development
 writes the failing test first. Property-based testing generates hundreds
-of random inputs to find cases you did not think of.`,
+of random inputs to find cases you did not think of.
+
+Coverage tools report which lines and branches the tests ran. Low
+coverage proves that code is untested; high coverage does not prove it
+is correct, because a line can run with every input but the one that
+breaks it.`,
+				Diagram: `        ╱ end-to-end ╲        few, slow, the whole app
+       ╱ integration  ╲       some: pieces together
+      ╱   unit tests    ╲     many, fast, one function each
+     ────────────────────`,
+				UnderTheHood: `A C file with average(a, b) = (a + b) / 2 and a clamp function, tested
+by hand with average(2, 4), average(-3, 3) and clamp(5, 0, 10): all
+correct. gcc --coverage and gcov reported:
+
+  Lines executed: 46.15% of 13
+  Branches taken at least once: 25.00% of 12
+  clamp marked 1*: run, but some of its branches never taken
+
+Then a million random pairs, each checked against the same formula
+computed in 64-bit arithmetic:
+
+  first failure at test 14:
+    average(318608798, 2100852393) = -937753052, want 1209730595
+  250,239 of 1,000,000 random tests fail
+
+a + b overflows whenever the sum leaves the int range, about one input
+in four. Built with -fsanitize=undefined, the run reported it at that same
+test: "signed integer overflow: 318608798 + 2100852393 cannot be
+represented in type 'int'". Three hand-picked tests saw nothing; random
+tests found it in fourteen tries.`,
 				MentalModel: "A test is a claim about your code that a machine re-checks forever.",
 				TryIt:       "Write five tests for is_palindrome, including an empty string and a single character.",
 				Analogy: `A pilot's pre-flight checklist: the same checks every time, however
@@ -118,10 +347,73 @@ accidentally reactivated during a deployment.`,
 				Exercises: trio(
 					"For a function that computes a person's age from their birth date, list 8 test cases, including tricky ones.",
 					"A birthday today, 29 February, a date in the future, very old dates.",
-					"Write that age function test-first: write one failing test, make it pass, and repeat until all 8 cases pass.",
-					"Use pytest, or your language's built-in test tool.",
+					"Write that age function test-first in C: write one failing test (a small main that compares the result and returns non-zero on a mismatch), make it pass, and repeat until all 8 cases pass. Then measure your coverage with gcc --coverage and gcov.",
+					"A test can be one line: if (age(...) != 34) { printf(\"line %d failed\\n\", __LINE__); fails++; }",
 					"Set up continuous integration for one of your GitHub repositories (for example with GitHub Actions) so the tests run on every push, and add a status badge to the README.",
 					"A workflow file in .github/workflows/ that checks out the code and runs the tests.",
+				),
+			},
+			{
+				Name:    "Debugging Tools: gdb, Core Dumps & git bisect",
+				Summary: "Stop guessing: a debugger shows where it broke, and bisect finds the commit that broke it.",
+				Body: `When a program crashes or misbehaves, three tools replace guesswork:
+- A debugger (gdb, lldb) runs the program under control. bt prints the
+  backtrace, the chain of calls that led to the crash; frame and print
+  show any function's local variables at that moment; break and step
+  stop and walk through code. Build with -g so the debugger knows the
+  source lines, and -O0 so variables are not optimised away.
+- A core dump is the crashed process's memory written to a file. With
+  ulimit -c unlimited (or systemd-coredump), you can run gdb ./prog core
+  after the fact, even for a crash on a user's machine.
+- git bisect is a binary search through history. Mark one commit good
+  and one bad; Git checks out the middle, you test it, and it halves the
+  range. With a script that returns 0 for good, git bisect run does it
+  all automatically.
+
+Underneath them all is the scientific method: reproduce the bug
+reliably, make a hypothesis, test it, and change one thing at a time.`,
+				Diagram: `1000 commits:  good ●──────────────────────────● bad
+bisect:        test 500 ─▶ test 750 ─▶ test 625 ─▶ … (10 tests)
+                                                  ▲
+                                   the first bad commit`,
+				UnderTheHood: `A program that walked an array of user pointers with i <= n instead of
+i < n crashed: "Segmentation fault", exit status 139. Under gdb:
+
+  Program received signal SIGSEGV, Segmentation fault.
+  #0  __strlen_evex () at ../sysdeps/x86_64/multiarch/strlen-evex-base.S:81
+  #1  name_length (u=0x0) at crash.c:4
+  #2  total (users=0x7fffffffc710, n=2) at crash.c:5
+  #3  main () at crash.c:9
+  (gdb) frame 2
+  (gdb) print i          $1 = 2
+  (gdb) print users[i]   $2 = (struct user *) 0x0
+
+The crash was inside the C library's strlen, but the backtrace shows
+who called it with a NULL pointer, and print i shows the loop had run one
+step too far. Core dumps were off on this machine: ulimit -c reported 0.
+
+For history, a script made 1,000 commits with a bug introduced in
+commit 637. git bisect run, given only "the first commit was good, the
+last is bad" and a one-line test, ran the test 10 times and reported
+commit 637 as the first bad commit: log₂ 1000 ≈ 10.`,
+				MentalModel: "Bisect the time (git bisect) and the space (backtrace), then read the variables.",
+				TryIt:       "Build a program that crashes with gcc -g -O0, run it under gdb, and use bt, frame and print to explain the crash in one sentence.",
+				Analogy: `A detective at a crime scene (the core dump) reconstructing the chain of
+events from the evidence left behind, and the children's game of
+guessing a number between 1 and 1,000 with "higher or lower": ten
+questions are always enough.`,
+				Example: `Linux kernel developers bisect regressions across thousands of commits
+between releases, and git bisect run is how a single developer can find
+which of a month's changes broke a test overnight. Browsers and operating
+systems collect crash reports, essentially trimmed core dumps with
+backtraces, from millions of users to find the crashes that matter most.`,
+				Exercises: trio(
+					"git bisect starts with 4,000 commits between good and bad. At most how many tests does it need? And for 1,000,000 commits?",
+					"⌈log₂ 4000⌉ = 12; ⌈log₂ 1,000,000⌉ = 20.",
+					"In C, write a program with a bug that only appears for some inputs (for example an off-by-one in a loop). Debug it in gdb with a breakpoint (break file.c:LINE), a condition (condition 1 i == 99), step and print, without adding any printf.",
+					"run args, then bt when it stops; watch var stops whenever a variable changes.",
+					"In a project with real history (yours, or a clone of an open-source one), find when a behaviour changed using git bisect run and a small test script, and write up which commit it was and why it broke.",
+					"The script must exit 0 for good, 1 to 124 for bad, and 125 to skip a commit that does not build.",
 				),
 			},
 			{
@@ -137,7 +429,13 @@ duplication (but do not abstract too early), keep coupling low and
 cohesion high, and prefer clear names to clever code. Design patterns
 are named solutions to recurring problems (observer, strategy, adapter).
 Refactoring improves structure without changing behaviour, and it is
-safe because tests exist.`,
+safe because tests exist.
+
+In C, an interface is a header plus an opaque type: the header declares
+struct order; and the functions that use it, while only the .c file
+knows its fields, so no caller can depend on them. A table of function
+pointers is how C does polymorphism; it is what object-oriented
+languages build for you as a vtable.`,
 				Diagram: `┌──────────────────────────────────┐
 │ interface / API     (what)       │
 ├──────────────────────────────────┤
@@ -146,6 +444,19 @@ safe because tests exist.`,
 │ storage / network   (how)        │
 └──────────────────────────────────┘
 each layer only talks to the layer below it`,
+				UnderTheHood: `What does an interface cost? A C program called a square's area
+function 200 million times, directly and through a struct of function
+pointers whose contents the compiler could not see:
+
+  direct call            1.28 ns per call
+  through the ops table  2.91 ns per call
+
+objdump shows the difference: call 12d0 <square_area> for the direct
+call, call *(%rax) for the other, a jump to an address loaded from
+memory. The extra 1.6 ns is that load and an indirect branch the CPU
+must predict. Unless it is in the innermost loop of a hot path, an
+abstraction costs nothing you could measure; what costs real time is
+the code people cannot understand well enough to change.`,
 				MentalModel: "A good module is a deep box with a small lid.",
 				TryIt:       "Refactor a 100-line script into functions for input, processing and output, keeping its behaviour identical.",
 				Analogy: `A car: the driver uses a steering wheel and pedals (the interface) and
@@ -159,10 +470,10 @@ of teams could work independently.`,
 				Exercises: trio(
 					"Pick an app you use daily and sketch its likely modules (login, feed, messaging, storage). Which ones need to know about each other?",
 					"Draw boxes and arrows; fewer arrows is better.",
-					"Restructure your bill splitter or budget tracker so that the calculation logic has no print() or input() calls, then write unit tests for that logic alone.",
-					"Pure functions take data in and return data; the interface layer calls them.",
+					"Restructure your bill splitter or budget tracker in C so that the calculation logic lives in its own .c file with a header, with no printf or scanf, then write unit tests for that logic alone.",
+					"Pure functions take data in and return data; the interface layer (main.c) calls them and does the printing.",
 					"Your budget tool reads CSV files from your bank. Design it so that supporting a second bank's different CSV format means writing one small new component, not changing the rest. Implement both.",
-					"The adapter pattern: each bank gets a parser that outputs the same Transaction structure.",
+					"The adapter pattern: each bank gets a parser that outputs the same Transaction structure; in C, a struct of function pointers selects the parser.",
 				),
 			},
 			{
@@ -177,7 +488,43 @@ change automatically.
 In production you need logs (what happened), metrics (how much, how
 fast) and alerts (tell a human when something is wrong). Reliable teams
 use code review, gradual rollouts, feature flags, backups whose restore
-has actually been tested, and blameless post-mortems after incidents.`,
+has actually been tested, and blameless post-mortems after incidents.
+
+A container is not a virtual machine: it is an ordinary process that the
+kernel gives its own view of the system with namespaces (its own process
+IDs, mounts, network and host name) and its own limits with cgroups
+(memory, CPU). That is why containers start in milliseconds and share
+the host's kernel.`,
+				Diagram: `host kernel
+├── process: your shell          (the host's namespaces)
+└── container: a process tree with its own
+      pid namespace   (it sees itself as PID 1)
+      mnt namespace   (its own / from the image)
+      net namespace   (its own interfaces)
+      cgroup          (memory.max, cpu.max)`,
+				UnderTheHood: `unshare, run as root, starts a process in new namespaces, the same
+kernel feature Docker uses:
+
+  unshare --pid --fork --mount-proc sh -c 'echo $$; ps -e'
+  1
+      PID COMMAND
+        1 sh
+        2 ps
+
+Inside the new PID namespace the shell was process 1, and ps saw only
+two processes; outside, ps -e listed 79. unshare --uts let a shell set
+its host name to box-in-a-box while the machine itself stayed "vm".
+/proc/self/cgroup showed the shell running these experiments inside a
+memory cgroup set up by the machine's own supervisor.
+
+What goes into the box matters too. "hello" compiled three ways:
+
+  C, linked to the shared C library    15,960 bytes   needs libc.so.6
+  C, gcc -static                      785,360 bytes   needs nothing
+  Go                                2,209,303 bytes   needs nothing
+
+A static binary runs in an empty container image; a dynamic one needs
+the right shared libraries inside it.`,
 				MentalModel: "If it is not monitored, you do not know it works; if the backup is not tested, you do not have one.",
 				TryIt:       "Put a tiny web app in a Docker container and run it locally.",
 				Analogy: `A restaurant is more than a recipe. It needs suppliers (dependencies),
@@ -192,7 +539,7 @@ worldwide, which is why staged rollouts matter.`,
 					`List 10 things that could go wrong between "it works on my laptop" and "it works for 10,000 users".`,
 					"Think about configuration, load, data, network, versions and people.",
 					"Write a Dockerfile for one of your programs, build the image and run it. Then add a CI workflow that builds the image on every push.",
-					"Start FROM an official language image and COPY your code in.",
+					"Start FROM an official language image and COPY your code in; for a static C or Go binary, FROM scratch works.",
 					"Deploy a small web app to a free hosting tier, add a health-check endpoint and uptime monitoring that emails you when it goes down, then break it on purpose and confirm that the alert arrives.",
 					"Many free uptime monitors can check a URL every few minutes.",
 				),
@@ -219,6 +566,16 @@ worldwide, which is why staged rollouts matter.`,
 			{"What is a Git merge conflict?", "Two branches changed the same lines differently, so Git needs a human to choose the result."},
 			{"Why run tests in CI and not only on your laptop?", "Every change gets checked automatically in a clean environment, before it reaches users."},
 			{"What is the difference between refactoring and rewriting?", "Refactoring changes structure in small steps without changing behaviour, protected by tests; rewriting replaces the code wholesale."},
+			{"Why is cd built into the shell rather than a program in /usr/bin?", "A program runs in a child process and cannot change its parent's current directory; only the shell itself can change its own."},
+			{"Why should a shell script write \"$file\" rather than $file?", "Unquoted, the shell splits the value at spaces and expands wildcards, so a name with a space becomes several arguments."},
+			{"What does set -euo pipefail do?", "-e stops at the first failing command, -u makes unset variables an error, and pipefail makes a pipeline fail if any of its commands fails."},
+			{"What is a Git blob's ID, and why do identical files cost nothing extra?", "The SHA-1 of \"blob <size>\", a zero byte and the content. Identical content has the same ID, so Git stores it once."},
+			{"What is a branch, physically?", "A small file in .git/refs/heads holding the ID of one commit; committing on the branch rewrites that file."},
+			{"Why does touching a widely included header rebuild almost everything?", "Every object file that lists the header as a prerequisite is now older than it, so make recompiles each of them."},
+			{"What does a lockfile guarantee?", "Every build uses the same exact versions of every dependency, with their hashes checked, so builds are reproducible and a tampered download is refused."},
+			{"Can 100% line coverage miss a bug?", "Yes: every line can run with inputs that work, while the input that breaks it (an overflow, an edge case) is never tried."},
+			{"How many tests does git bisect need for 1,000 commits?", "About 10, since each test halves the range: ⌈log₂ 1000⌉ = 10."},
+			{"What makes a container different from a virtual machine?", "A container is a process tree on the host's kernel, isolated with namespaces and limited with cgroups; a virtual machine runs its own kernel on emulated hardware."},
 		},
 	},
 
@@ -239,6 +596,8 @@ own virtual machines.`,
 			"Explain how memory-safety bugs in C become exploits, and prevent them",
 			"Harden a server and its network, and keep secrets and dependencies under control",
 			"Detect an attack in logs and run a calm, documented incident response",
+			"Read a research paper, a CVE and a CVSS score, and prioritise what to patch",
+			"Find an unknown bug by fuzzing and disclose it responsibly, within the law",
 		},
 		Glossary: []Term{
 			{"Vulnerability", "A weakness that an attacker can exploit."},
@@ -256,6 +615,12 @@ own virtual machines.`,
 			{"Port scan", "Probing a machine to find which network services answer."},
 			{"Supply-chain attack", "Compromising software you depend on so the attack arrives through a trusted channel."},
 			{"Incident response", "The planned steps for detecting, containing and recovering from an attack."},
+			{"CVE", "Common Vulnerabilities and Exposures: a unique public ID for one known vulnerability, such as CVE-2021-44228."},
+			{"CWE", "Common Weakness Enumeration: the class a vulnerability belongs to, such as CWE-89 (SQL injection) or CWE-416 (use-after-free)."},
+			{"CVSS", "Common Vulnerability Scoring System: a 0.0 to 10.0 severity score computed from a vector of metrics."},
+			{"Zero-day", "A vulnerability the vendor does not yet know about, so no patch exists."},
+			{"Fuzzing", "Feeding a program huge numbers of malformed inputs under a sanitizer to find inputs that crash it."},
+			{"Coordinated disclosure", "Reporting a vulnerability privately to the vendor and giving them time to fix it before publishing."},
 		},
 		Concepts: []Concept{
 			{
@@ -691,6 +1056,169 @@ outgoing traffic.`,
 					"Many countries require reporting some breaches within a deadline (72 hours under the EU's GDPR); put that in the plan.",
 				),
 			},
+			{
+				Name:    "Reading Research Papers",
+				Summary: "The frontier of computing lives in papers; learn to read one without drowning in it.",
+				Body: `Textbooks are years behind; the newest ideas, in security and
+everywhere else, arrive first as papers. Reading one is a skill, not a
+talent, and it is not read front to back.
+
+The three-pass method (Keshav): first pass, five minutes, read the
+title, abstract, introduction, section headings and conclusion, and
+decide whether to go on. Second pass, up to an hour, read the whole
+thing but skip the heavy proofs, studying the figures and tables, which
+carry most of the result, and marking terms to look up. Third pass, for
+a paper you must truly understand, rebuild it: re-derive the argument,
+re-implement the core, and note where you would have done it
+differently. Most papers deserve only the first pass.
+
+Read actively: a paper makes a claim, offers evidence and compares with
+what came before. Ask what exactly is new, what the threat model or
+assumptions are, what the evaluation does not cover, and whether you
+believe the result. Find papers through Google Scholar, arXiv and a
+venue's proceedings; follow a paper backwards through its references and
+forwards through "cited by". Preprints are not peer-reviewed, and a
+single paper is a claim, not a settled fact.`,
+				Diagram: `pass 1 (5 min)   title · abstract · intro · headings · conclusion → read on?
+pass 2 (1 hr)    whole paper, skip proofs, study figures and tables
+pass 3 (hours)   re-derive and re-implement; find the unstated assumptions
+                 most papers: stop after pass 1`,
+				MentalModel: "A paper is an argument to interrogate, read in passes, not a chapter to absorb front to back.",
+				TryIt:       "Give a famous short paper (Dijkstra's \"Go To Statement Considered Harmful\", or the original RSA paper) a five-minute first pass and write down its one claim.",
+				Analogy: `Watching a match before studying the players. First you see the whole
+game and the final score (abstract and conclusion); only if it matters
+do you rewatch in slow motion to see exactly how each goal was built
+(the method and proofs).`,
+				Example: `Every technology in this degree began as a paper: Shannon's 1948 theory
+of communication, Codd's 1970 relational model, Diffie and Hellman's
+1976 key exchange, and the 2017 "Attention Is All You Need", which
+started the large-language-model era. Security research is published at
+venues such as USENIX Security, IEEE S&P ("Oakland"), ACM CCS and NDSS,
+and the talks at Black Hat and DEF CON.`,
+				Exercises: trio(
+					"For a paper of your choice, write one sentence each for: its claim, its evidence, and what it does not address.",
+					"The abstract gives the claim; the evaluation section gives the evidence and, read carefully, its limits.",
+					"Give three papers a first pass in 15 minutes total and rank them by how much you would gain from a second pass. Pick one and do the second pass, listing every term you had to look up.",
+					"Figures and tables first: they usually carry the result more clearly than the prose.",
+					"Re-implement the core idea of a short systems or security paper (a data structure, an algorithm, a small protocol) from its description alone, then compare your version with the authors' code if they released it.",
+					"If your implementation behaves differently, you have found either a bug of yours or an unstated assumption of theirs; both are worth writing down.",
+				),
+			},
+			{
+				Name:    "Reading CVEs, CWEs & Advisories",
+				Summary: "The shared language defenders use to name, score and prioritise known vulnerabilities.",
+				Body: `When a vulnerability becomes public it gets a CVE ID, such as
+CVE-2021-44228 (Log4Shell): a unique name everyone can refer to. The
+record names the affected product and versions, links to the fix, and
+usually cites a CWE, the class of weakness (CWE-79 cross-site scripting,
+CWE-89 SQL injection, CWE-416 use-after-free, CWE-787 out-of-bounds
+write): the same bugs this stage has been teaching.
+
+Severity is scored with CVSS, from 0.0 to 10.0. The base score is
+computed from a vector string such as
+CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H: how the vulnerability is
+reached (Attack Vector: Network, Adjacent, Local, Physical), how hard
+(Attack Complexity), what privileges and user interaction it needs, and
+its impact on confidentiality, integrity and availability. A high score
+is not the same as high risk to you: a 9.8 in software you do not run,
+or that is not reachable from your network, may matter less than a 6.5
+on your public login page.
+
+Prioritise with more than the number. CISA's Known Exploited
+Vulnerabilities (KEV) catalogue lists what attackers are using right
+now, and EPSS estimates the probability a vulnerability will be
+exploited. "Patch the highest CVSS first" is a worse rule than "patch
+what is being exploited and reachable first".`,
+				Diagram: `CVE-2021-44228                  the name (year + number)
+  └ CWE-917  expression-language injection   the weakness class
+  └ CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H  = 10.0   the score
+  └ affected: Log4j 2.0-beta9 .. 2.14.1;  fixed in 2.15.0 (then 2.17.1)
+  └ on CISA KEV: yes  → being exploited: patch now`,
+				MentalModel: "A CVE names the bug, a CWE names its family, CVSS scores it, and KEV tells you if it is on fire.",
+				TryIt:       "Look up CVE-2021-44228 on the NVD and read its CVSS vector field by field.",
+				Analogy: `A disease registry. The CVE is the case number, the CWE is the diagnosis
+("it's a kind of pneumonia"), CVSS is the severity triage score, and the
+KEV catalogue is the public-health alert that this strain is actively
+spreading right now.`,
+				Example: `Log4Shell (CVE-2021-44228) scored 10.0 and was in a logging library
+buried inside thousands of applications, so the hard part was not the
+score but finding everywhere it was used. The Equifax breach exploited
+CVE-2017-5638 in Apache Struts, a patch that had been available for
+months: the vulnerability was known, the patching was not done.`,
+				Exercises: trio(
+					"Two vulnerabilities score CVSS 9.8 and 6.1. One is in a library on your internet-facing server; the other needs an attacker already logged in as an admin. Which do you patch first, and why is the score not enough?",
+					"Reachability and context beat the raw number: an exploitable, reachable 6.1 can outrank an unreachable 9.8.",
+					"Parse a CVSS v3.1 base vector yourself and compute the base score, then check it against the official calculator for three real CVEs.",
+					"The base score combines the exploitability metrics and the impact metrics with a defined formula; the specification gives the exact weights.",
+					"Take a project with dependencies, list its known vulnerabilities with your language's audit tool, and for each decide patch now, patch soon or accept, writing down the reasoning (reachable? exploited in the wild per KEV? a fix available?).",
+					"A vulnerability in code you never call may be a lower priority than a medium one on a hot path; record why, so the decision can be reviewed.",
+				),
+			},
+			{
+				Name:    "Vulnerability Research & Coordinated Disclosure",
+				Summary: "How researchers find a flaw nobody knew about, and get it fixed without causing harm.",
+				Body: `A zero-day is a vulnerability the vendor does not yet know about, so
+there is no patch. Finding one before an attacker does, and getting it
+fixed, is the work of a security researcher, and it is a legitimate,
+well-paid career. It is also bounded by law and ethics: in most
+countries, testing a system you do not own or have permission to test is
+a crime (the US Computer Fraud and Abuse Act, the UK Computer Misuse
+Act), whatever your intention. Everything below is practised only on
+your own systems, on deliberately vulnerable targets built for it, or
+under the explicit scope of a bug-bounty or engagement.
+
+How researchers find unknown bugs, all of which you have met in this
+degree:
+- fuzzing: feed a program millions of malformed or random inputs under a
+  sanitizer (AddressSanitizer, UBSan) and watch for crashes. Modern
+  fuzzers (AFL++, libFuzzer) guide themselves by code coverage. This is
+  how most memory-safety bugs are now found.
+- code audit: read the source for the patterns from this stage, missing
+  length checks, integer overflow, unchecked return values, trust of
+  user input.
+- diffing patches: compare a program before and after a fix to see what
+  changed, which can reveal a related, still-unpatched bug.
+
+A crash is not yet a finding. You minimise the input to the smallest
+that still triggers it, work out the root cause (which line, which
+assumption), and assess impact: can it be made to disclose memory, or
+only to crash? That assessment is where judgement, and restraint, matter.
+
+Then you disclose, coordinated. Report privately to the vendor (or
+through a CERT or a bug-bounty platform), give them a reasonable time to
+fix it (90 days is the common norm, as Google Project Zero uses), and
+publish only after a fix is available, or the deadline passes with none.
+Selling to the highest bidder, or publishing a working exploit against
+unpatched software people rely on, causes the harm the whole field
+exists to prevent.`,
+				Diagram: `find ─▶ reproduce ─▶ minimise ─▶ root cause ─▶ assess impact
+                                                   │
+                                                   ▼
+          report privately to the vendor ─▶ they fix it ─▶ CVE issued
+                              │  (≈90 days)            │
+                              └─ no fix in time ───────┴─▶ publish responsibly`,
+				MentalModel: "Find it, prove it minimally, report it privately, and let the fix ship before the world hears.",
+				TryIt:       "Read a published Project Zero write-up end to end and note the timeline from report to fix to disclosure.",
+				Analogy: `Finding a faulty lock on a neighbour's door. The responsible thing is to
+tell them quietly and give them time to change it, not to pick it to
+prove you can, and not to post the technique while every door in the
+street still has that lock.`,
+				Example: `Google's Project Zero finds zero-days in widely used software and
+publishes after a 90-day deadline, which pushed the industry toward
+timely patching. OSS-Fuzz runs fuzzers continuously against hundreds of
+open-source projects and has reported tens of thousands of bugs to their
+maintainers. Bug-bounty programmes (HackerOne, Bugcrowd, and vendors'
+own) pay researchers for exactly this work, under rules that make it
+legal; some single high-impact reports have paid over $100,000.`,
+				Exercises: trio(
+					"Put these in the right order and say why each matters: publish, minimise the input, report to the vendor, confirm the crash reproduces, assess impact.",
+					"Reproduce, minimise, assess, report, then publish only after a fix or the deadline: skipping \"report first\" is what makes disclosure irresponsible.",
+					"Write a small parser in C (for a config format, or a simple image header), then fuzz it with libFuzzer or AFL++ under -fsanitize=address,undefined. Minimise the first crashing input by hand to the fewest bytes that still crash it, find the root cause, and fix it. Keep the crashing input as a regression test.",
+					"A libFuzzer target is one function, int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size); build with -fsanitize=fuzzer,address.",
+					"Practise the full loop legally: pick a target that invites it (a pwn.college or picoCTF challenge, or a program with an open bug-bounty scope you have read), find an issue, and write it up as a disclosure report: summary, affected version, reproduction steps, impact, and suggested fix.",
+					"A good report lets the maintainer reproduce the bug in minutes; that is what gets it fixed, and what earns a bounty.",
+				),
+			},
 		},
 		Resources: []Resource{
 			{"Site", "OWASP Top 10:2025", "https://owasp.org/Top10/2025/0x00_2025-Introduction/", "The current list of the most critical web-application security risks."},
@@ -726,6 +1254,12 @@ outgoing traffic.`,
 			{"What is the difference between a 401 and a 403 response?", "401: we do not know who you are (authenticate). 403: we know who you are, and you may not do this."},
 			{"You leaked an API key in a public commit and deleted it. What now?", "Revoke it and issue a new one; it stays in Git history and has probably been scraped already."},
 			{"Why should you not wipe a hacked server immediately?", "It destroys the evidence of how the attacker got in; isolate it and investigate first."},
+			{"What is the three-pass method for reading a paper?", "Pass 1: title, abstract, intro, headings and conclusion, to decide whether to read on. Pass 2: the whole paper, skipping proofs, studying figures. Pass 3: re-derive and re-implement it."},
+			{"What do a CVE ID, a CWE and a CVSS score each tell you?", "The CVE names a specific vulnerability; the CWE names its class of weakness; the CVSS score (0 to 10) rates its severity."},
+			{"Why is the highest CVSS score not always what to patch first?", "A high score in software you do not run, or that an attacker cannot reach, can matter less than a lower-scored, reachable, actively exploited bug (see the CISA KEV catalogue)."},
+			{"What is a zero-day?", "A vulnerability the vendor does not yet know about, so no patch exists; finding and responsibly reporting one before attackers use it is the work of a security researcher."},
+			{"What is coordinated disclosure, and why the delay before publishing?", "Report the flaw privately to the vendor and give them a reasonable time (often 90 days) to fix it, publishing only after a fix exists, so attackers do not get a working exploit against unpatched systems."},
+			{"Why is testing a system you do not own a crime even with good intentions?", "Laws such as the US CFAA and the UK Computer Misuse Act forbid unauthorised access regardless of intent; practise only on your own systems, deliberately vulnerable targets, or within an explicit bug-bounty or engagement scope."},
 		},
 	},
 
@@ -733,12 +1267,19 @@ outgoing traffic.`,
 	11: {
 		Overview: `What can computers do at all, and what can they do efficiently? This
 stage explores the mathematical limits of computation: simple machines
-that recognise patterns, the Turing machine that models every computer,
-problems that no program can ever solve, and the famous P vs NP question.`,
+that recognise patterns and the regex engines built on them, grammars
+and stacks, the Turing machine that models every computer, problems that
+no program can ever solve, the famous P vs NP question, reductions
+between problems, and the heuristics that tame hard problems in
+practice. The theory is measured, too: a regex that takes exponential
+time, a DFA that is 2ⁿ times bigger than its NFA, a 5-state Turing
+machine that runs for 47 million steps, and a Sudoku solved as logic.`,
 		Outcomes: []string{
 			"Use regular expressions and grammars confidently, knowing their limits",
 			"Explain why some problems can never be solved by any program",
 			"Recognise hard (NP-complete) problems and choose practical approaches",
+			"Explain why some regex engines can hang and others cannot",
+			"Turn a puzzle into a SAT problem, and judge a heuristic's answer against the optimum",
 		},
 		Glossary: []Term{
 			{"Automaton", "An abstract machine that reads input and moves between states."},
@@ -750,6 +1291,11 @@ problems that no program can ever solve, and the famous P vs NP question.`,
 			{"NP", "Problems whose proposed solutions can be checked quickly."},
 			{"NP-complete", "The hardest problems in NP; a fast solution to one would solve them all."},
 			{"Heuristic", "A practical rule of thumb that usually finds good answers, without guarantees."},
+			{"NFA", "A nondeterministic finite automaton: it may have several possible next states, and accepts if any path does."},
+			{"Backtracking", "Trying one choice, and undoing it to try the next when it fails; can take exponential time."},
+			{"Reduction", "Turning instances of one problem into instances of another, so a solver for the second solves the first."},
+			{"SAT", "The satisfiability problem: can the variables of a formula be set so that it is true? The first problem proved NP-complete."},
+			{"Approximation ratio", "How far, at worst, an algorithm's answer can be from the optimum, such as \"at most twice the best\"."},
 		},
 		Concepts: []Concept{
 			{
@@ -770,6 +1316,22 @@ patterns take exponential time on hostile input.`,
           a            b
  ─▶ (S0) ───▶ (S1) ───▶ ((S2))      S0 on b → S0     S1 on a → S1
                                      S2 on a → S1     S2 on b → S0`,
+				UnderTheHood: `The pattern ^(a+)+$ matches strings of a's. Given a string of n a's
+followed by a b, which cannot match, Python's re module (a backtracking
+engine) tried every way of splitting the a's between the two +'s
+before giving up:
+
+  n = 16    0.004 s
+  n = 18    0.018 s
+  n = 20    0.064 s
+  n = 22    0.200 s
+  n = 24    0.847 s     about 4 times slower for every 2 more a's
+
+At that rate n = 40 would take years. GNU grep -E, which runs the
+pattern as an automaton, answered in 2.7 ms for n = 24, and still 2.7 ms
+for n = 100,000: it reads each character once, keeping track of every
+state the pattern could be in. Same pattern, same answer; the
+difference is the algorithm, and it is the subject of the next lesson.`,
 				MentalModel: "If you only need to remember a fixed amount, a finite automaton (or a regex) can do it.",
 				TryIt:       "Write a regex for UK postcodes or US ZIP+4 codes and test it on regex101.com.",
 				Analogy: `A turnstile is either locked or unlocked. A coin unlocks it, and pushing
@@ -782,10 +1344,76 @@ by driving its servers' CPUs to 100% (catastrophic backtracking).`,
 				Exercises: trio(
 					"Draw a finite automaton that accepts binary strings containing an even number of 1s.",
 					`Two states are enough: "even so far" and "odd so far".`,
-					`Implement a DFA simulator (states, transitions, accepting states) and run both the "ends in ab" machine and your even-1s machine on 20 test strings.`,
-					"A dictionary from (state, symbol) to the next state.",
-					"Write a log scanner that uses regular expressions to extract timestamps, IP addresses and status codes from a web-server log, and reports the number of errors per hour.",
-					`Named groups such as (?P<ip>\d+\.\d+\.\d+\.\d+) keep the code readable.`,
+					`In C, implement a DFA simulator (a transition table int next[STATES][2], and an array of accepting states) and run both the "ends in ab" machine and your even-1s machine on 20 test strings.`,
+					"The whole simulation is one loop: state = next[state][symbol] for each character.",
+					"Write a log scanner that uses regular expressions to extract timestamps, IP addresses and status codes from a web-server log, and reports the number of errors per hour, with grep -E and awk, or in C with regcomp and regexec from regex.h.",
+					"In regex.h, regexec fills an array of regmatch_t with the start and end of each parenthesised group.",
+				),
+			},
+			{
+				Name:    "NFAs, DFAs & How Regex Engines Work",
+				Summary: "Nondeterminism is free in theory and costs either memory or time in practice; good engines never backtrack.",
+				Body: `A nondeterministic finite automaton (NFA) may have several possible next
+states for a symbol, or none, and may jump without reading anything (an
+ε-move). It accepts if any path through it ends in an accepting state.
+Thompson's construction (1968) turns any regular expression into an NFA
+with at most about two states per symbol of the pattern.
+
+There are two honest ways to run an NFA:
+- simulate it: keep the set of states it could be in, and update the
+  whole set for each input character. Time is O(pattern × text), never
+  more, whatever the input. RE2, Go's regexp, Rust's regex crate and
+  grep work this way.
+- convert it to a DFA with the subset construction: each DFA state is a
+  set of NFA states. Matching is then one table lookup per character,
+  but the DFA can have up to 2ⁿ states for an n-state NFA, so engines
+  build it lazily, only the states the text actually reaches.
+
+Backtracking engines (Perl, Python, Java, JavaScript) instead try one
+path at a time and back up on failure. That supports backreferences
+like (a+)\1, which no automaton can, at the price of exponential worst
+cases.`,
+				Diagram: `regex a(b|c)*  ─Thompson─▶  NFA  ─subset construction─▶  DFA
+                                                 {each DFA state =
+simulate the NFA: a set of states per character   a set of NFA states}
+backtrack:        one path at a time, undo on failure`,
+				UnderTheHood: `The language "the n-th symbol from the end is 1" has an NFA with n + 1
+states: wait in state 0, guess that this 1 is the one, then count n − 1
+more symbols. A short program ran the subset construction on it and
+counted the DFA states it produced:
+
+  n =  1      2 NFA states      2 DFA states
+  n =  3      4                 8
+  n =  5      6                32
+  n = 10     11             1,024
+  n = 16     17            65,536
+
+Exactly 2ⁿ: the DFA must remember the last n symbols, every one of the
+2ⁿ combinations, because any of them could turn out to be the n-th from
+the end. This is not an accident of the construction; it is proven that
+no smaller DFA exists. The NFA simulation stays at 17 states for n = 16,
+and that is why engines simulate, or build only the part of the DFA
+they need.`,
+				MentalModel: "Track every possible state at once, and the input can never make you go back.",
+				TryIt:       "Draw the Thompson NFA for (a|b)*abb, then run the subset construction by hand and count the DFA states you get.",
+				Analogy: `Searching a maze. A backtracking engine sends one explorer, who walks
+down a corridor and, at a dead end, walks all the way back to try the
+next one. An NFA simulation floods the maze with water: every corridor
+fills at once, step by step, and you only watch where the water has
+reached.`,
+				Example: `Google built RE2 so that users could type regular expressions into Code
+Search without being able to hang its servers, and Go's regexp package
+and Rust's regex crate follow its design. Cloudflare's 2019 outage was
+a backtracking regex; after it, the company moved its firewall rules to
+an engine with guaranteed linear time. Lexer generators such as lex
+and flex compile token patterns into DFAs ahead of time.`,
+				Exercises: trio(
+					"How many states does the Thompson NFA for a|b have? And for (a|b)*?",
+					"Each symbol gets two states joined by its edge; | adds a new start and end with ε-moves to both branches (6 states); * adds two more with a loop back (8).",
+					"In C, simulate an NFA for a pattern you build by hand: store the states and their transitions in arrays, keep the current set as a bool array, and update it for each input character, following ε-moves. Run it on the input that makes ^(a+)+$ hang and time it.",
+					"Compute the ε-closure (every state reachable by ε-moves) each time you add a state to the set.",
+					"Write a lazy DFA: start from the NFA, create each DFA state (a set of NFA states) only when the input first reaches it, cache it in a hash table, and count how many of the possible states a real text actually creates.",
+					"Represent a set of NFA states as a bitmask (or a sorted list) so that equal sets hash to the same DFA state.",
 				),
 			},
 			{
@@ -799,11 +1427,31 @@ remember how many brackets are open. Parsers (Stage 5 builds one) are
 practical pushdown automata.
 
 The Chomsky hierarchy orders these classes of languages from the
-simplest to the most powerful.`,
+simplest to the most powerful.
+
+A recursive-descent parser uses the call stack as its pushdown stack:
+each level of nesting is one more function call. That makes nesting
+depth a real limit, and a hostile input that is nothing but opening
+brackets can crash a parser that does not set one.`,
 				Diagram: `recursively enumerable     ◀ Turing machines
   └ context-sensitive
       └ context-free         ◀ pushdown automata (code, JSON, HTML)
           └ regular          ◀ finite automata, regexes`,
+				UnderTheHood: `How deep can real JSON parsers nest? Each was given n "[" followed by
+n "]":
+
+  Python json    depth 990 ok, depth 1,000: RecursionError
+                 (its recursion limit is 1,000 calls)
+  Go json        depth 10,000 ok, depth 10,001:
+                 "exceeded max depth"
+  Node.js        depth 100,000 ok
+
+Three parsers, three limits, and each one is a pushdown automaton
+running out of stack, or refusing to before it does. Go's limit is a
+deliberate rule against stack exhaustion from hostile input; Python's
+is its general recursion limit. No regular expression could check
+these inputs at all, at any depth, because matching [ to ] needs to
+count, and a finite automaton cannot.`,
 				MentalModel: "Finite memory handles patterns; a stack handles nesting.",
 				TryIt:       `Write a grammar for arithmetic with +, * and parentheses, and derive "2 * (3 + 4)" by hand.`,
 				Analogy: `Russian nesting dolls: to know that every doll is closed again, you must
@@ -815,8 +1463,8 @@ generate parsers from grammars, for compilers and for code editors.`,
 				Exercises: trio(
 					`Using the rule S → ( S ) S | ε, derive "(()())".`,
 					`ε means "empty". Expand the leftmost S each time.`,
-					"Write a recursive-descent parser and evaluator for: Expr → Term (('+'|'-') Term)*, Term → Factor (('*'|'/') Factor)*, Factor → number | '(' Expr ')'.",
-					"One function per rule, each consuming tokens.",
+					"In C, write a recursive-descent parser and evaluator for: Expr → Term (('+'|'-') Term)*, Term → Factor (('*'|'/') Factor)*, Factor → number | '(' Expr ')'. Give it a depth limit, and test it on 100,000 opening brackets.",
+					"One function per rule, each consuming tokens; pass the depth down and fail cleanly when it passes the limit.",
 					"Write a checker that validates brackets, braces and quotes in a JSON-like config file and reports the line and column of the first error, as editors do when they underline a missing bracket.",
 					"A stack of open symbols, each stored with its position.",
 				),
@@ -838,6 +1486,28 @@ stored-program computer: programs are just data.`,
                  ▲
                 head        state: q2
 rule:  (q2, reads 1) → write 0, move right, go to state q3`,
+				UnderTheHood: `How long can a tiny Turing machine run before it stops? The "busy
+beaver" question asks, for machines with n states and two symbols,
+started on a blank tape, which halting one runs longest. This
+5-state machine, found by Marxen and Buntrock in 1989:
+
+  A: 0 → 1 R B    1 → 1 L C
+  B: 0 → 1 R C    1 → 1 R B
+  C: 0 → 1 R D    1 → 0 L E
+  D: 0 → 1 L A    1 → 1 L D
+  E: 0 → 1 R halt 1 → 0 L A
+
+was simulated in C, its tape an array:
+
+  halted after 47,176,870 steps, 4,098 ones, 12,289 cells visited
+  0.21 s at gcc -O2; 1.59 s with sanitizers
+
+Ten rules, 47 million steps. In 2024 a collaborative project proved
+with the Coq proof assistant that no 5-state machine that halts runs
+longer: BB(5) = 47,176,870. For 6 states the known champion runs for
+more steps than could be written in decimal with every atom in the
+observable universe, and the general question is undecidable, which is
+the next lesson.`,
 				MentalModel: "Every computer is the same machine in different clothes; only speed and memory differ.",
 				TryIt:       "Run a Turing-machine simulator online and watch a binary-increment machine add 1 to 1011.",
 				Analogy: `A clerk with an endless paper strip, a pencil and a rulebook that says
@@ -851,7 +1521,7 @@ to be Turing-complete.`,
 				Exercises: trio(
 					"Trace, by hand, a Turing machine that flips every bit (0 ↔ 1) until it reaches a blank, on the input 1010.",
 					"One working state plus a halt state is enough.",
-					"Write a Turing-machine simulator (the tape as a dictionary, the rules as a table) and program it to increment a binary number.",
+					"In C, write a Turing-machine simulator (the tape as an array with the head starting in the middle, the rules as a table rule[state][symbol]) and program it to increment a binary number.",
 					"Move to the rightmost bit, then carry leftwards: 1 → 0 and continue; 0 → 1 and halt; blank → 1 and halt.",
 					`Research one "accidentally Turing-complete" system (PowerPoint, Magic: The Gathering, Minecraft…) and explain in half a page which of its features provide memory and which provide conditional branching, the two ingredients of computation.`,
 					"Look for something that stores state and something that chooses what happens next.",
@@ -878,6 +1548,27 @@ problem) and complete (never raising a false alarm).`,
         return
 
 trouble(trouble)  →  if it halts, it loops; if it loops, it halts.  Contradiction.`,
+				UnderTheHood: `Undecidability is not only about contrived programs. This loop:
+
+  while (x != 1) x = x % 2 ? 3 * x + 1 : x / 2;
+
+halts for every starting x anyone has ever tried, but nobody can prove
+it halts for all of them: that is the Collatz conjecture, open since
+1937. A C program ran it for every x below 10 million in 3.2 seconds:
+
+  longest:  8,400,511 takes 685 steps to reach 1
+  highest:  starting from 6,631,675, x climbs to 60,342,610,919,632
+
+Testing more numbers can never settle it, and a perfect halting checker
+would. Real tools therefore approximate. gcc -fanalyzer, given a
+function that frees a pointer only when argc > 5 and then uses it:
+
+  warning: use after 'free' of 'p' [CWE-416]
+  warning: dereference of possibly-NULL 'p' [CWE-690]
+
+It reasoned about both paths without running them, and also pointed
+out the unchecked malloc. On other programs it will miss bugs or raise
+false alarms: no tool can avoid both.`,
 				MentalModel: "Programs cannot fully predict programs, so tools must approximate.",
 				TryIt:       "Explain the halting proof to a friend, using only the 'trouble' program above.",
 				Analogy: `"This sentence is false." If it is true, it is false; if it is false, it
@@ -890,9 +1581,9 @@ trade some precision for usefulness.`,
 				Exercises: trio(
 					`Which can a program decide, and which not in general: "does this file contain the word print?", "does this program ever print anything?", "does this program have more than 100 lines?"`,
 					"Questions about behaviour are undecidable in general; questions about text are easy.",
-					`Write a "loop detector" that runs a function with a time limit and reports "probably infinite". Construct a function it wrongly flags, and explain why no time limit can be right for all programs.`,
+					`Write a "loop detector" in C that runs a function in a child process with a time limit (fork, alarm, waitpid) and reports "probably infinite". Construct a function it wrongly flags, and explain why no time limit can be right for all programs.`,
 					"A long but finite computation beats any fixed limit.",
-					"Run a static analyser on one of your projects (pylint, mypy, go vet or clippy) and classify three of its warnings as a true bug, a false alarm or style. Explain why the tool cannot be perfect.",
+					"Run a static analyser on one of your projects (gcc -fanalyzer or clang --analyze for C, go vet, or clippy) and classify three of its warnings as a true bug, a false alarm or style. Explain why the tool cannot be perfect.",
 					"Undecidability forces a trade-off between missed bugs and false alarms.",
 				),
 			},
@@ -918,6 +1609,21 @@ hard to solve but are easy to check.`,
 │ └──────────────────────────┘   graph colouring      │
 └─────────────────────────────────────────────────────┘
   if P = NP, the two boxes would be the same`,
+				UnderTheHood: `The travelling-salesperson problem by brute force in C: random cities,
+the first one fixed, every order of the others tried:
+
+  cities   tours          time
+       8        5,040     under 1 ms
+      10      362,880     0.025 s
+      11    3,628,800     0.197 s
+      12   39,916,800     2.27 s
+
+Each extra city multiplies the time by the number of cities: about 17.6
+million tours a second, so 20 cities (19! ≈ 1.2 × 10¹⁷ tours) would
+take around 220 years. Checking a proposed tour, adding up n distances
+and comparing with a target length, takes microseconds at any size.
+That gap, between finding and checking, is exactly the difference
+between P and NP, if they are different.`,
 				MentalModel: "Checking an answer is often easy even when finding it is hard.",
 				TryIt:       "Solve a Sudoku by backtracking and count how many positions the search tries.",
 				Analogy: `Finding a four-digit lock combination by trying every option is slow;
@@ -931,10 +1637,141 @@ crew scheduling and chip layout rely on solvers for NP-hard problems.`,
 				Exercises: trio(
 					"For a Sudoku, explain why checking a filled grid is fast, while solving a blank one may require trying many possibilities.",
 					"Checking means looking at each row, column and box once.",
-					"Solve the travelling-salesperson problem for 8 cities by brute force (all permutations) and with the nearest-neighbour heuristic. Compare route lengths and running times, then try 11 cities.",
+					"In C, solve the travelling-salesperson problem for 8 cities by brute force (all permutations) and with the nearest-neighbour heuristic. Compare route lengths and running times, then try 11 and 12 cities.",
 					"With the start fixed, 11 cities give 10! = 3,628,800 routes.",
 					"Plan a delivery route through 15 real addresses in your town (approximate coordinates are fine). Implement nearest-neighbour plus 2-opt improvement, and compare it with the order you would intuitively drive.",
 					"2-opt repeatedly reverses a segment of the route whenever that makes the route shorter.",
+				),
+			},
+			{
+				Name:    "Reductions & NP-Completeness",
+				Summary: "Solve a new problem by translating it into one you already have a solver for.",
+				Body: `A reduction turns any instance of problem A into an instance of problem
+B, quickly, so that the answers agree. Then a solver for B also solves
+A, and B is at least as hard as A. Reductions are how hardness is
+proved and how hard problems are solved in practice.
+
+In 1971 Stephen Cook (and independently Leonid Levin) proved that every
+problem in NP reduces to SAT, the question of whether a Boolean formula
+can be made true. SAT was the first NP-complete problem; since then
+thousands more have been shown NP-complete by reducing a known one to
+them: 3-SAT, graph colouring, clique, Hamiltonian cycle, subset sum,
+Sudoku of any size.
+
+The practical side is just as important. SAT solvers based on DPLL and
+its modern descendant, conflict-driven clause learning (CDCL), solve
+real formulas with millions of variables. So translating a scheduling,
+verification or puzzle problem into SAT is often the fastest way to
+solve it, even though the worst case is exponential.`,
+				Diagram: `Sudoku grid ──encode──▶ SAT formula ──solver──▶ true/false assignment
+                 │                                          │
+ variable x(r,c,d) = "cell (r,c) holds digit d"     decode ──▶ filled grid
+ each cell holds one digit; each row, column and box holds each digit once`,
+				UnderTheHood: `A Sudoku becomes SAT with one variable per (row, column, digit): 729
+variables. The rules become clauses:
+
+  every cell holds at least one digit            81 clauses
+  … and at most one (no two digits together)  2,916
+  every row, column and box has each digit       243
+  … and at most once                           8,748
+  total                                       11,988, plus one per given
+
+A short DPLL solver in Python (unit propagation, then branch on a
+literal from the shortest clause) took the puzzle Arto Inkala published
+in 2012 as "the world's hardest Sudoku", 21 givens:
+
+  solved in 3.1 s: 863 decisions, 30,771 unit propagations
+  812753649 943682175 675491283 154237896 369845721 …
+
+the published solution. The 60 empty cells allow 9⁶⁰ ≈ 1.8 × 10⁵⁷ grids
+to brute-force; unit propagation, which fills in every forced value
+for free, cut the search to 863 choices.`,
+				MentalModel: "If you can translate it into SAT, a SAT solver can probably solve it.",
+				TryIt:       "Write the clauses that say \"exactly one of x1, x2, x3 is true\" in CNF, and check them against all 8 assignments.",
+				Analogy: `Translating a letter into a language that has an excellent translator,
+rather than learning to write that letter yourself. The reduction is
+the translation; the SAT solver is the expert. Proving hardness works
+the same way in reverse: if your new problem can be used to answer a
+problem everyone already knows is hard, yours is hard too.`,
+				Example: `Hardware companies verify chip designs by reducing "can this circuit
+ever reach a bad state?" to SAT. Linux package managers such as
+openSUSE's zypper (libsolv) and Fedora's dnf solve package
+dependencies as SAT problems. In 2016 a SAT solver settled the Boolean
+Pythagorean triples problem, open for decades, with a proof 200
+terabytes long.`,
+				Exercises: trio(
+					"Encode \"A and B cannot both be on duty, and at least one of A, B, C must be\" as clauses in conjunctive normal form.",
+					"(¬A ∨ ¬B) ∧ (A ∨ B ∨ C).",
+					"In C, write a DPLL SAT solver that reads a formula in the DIMACS CNF format, with unit propagation and backtracking, and test it on small satisfiable and unsatisfiable formulas, then on a Sudoku you encode yourself.",
+					"Keep the assignment in an array indexed by variable, and undo the assignments of a branch when it fails.",
+					"Reduce a real scheduling problem you care about (exam timetables, a sports league, shifts at work) to SAT: choose the variables, write the constraints as clauses, solve it with your solver or a free one such as MiniSat or CaDiCaL, and decode the answer.",
+					"\"At most one of n\" takes n(n−1)/2 pairwise clauses; for large n, look up the sequential-counter encoding.",
+				),
+			},
+			{
+				Name:    "Approximation & Heuristics for Hard Problems",
+				Summary: "When the exact answer costs centuries, take a provably close one, or a usually excellent one, in milliseconds.",
+				Body: `For NP-hard optimisation problems, three practical strategies:
+- approximation algorithms, with a guarantee: the answer is never worse
+  than some factor of the optimum. Picking both ends of any uncovered
+  edge gives a vertex cover at most twice the smallest; Christofides'
+  algorithm gives a metric TSP tour at most 1.5 times the shortest.
+- heuristics and local search, with no guarantee but often excellent
+  results: start from a reasonable answer (nearest neighbour for TSP)
+  and keep making small improvements (2-opt: reverse a segment if that
+  shortens the tour) until none helps.
+- exact solvers that are fast in practice: branch and bound,
+  integer-programming and SAT solvers, which prune most of the search
+  on real inputs.
+
+Some problems resist all three: for some, even approximating within any
+constant factor is NP-hard. And when a problem must be solved exactly,
+problem size is the lever: an exponential algorithm is fine for 20
+items and hopeless for 60.`,
+				Diagram: `cost                                        exact search
+  ▲                                       ╱
+  │                                    ╱
+  │                              ╱ ─ ─ ─ ─ ─   heuristic: fast, good,
+  │                   ╱ ─ ─ ─ ─                no guarantee
+  │        ╱ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─   approximation: fast,
+  └───────────────────────────────────────▶      within a factor
+                                     problem size`,
+				UnderTheHood: `The same random 11-city instances solved exactly (3,628,800 tours each)
+and with two heuristics, six layouts:
+
+  nearest neighbour        +0.0% to +17.6% above the optimum
+  nearest neighbour, 2-opt +0.0% to +1.0%, optimal in 5 of 6
+
+Nearest neighbour alone was once 17.6% too long; 2-opt then fixed
+almost all of it. On 1,000 cities, where no exact answer is known:
+
+  nearest neighbour   289,951
+  after 2-opt         251,417   13.3% shorter, 7 passes, 0.145 s
+
+A brute-force search of 1,000 cities would need 999! tours, a number
+with 2,565 digits. A heuristic answer in a seventh of a second, close
+to optimal on every case that could be checked, is why routing,
+scheduling and chip design are solved problems in practice and open
+problems in theory.`,
+				MentalModel: "Good enough, fast, and with a known bound beats perfect and never.",
+				TryIt:       "Draw five points on paper, find the shortest tour by trying them all, then run nearest neighbour from each starting point and compare.",
+				Analogy: `Packing a car boot. Nobody computes the optimal arrangement of every
+bag; you put the big ones in first, then fill the gaps, then swap two
+bags if that makes room. You end up close to the best packing in a
+minute instead of the perfect one next year.`,
+				Example: `UPS's ORION routes its drivers with heuristics, not exact optimisation,
+and airlines plan crews with integer programming solvers that are
+exponential in the worst case but fast on their data. The Concorde TSP
+solver has found exact optimal tours for instances with 85,900 cities,
+using branch and cut, while 2-opt and Lin–Kernighan heuristics get
+within a few percent in seconds.`,
+				Exercises: trio(
+					"The greedy vertex cover takes any edge with neither end covered and adds both ends. Why is the result at most twice the size of the smallest cover?",
+					"The chosen edges share no vertices, and any cover must contain at least one end of each of them; greedy takes two.",
+					"In C, implement nearest neighbour and 2-opt for TSP, and compare both with the exact answer from brute force on 50 random instances of 10 cities: report the average and the worst ratio.",
+					"Fix the random seed for each instance so that both methods see the same cities.",
+					"Take a real knapsack-style decision (packing for a trip by weight and value, or a budget across projects), solve it exactly with dynamic programming, and compare with the greedy \"best value per kilogram first\" heuristic. Find an instance where greedy is far from the optimum.",
+					"Greedy fails when one heavy, valuable item would fit only if a few lighter ones were left out.",
 				),
 			},
 		},
@@ -957,6 +1794,15 @@ crew scheduling and chip layout rely on solvers for NP-hard problems.`,
 			{"What does the halting problem say?", "No program can correctly decide, for every program and input, whether it halts."},
 			{"What makes a problem NP-complete?", "It is in NP (solutions can be checked quickly), and every NP problem reduces to it."},
 			{"What do we do in practice with NP-hard problems?", "Use heuristics, approximation algorithms, or solvers that work well on real inputs."},
+			{"Why can ^(a+)+$ take exponential time in Python but not in grep?", "Python's engine backtracks through every way of splitting the a's between the two +'s; grep runs the pattern as an automaton, tracking all possible states at once, one pass over the text."},
+			{"Why can converting an NFA to a DFA blow up, and how do engines avoid it?", "Each DFA state is a set of NFA states, and there can be 2ⁿ sets. Engines simulate the NFA directly, or build only the DFA states the text reaches."},
+			{"What can a backtracking regex engine do that an automaton cannot?", "Backreferences such as (a+)\\1, which need to remember an unbounded amount of text."},
+			{"Why does a recursive-descent parser need a nesting limit?", "Each level of nesting is a function call; an input of nothing but opening brackets would exhaust the stack and crash it."},
+			{"What is BB(5), and why can't BB(n) be computed in general?", "47,176,870: the most steps any halting 5-state, 2-symbol Turing machine takes from a blank tape. Computing it in general would solve the halting problem."},
+			{"What does it mean to reduce problem A to problem B?", "Translate every instance of A, quickly, into an instance of B with the same answer, so a solver for B solves A, and B is at least as hard as A."},
+			{"Why was SAT the first NP-complete problem?", "The Cook–Levin theorem (1971) showed that any problem in NP can be translated into a Boolean formula that is satisfiable exactly when the answer is yes."},
+			{"What does unit propagation do in a SAT solver?", "When a clause has only one unassigned literal left and the rest are false, that literal must be true: it is set at once, often triggering more forced values."},
+			{"What is the difference between an approximation algorithm and a heuristic?", "An approximation algorithm guarantees its answer is within a proven factor of the optimum; a heuristic usually does well but promises nothing."},
 		},
 	},
 
@@ -964,13 +1810,18 @@ crew scheduling and chip layout rely on solvers for NP-hard problems.`,
 	12: {
 		Overview: `Every programming language is a set of design choices about how to
 express computation. This stage teaches the big ideas behind all of
-them (paradigms, type systems, memory management, execution models and
-concurrency), so that you can learn any new language in days instead of
-months.`,
+them (paradigms, type systems, recursion and closures, generics, error
+handling, memory management, execution models and concurrency), so that
+you can learn any new language in days instead of months. Each idea is
+shown in the languages built around it, and measured: C, Java, OCaml,
+Haskell, Rust, Go, Erlang, JavaScript, Python and SQL, all run for these
+lessons.`,
 		Outcomes: []string{
 			"Recognise the paradigm and design choices behind any language",
 			"Use types, memory models and concurrency models deliberately",
 			"Pick up a new programming language quickly",
+			"Write recursive and higher-order code that does not overflow the stack",
+			"Choose between exceptions, result types and error codes, and between generics and interfaces",
 		},
 		Glossary: []Term{
 			{"Paradigm", "A style of programming, such as imperative, object-oriented or functional."},
@@ -982,6 +1833,12 @@ months.`,
 			{"Bytecode", "A compact, portable instruction format run by a virtual machine."},
 			{"JIT", "Just-in-time compiler: compiles frequently run code to machine code while the program runs."},
 			{"Concurrency", "Structuring a program as several tasks that make progress independently."},
+			{"Type inference", "The compiler working out the types you did not write, as OCaml and Haskell do for whole programs."},
+			{"Closure", "A function together with the variables it captured from where it was created."},
+			{"Tail call", "A call that is the very last thing a function does, which a compiler can turn into a jump that uses no stack."},
+			{"Generics", "Code written once for many types, such as a list of T; compiled as one copy per type or as one shared copy."},
+			{"Result type", "A return value that is either a success with a value or an error, which the caller must handle (Rust's Result, Haskell's Either)."},
+			{"Actor", "An isolated process with its own state that communicates only by sending messages, as in Erlang."},
 		},
 		Concepts: []Concept{
 			{
@@ -992,14 +1849,42 @@ early BASIC). Object-oriented programming bundles data with the methods
 that act on it into objects, using encapsulation, inheritance and
 polymorphism (Java, C#, Python). Functional programming builds programs
 from pure functions that do not change state, and treats functions as
-values that can be passed around (Haskell, Clojure, and map/filter/reduce
-in most languages). Declarative languages describe what you want, not
-how to get it (SQL, HTML, regex).
+values that can be passed around (Haskell, OCaml, Erlang, Clojure, and
+map/filter/reduce in most languages). Declarative languages describe
+what you want, not how to get it (SQL, HTML, regex).
 
 Most modern languages mix paradigms. The skill is choosing the right
 style for each part of a program.`,
+				Diagram: `the same question: the sum of the squares of the even numbers to 1,000,000
+
+C        for (i = 1; i <= n; i++) if (i % 2 == 0) total += i * i;
+Java     LongStream.rangeClosed(1, n).filter(i -> i % 2 == 0).map(i -> i * i).sum()
+Haskell  sum [x * x | x <- [1 .. n], even x]
+Erlang   lists:sum([X * X || X <- lists:seq(1, N), X rem 2 =:= 0])
+SQL      SELECT sum(i * i) FROM n WHERE i % 2 = 0`,
+				UnderTheHood: `All of the versions above were run for this lesson, and all printed
+166667166667000000. The OCaml one, written with lists:
+
+  List.init 1_000_000 (fun i -> i + 1)
+  |> List.filter (fun i -> i mod 2 = 0)
+  |> List.map (fun i -> i * i)
+  |> List.fold_left ( + ) 0
+
+crashed with "Fatal error: exception Stack_overflow". In OCaml 4.14,
+List.init and List.filter are tail-recursive but List.map is not: on
+500,000 elements it needed 500,000 stack frames, more than the 8 MB stack
+holds. Rewritten with Seq, a lazy sequence that produces one element at
+a time, the same pipeline printed the right answer.
+
+Laziness goes further in Haskell, where every list is lazy:
+
+  take 5 (filter even (map (^ 2) [1 ..]))   →   [4,16,36,64,100]
+
+map over the infinite list [1 ..] finishes, because only the five
+squares asked for are ever computed. A paradigm is a choice of what the
+language does for you, and of its costs.`,
 				MentalModel: "Paradigms are lenses; use the one that makes the problem simplest.",
-				TryIt:       "Sum the squares of the even numbers in a list three ways: a for loop, a class, and map/filter/reduce.",
+				TryIt:       "Sum the squares of the even numbers in a list three ways: a for loop in C, a stream in Java, and a list comprehension in Haskell or Erlang.",
 				Analogy: `Giving directions. Imperative: "walk 200 m, turn left, go two blocks".
 Declarative: "meet me at the library", and you find your own way.
 Object-oriented: asking a taxi driver (an object that knows how to drive)
@@ -1012,9 +1897,9 @@ Android apps were historically written in Java.`,
 				Exercises: trio(
 					"Classify each as imperative, object-oriented, functional or declarative: a SQL query, a recipe, a spreadsheet formula, a class Dog with a bark() method.",
 					"Does it say how, say what, or bundle data with behaviour?",
-					"Implement a shopping cart twice: once with classes (Cart, Item) and once with only pure functions over lists and dictionaries. Compare which is easier to test.",
-					"The pure version returns a new cart instead of modifying the old one.",
-					"Take a script that processes a CSV of orders with nested loops and mutable counters, and rewrite the processing as a pipeline of pure functions (parse → filter → group → summarise), keeping its tests passing.",
+					"Implement a shopping cart twice: in Java with classes (Cart, Item, methods that change the cart), and in OCaml or Haskell with only pure functions that return a new cart. Write the same five tests for both and compare which was easier to test.",
+					"In the functional version, add_item cart item returns a new cart; nothing is ever modified.",
+					"Take a program that processes a CSV of orders with nested loops and mutable counters, and rewrite the processing as a pipeline of pure functions (parse → filter → group → summarise) in a functional language (OCaml, Haskell, Elixir) or with JavaScript's map, filter and reduce, keeping its tests passing.",
 					"Each stage takes data and returns new data, with no global variables.",
 				),
 			},
@@ -1022,18 +1907,48 @@ Android apps were historically written in Java.`,
 				Name:    "Type Systems",
 				Summary: "Rules that catch mistakes before your code runs.",
 				Body: `A type system classifies values and checks that operations make sense.
-Static typing checks before the program runs (Go, Rust, Java,
-TypeScript); dynamic typing checks while it runs (Python, JavaScript,
-Ruby). Strong versus weak typing is about implicit conversions, such as
-what "5" + 3 does. Type inference lets the compiler work out types for
-you, and generics let one function work safely over many types
-(List<T>).
+Static typing checks before the program runs (Go, Rust, Java, OCaml,
+Haskell, TypeScript); dynamic typing checks while it runs (Python,
+JavaScript, Ruby, Erlang). Strong versus weak typing is about implicit
+conversions, such as what "5" + 3 does. Type inference lets the
+compiler work out types for you, and generics let one function work
+safely over many types (List<T>).
 
 Richer types can rule out whole classes of bugs. Optional types replace
 null, which Tony Hoare called his "billion-dollar mistake". Sum types
 (enums that carry data) force you to handle every case.`,
+				Diagram: `                   checked before running      checked while running
+no surprises       Rust, OCaml, Haskell        Python, Ruby
+(strong)           Java, Go                    Erlang
+converts quietly   C (int ↔ pointer, casts)    JavaScript ("5" + 3 = "53")
+(weak)`,
+				UnderTheHood: `"5" + 3, run in three dynamic languages:
+
+  JavaScript   "53"      and "5" * 3 is 15: it converts quietly
+  Python       TypeError: can only concatenate str (not "int") to str
+  Ruby         TypeError: no implicit conversion of Integer into String
+
+OCaml inferred every type in this file without a single annotation
+(ocamlc -i prints them):
+
+  let f x = x + 1                  val f : int -> int
+  let g x y = if x then y else []  val g : bool -> 'a list -> 'a list
+  let compose f g x = f (g x)      val compose : ('a -> 'b) -> ('c -> 'a) -> 'c -> 'b
+
+A traffic light as a sum type, with a case forgotten:
+
+  OCaml   Warning 8 [partial-match]: this pattern-matching is not
+          exhaustive. Here is an example of a case that is not matched:
+          Yellow
+  Rust    error[E0004]: non-exhaustive patterns: Light::Yellow not covered
+
+And null, in C: a lookup that returned NULL for an unknown name, passed
+straight to strlen, compiled without a warning and ended in
+"Segmentation fault", exit status 139. Rust's Option and Haskell's
+Maybe make that impossible: the "no answer" case is a value the
+compiler makes you handle.`,
 				MentalModel: "Types are tests that the compiler writes and runs for free.",
-				TryIt:       "Add type hints to a Python program and run mypy to find mismatches.",
+				TryIt:       "Write let f x = x + 1 and let g x = x ^ \"!\" in OCaml's toplevel (ocaml), read the types it infers, then try f \"a\".",
 				Analogy: `Electrical plugs are shaped so that you cannot push a kettle's plug into
 a phone-charger socket. The shape (the type) prevents a dangerous mistake
 before any current flows.`,
@@ -1044,11 +1959,202 @@ companies have reported that it would have caught a significant fraction
 of their production bugs.`,
 				Exercises: trio(
 					`Predict the result in Python and in JavaScript: "5" + 3 and "5" * 3. Which language is stricter here?`,
-					`Python raises TypeError for "5" + 3; JavaScript converts, giving "53" and 15.`,
-					"Model a traffic light as a sum type (Red | Yellow | Green) in Rust, TypeScript or Python (Enum plus match), with a next() function. Show that forgetting a case is caught by the compiler or type checker.",
-					"Rust's match, or a TypeScript switch with a never check, both detect missing cases.",
-					"Take a small untyped JavaScript or Python project (yours or an open-source one), add types step by step (TypeScript, or mypy --strict), and record every real bug or unclear piece of code the types exposed.",
+					`Python raises TypeError for "5" + 3 and gives "555" for "5" * 3; JavaScript converts, giving "53" and 15.`,
+					"Model a traffic light as a sum type (Red | Yellow | Green) with a next function in OCaml, Rust or Haskell, and an Option-returning lookup function. Show that forgetting a case, or using the lookup's result without checking for None, is caught by the compiler.",
+					"OCaml's match warns (make it an error with -w +8); Rust's match refuses to compile; in Haskell compile with -Wall.",
+					"Take a small untyped JavaScript project (yours or an open-source one), convert it to TypeScript step by step with strict mode on, and record every real bug or unclear piece of code the types exposed.",
 					"Start at the edges: function signatures for inputs and outputs.",
+				),
+			},
+			{
+				Name:    "Recursion, Closures & Higher-Order Functions",
+				Summary: "Functions as values: passed in, returned, and remembering where they were made.",
+				Body: `A higher-order function takes functions as arguments or returns them:
+map, filter and fold (reduce) replace most loops over collections. A
+closure is a function together with the variables it captured where it
+was created; calling make_counter() twice gives two counters, each with
+its own hidden count. In C, which has no closures, the same thing takes
+a function pointer plus a void * pointer to the captured data, passed
+along by hand; qsort and pthread_create work this way.
+
+Functional languages loop by recursion, which raises the question of the
+stack. A tail call, a call that is the very last thing a function does,
+can reuse the current stack frame, so a tail-recursive loop runs in
+constant stack space. OCaml, Haskell, Erlang and Scheme guarantee this;
+C compilers often do it at -O2; Java, Python and JavaScript in practice
+do not, so deep recursion there overflows. The standard fix is an
+accumulator: carry the result along as an argument, so nothing is left
+to do after the recursive call.`,
+				Diagram: `sum 3 = 3 + sum 2                 sum_acc 0 3 = sum_acc 3 2
+      = 3 + (2 + sum 1)                        = sum_acc 5 1
+      = 3 + (2 + (1 + sum 0))                  = sum_acc 6 0
+      = 6   (every frame waits)                 = 6   (nothing waits: a loop)`,
+				UnderTheHood: `The same recursive sum, sum n = n + sum (n − 1), pushed until it broke:
+
+  Python      n = 900 fine; n = 1,000: RecursionError (its limit is 1,000)
+  JavaScript  the deepest that worked, by bisection: 9,642 (Node.js 22)
+  OCaml       n = 100,000 fine; n = 1,000,000: Stack_overflow
+  OCaml, with an accumulator, sum_acc (acc + n) (n − 1):
+              n = 100,000,000 → 5000000050000000, in constant stack
+
+The tail-recursive version made a hundred million calls in the stack
+space of one, because OCaml compiles a tail call into a jump. This is the
+same reason List.map overflowed in the first lesson: it is not tail-
+recursive in OCaml 4.14 (OCaml 5.1 rewrote it so that it is).
+
+Closures, measured in OCaml:
+
+  let make_counter () = let count = ref 0 in fun () -> incr count; !count
+  a() twice, then a() → 3; a fresh b() → 1
+
+Each closure carries its own count: the function's code plus a pointer to
+its captured variables, which is exactly what a C programmer builds by
+hand with a function pointer and a void *.`,
+				MentalModel: "A closure is code plus the variables it remembers; a tail call is a loop in disguise.",
+				TryIt:       "In JavaScript or OCaml, write make_counter, create two counters and call them in turn; then write the same in C with a struct holding a count and a function pointer.",
+				Analogy: `A recipe card with a note clipped to it, "use the oven at Mum's house":
+the recipe (the code) plus what it needs from where it was written (the
+captured variables). Tail recursion is passing a running total down a
+line of people instead of having each one wait to add their number on
+the way back.`,
+				Example: `JavaScript is built on closures: every event handler and callback that
+remembers a variable from the code around it is one. React's hooks are
+closures over a component's state. MapReduce and Spark are higher-order
+functions (map, then reduce) run over clusters, and Erlang servers run
+for years as tail-recursive loops that never grow the stack.`,
+				Exercises: trio(
+					"What does this print, and why? let a = make_counter () and b = make_counter () in a (); a (); print (b ())",
+					"1: b has its own count, captured when it was created; a's two calls do not touch it.",
+					"In OCaml or Haskell, implement map, filter and fold yourself, first with plain recursion and then tail-recursively with an accumulator (reversing at the end). Run both on a list of 10 million elements and explain which survives.",
+					"The accumulator version builds the result backwards, so reverse it once at the end: still O(n).",
+					"In C, write map, filter and fold over an array of ints that take a function pointer and a void *context, and use the context to filter by a threshold chosen at run time and to count calls. Then write the same in JavaScript with closures, and compare what each language had to make explicit.",
+					"The context pointer is the closure's environment: in C you allocate and pass it; in JavaScript the language does it for you.",
+				),
+			},
+			{
+				Name:    "Generics & Polymorphism",
+				Summary: "One piece of code for many types: copied per type, or shared through a table of functions.",
+				Body: `Polymorphism means one interface for many types. There are two ways to
+compile it:
+- monomorphisation (static dispatch): the compiler makes a separate copy
+  of the generic code for every type it is used with, and can optimise
+  each copy fully. C++ templates, Rust generics and (mostly) Go generics
+  work this way. Fast, but more code and longer builds.
+- dynamic dispatch: one shared copy calls the type-specific parts through
+  a table of function pointers (a vtable): Java interfaces, C++ virtual
+  functions, Rust's dyn Trait, Go interfaces, and C's qsort with its
+  comparison function. Smaller, flexible, a little slower per call.
+
+Java implements generics by erasure: List<String> and List<Integer> are
+the same class at run time, and the type parameters exist only for the
+compiler. Haskell's type classes and Rust's traits group the operations a
+type must provide (Ord, Display) and pick the implementation by type.`,
+				Diagram: `monomorphised (Rust, C++)            dynamic dispatch (Java, Go, C)
+largest::<i32>   ─▶ its own code      largest(xs) ─▶ calls cmp through
+largest::<f64>   ─▶ its own code                     a pointer, one copy
+largest::<char>  ─▶ its own code                     for every type`,
+				UnderTheHood: `A generic Rust function, largest<T: PartialOrd + Copy>, called with i32,
+f64 and char, compiled to an object file, and nm listed three
+functions named gen::largest: one copy per type.
+
+Java's erasure, from a two-line program:
+
+  new ArrayList<String>().getClass() == new ArrayList<Integer>().getClass()
+  → true; the class is java.util.ArrayList, for both
+
+The cost of not specialising: sorting 10 million random ints at -O2,
+
+  C qsort, comparison through a function pointer    1.67 s
+  C++ std::sort, comparison inlined by the template  0.88 s
+
+The same algorithm family and the same data. qsort calls its
+comparison function 200-odd million times through a pointer, and
+cannot inline it; std::sort is compiled anew for int, and its
+comparison becomes one instruction.`,
+				MentalModel: "Copy the code per type for speed, or share it through a function table for flexibility.",
+				TryIt:       "Write a generic largest function in Rust (or a template in C++), call it with two types, and find the two copies with nm on the object file.",
+				Analogy: `A cookie cutter for every shape you need (monomorphisation) against one
+adjustable cutter that you reconfigure by looking up a chart each time
+(dynamic dispatch). The first is faster on the production line; the
+second takes up less room in the drawer and works for shapes invented
+later.`,
+				Example: `Go waited until version 1.18 (2022) to add generics, after a decade of
+debate about exactly these trade-offs. Rust programs are known for long
+compile times partly because of monomorphisation. Java's erasure kept
+old bytecode compatible when generics arrived in 2004, which is why a
+Java program cannot ask what T is at run time.`,
+				Exercises: trio(
+					"After erasure, what can a Java method with a List<T> parameter not do that a Rust function with a Vec<T> can? Give one example.",
+					"It cannot create a new T, or check whether the list holds Strings: T is gone at run time. Rust has a separate copy that knows T.",
+					"In Rust, write a trait Shape with area(), two structs that implement it, and two functions that sum the areas of a list: one generic (fn total<T: Shape>(v: &[T])) and one with Vec<Box<dyn Shape>>. Explain which can mix circles and squares in one list, and why.",
+					"Only the dyn version holds different types together; the generic one needs all elements to be the same T.",
+					"Benchmark C's qsort against a sort written for int only (or C++ std::sort) on 10 million numbers, then look at both in objdump or Compiler Explorer and find the indirect call that the specialised version does not have.",
+					"In the qsort loop, look for call *%rax or call *%rcx: the comparison function, reached through a pointer.",
+				),
+			},
+			{
+				Name:    "Error Handling: Exceptions, Results & Error Codes",
+				Summary: "Every language must answer: how does a function say it failed, and who must notice?",
+				Body: `Four designs, all in wide use:
+- error codes: the function returns a special value (-1, NULL) and puts
+  the reason somewhere (C's errno). Cheap, but easy to ignore silently.
+- exceptions: the function throws, and the error unwinds the stack to
+  the nearest handler (Java, Python, C#, OCaml). The happy path stays
+  clean, but any call may throw, and nothing in its signature says so
+  (except Java's checked exceptions).
+- result types: the function returns either a value or an error, and the
+  type system makes the caller deal with it (Rust's Result and its ?
+  operator, Haskell's Either, Swift's throws). Explicit and checked.
+- multiple returns: Go's value, err := f(), checked with if err != nil.
+
+Erlang adds a fifth philosophy, "let it crash": processes are cheap and
+isolated, so a process that hits an unexpected error simply dies, and a
+supervisor restarts it in a known good state. Whatever the design, the
+rules are the same: never silently ignore an error, add context as it
+travels up, and handle it where you can actually do something about it.`,
+				Diagram: `C        fd = open(path, O_RDONLY);  if (fd < 0) perror(path);
+Java     try { read(path); } catch (IOException e) { … }
+Rust     let text = fs::read_to_string(path)?;     // ? returns the Err early
+Go       data, err := os.ReadFile(path); if err != nil { return err }
+Erlang   let the process crash; its supervisor restarts it`,
+				UnderTheHood: `The same failure, opening a file that does not exist, in three styles:
+
+  C       open() returned -1, errno 2, "No such file or directory"
+  Go      open /no/such/file: no such file or directory
+  Rust    total("40", "two") → Err(ParseIntError { kind: InvalidDigit })
+          total("40", "2")   → Ok(42)
+
+What does each style cost? Five million calls, half of them failing,
+after the JIT had warmed up:
+
+  Java, returning -1 for the failure          2.1 ns per call
+  Java, throwing IllegalArgumentException   291.1 ns per call
+  OCaml, raising an exception                 4.4 ns per call
+
+A Java exception records the stack trace when it is created, which is
+most of its cost; OCaml's exceptions are a jump to the handler, cheap
+enough to use for control flow. So in Java, exceptions are for
+exceptional cases; in OCaml, raising Not_found from a lookup is
+ordinary style.`,
+				MentalModel: "Make failure impossible to ignore, and handle it where you can act on it.",
+				TryIt:       "In Rust, write a function that parses two numbers from strings with ? and returns Result<i64, ParseIntError>; call it with good and bad input and print both results.",
+				Analogy: `A delivery that cannot be made. Error codes: a note through the door
+that you may or may not read. Exceptions: the parcel is sent back up the
+chain until someone signs for it. Result types: the courier will not
+leave until you say what to do with it. Let it crash: the van is
+replaced and the route restarts from the depot.`,
+				Example: `Ericsson's AXD301 telephone switch, written in Erlang with supervisors,
+was reported to reach nine nines of availability. Go's explicit if err !=
+nil is the most discussed feature of the language. A famous 2014 Apple
+bug ("goto fail") skipped a TLS certificate check because of a single
+duplicated line in C error-handling code.`,
+				Exercises: trio(
+					"In C, what goes wrong in: FILE *f = fopen(path, \"r\"); fgets(buf, sizeof buf, f);? Fix it.",
+					"fopen returns NULL when the file cannot be opened, and fgets(…, NULL) crashes: check f first and report errno with perror.",
+					"Write the same small config-file parser (key = value lines, with a line number in every error) twice: in Rust with a custom error enum and ?, and in Go with fmt.Errorf(\"line %d: %w\", …). Compare how each version shows where an error came from.",
+					"In Rust, implement std::fmt::Display for the error enum; in Go, errors.Is and errors.As look through wrapped errors.",
+					"In Erlang (or Elixir), write a worker process that crashes on bad input and a supervisor that restarts it, then send it a mix of good and bad messages and show that the service keeps running.",
+					"spawn_link links the two processes; process_flag(trap_exit, true) lets the supervisor receive the crash as a message.",
 				),
 			},
 			{
@@ -1059,15 +2165,40 @@ C++), the programmer frees it, and mistakes cause leaks (memory never
 freed), use-after-free and double-free bugs, a major source of security
 holes.
 
-Garbage collection (Java, Go, Python, JavaScript) automatically finds
-unreachable objects and frees them, at the cost of some CPU time and
-occasional pauses. Reference counting (Python, Swift) frees an object as
-soon as nothing refers to it, but needs extra help with cycles. Rust's
-ownership system checks at compile time that every value has exactly one
-owner and that references never outlive it: memory safety without a
-garbage collector.`,
+Garbage collection (Java, Go, JavaScript, OCaml, Haskell, Erlang)
+automatically finds unreachable objects and frees them, at the cost of
+some CPU time and occasional pauses. Reference counting (Python, Swift)
+frees an object as soon as nothing refers to it, but needs extra help
+with cycles. Rust's ownership system checks at compile time that every
+value has exactly one owner and that references never outlive it: memory
+safety without a garbage collector.`,
+				Diagram: `manual (C)        malloc ──────────────────── free   you decide when
+refcount (Python) count++ on each new reference, count-- on each drop; 0 → freed
+tracing GC (Go)   from the roots, mark what is reachable; sweep the rest
+ownership (Rust)  one owner; freed when the owner goes out of scope`,
+				UnderTheHood: `Reference counting, watched in CPython with sys.getrefcount:
+
+  a new list x                1 reference
+  after y = x                 2
+  after del y                 1
+
+Two objects pointing at each other, then deleted, are never freed by
+counting alone (each still has a count of 1); with the automatic
+collector disabled, gc.collect() then found and freed exactly 2 objects.
+
+Rust refused to compile a use after a move:
+
+  error[E0382]: borrow of moved value: name
+    let moved = name;      value moved here
+    println!("{} {}", name, moved);   value borrowed here after move
+
+Go's collector, traced with GODEBUG=gctrace=1, on a program that
+allocated 20 million 72-byte nodes and kept one in a thousand: 641
+collections in about 2.1 seconds, each with stop-the-world pauses of
+around 0.02 and 0.07 ms either side of 4 ms of concurrent marking, the
+live heap held near 2 MB, against more than 1.4 GB allocated in all.`,
 				MentalModel: "Every allocation needs an owner who knows when it is finished.",
-				TryIt:       "In Python, use sys.getrefcount and the gc module to watch an object's reference count change.",
+				TryIt:       "In Python, use sys.getrefcount and the gc module to watch an object's reference count change, then make a cycle and see who frees it.",
 				Analogy: `A library. With manual management, you must return every book yourself:
 forget and the shelves empty out; return one twice and the records are
 chaos. Garbage collection is a librarian who periodically collects the
@@ -1080,8 +2211,8 @@ US government agencies have urged a move to memory-safe languages.`,
 				Exercises: trio(
 					"Explain what goes wrong in each case: forgetting to free memory, freeing it twice, and using it after freeing it.",
 					"A leak, a double free and a use-after-free.",
-					"In C, write a program with a memory leak and a use-after-free, find both with AddressSanitizer or Valgrind, and fix them.",
-					"gcc -g -fsanitize=address prog.c && ./a.out",
+					"In C, write a program with a memory leak and a use-after-free, find both with AddressSanitizer or Valgrind, and fix them. Then write the same program in Rust and read the compiler's error for the use-after-free.",
+					"gcc -g -fsanitize=address prog.c && ./a.out; in Rust, the borrow checker refuses the program before it runs.",
 					"A long-running Python web service grows from 200 MB to 4 GB over a week. Reproduce a similar leak in a small script (for example an ever-growing cache), find it with tracemalloc, and fix it with a bounded cache.",
 					"functools.lru_cache(maxsize=…) or an explicit eviction policy.",
 				),
@@ -1091,19 +2222,46 @@ US government agencies have urged a move to memory-safe languages.`,
 				Summary: "Different ways of turning source code into a running program.",
 				Body: `An interpreter reads your program and executes it directly (shell
 scripts, simple interpreters). A compiler translates it ahead of time
-into machine code (C, Go, Rust): fast to run, slower to build. Many
-languages compile to bytecode for a virtual machine (Java's JVM, Python's
-CPython VM, .NET's CLR), which makes the program portable across CPUs.
+into machine code (C, Go, Rust, OCaml, Haskell): fast to run, slower to
+build. Many languages compile to bytecode for a virtual machine (Java's
+JVM, Python's CPython VM, Erlang's BEAM, .NET's CLR), which makes the
+program portable across CPUs.
 
 Just-in-time (JIT) compilers watch the running program and compile its
 hot paths to machine code, getting the best of both worlds (V8 for
 JavaScript, the JVM's HotSpot, PyPy). The runtime provides services such
-as garbage collection, threads and the standard library.`,
-				Diagram: `source ─▶ [compiler] ─▶ machine code ──────────────▶ CPU   (C, Go, Rust)
+as garbage collection, threads and the standard library, and its start-up
+time is part of every run.`,
+				Diagram: `source ─▶ [compiler] ─▶ machine code ──────────────▶ CPU   (C, Go, Rust, OCaml)
 source ─▶ [compiler] ─▶ bytecode ─▶ [VM + JIT] ────▶ CPU   (Java, C#, JavaScript)
+source ─▶ [compiler] ─▶ bytecode ─▶ [VM, no JIT] ──▶ CPU   (CPython, Ruby, Erlang)
 source ─────────────────────────▶ [interpreter] ───▶ CPU   (shell scripts)`,
+				UnderTheHood: `The same naive fib(35), about 30 million calls, everywhere, timed with
+start-up included:
+
+  C, gcc -O2                    45 ms    native code
+  Go                            67 ms    native code
+  OCaml, ocamlopt               73 ms    native code
+  Haskell, ghc -O2              88 ms    native code
+  JavaScript, Node.js 22       196 ms    JIT (V8), start-up 43 ms
+  Java, HotSpot                304 ms    JIT, start-up 53 ms
+  Java, -Xint (no JIT)         923 ms    bytecode interpreter
+  Ruby 3.3                   1,323 ms    bytecode VM
+  Erlang                     1,365 ms    of which 1,179 ms is starting the VM
+  Python 3.11                1,962 ms    bytecode VM
+  Guile Scheme, interpreted  5,731 ms
+
+The JIT made the same Java bytecode three times faster than the JVM's own
+interpreter. Python's dis module shows what CPython runs instead of
+machine code:
+
+  LOAD_FAST n · LOAD_CONST 2 · COMPARE_OP < · POP_JUMP_FORWARD_IF_FALSE
+  LOAD_GLOBAL fib · LOAD_FAST n · LOAD_CONST 1 · BINARY_OP - · CALL 1 …
+
+Each of those instructions is a trip through the interpreter's loop;
+each line of the C version is one or two machine instructions.`,
 				MentalModel: "Interpreted versus compiled describes an implementation, not a language.",
-				TryIt:       "Use Python's dis module to see the bytecode of a small function.",
+				TryIt:       "Use Python's dis module to see the bytecode of a small function, and javap -c to see the JVM bytecode of the same function in Java.",
 				Analogy: `A live interpreter translating a speech sentence by sentence (an
 interpreter), versus a translated book prepared in advance (a compiler).
 A JIT is an interpreter who notices you keep repeating the same phrases
@@ -1115,10 +2273,10 @@ near-native speed; Figma uses it.`,
 				Exercises: trio(
 					"For Python (CPython), Go and JavaScript in Chrome, say whether each is usually compiled ahead of time, run as bytecode by a VM, or JIT-compiled.",
 					"CPython: a bytecode VM. Go: compiled to native code. V8: JIT.",
-					`Write a tiny stack-based bytecode VM (PUSH, ADD, MUL, PRINT) and a compiler that turns expressions such as "2 * (3 + 4)" into that bytecode.`,
+					`In C, write a tiny stack-based bytecode VM (PUSH, ADD, MUL, PRINT) and a compiler that turns expressions such as "2 * (3 + 4)" into that bytecode.`,
 					"Compile the syntax tree in post-order: children first, then the operator.",
-					"Benchmark the same CPU-heavy function (for example naive Fibonacci of 30) in CPython, PyPy (if available), Node.js and Go, and explain the differences using the words interpreter, JIT and compiler.",
-					"Run each several times and take the median.",
+					"Benchmark the same CPU-heavy function (for example naive Fibonacci of 35) in at least four languages from different rows of the diagram above, measure each runtime's empty start-up separately, and explain the differences using the words interpreter, bytecode, JIT and compiler.",
+					"Run each several times and take the median; subtract start-up before comparing.",
 				),
 			},
 			{
@@ -1133,8 +2291,29 @@ models:
 - data parallelism: the same operation on lots of data at once (GPUs, Stage 16).
 
 Choosing the right model matters more than micro-optimising.`,
+				Diagram: `threads      ┌ thread ┐ ┌ thread ┐   share memory, guard it with locks
+             └───┬────┘ └───┬────┘
+                 └─ memory ─┘
+actors       (proc) ──msg──▶ (proc) ──msg──▶ (proc)   nothing shared
+event loop   one thread: run a callback, wait for the next ready event`,
+				UnderTheHood: `What a concurrent task costs, measured for 100,000 of each:
+
+  Erlang processes    spawned in 322 ms, 2,688 bytes each;
+                      every one pinged and answered in 241 ms
+  Go goroutines       started in 343 ms, about 2,800 bytes each;
+                      every one woken and finished in 53 ms
+  POSIX threads       70 µs each to create and join, one at a time,
+                      and each reserves an 8 MiB stack (Stage 8)
+
+An Erlang process or a goroutine starts with a stack of a few kilobytes
+that grows when needed, and the language's own scheduler switches
+between them without entering the kernel. That is why a server can give
+each connection its own process or goroutine where it could never give
+each one an operating-system thread. (At a million, both still worked:
+about 2.7 GB in all, though touching that much fresh memory took this
+virtual machine 8 to 21 seconds.)`,
 				MentalModel: "Prefer passing messages over sharing state; when you must share, lock carefully.",
-				TryIt:       "Download 20 web pages one after another, then concurrently with asyncio or goroutines, and compare the times.",
+				TryIt:       "Download 20 web pages one after another, then concurrently with goroutines or JavaScript's Promise.all, and compare the times.",
 				Analogy: `A kitchen. Several cooks sharing one chopping board need rules (locks).
 Cooks passing dishes through a hatch (channels) avoid collisions. A
 single waiter who takes an order, then serves other tables while the
@@ -1146,10 +2325,10 @@ Kubernetes.`,
 				Exercises: trio(
 					"Is each one concurrency, parallelism or both: one chef juggling three dishes; three chefs each cooking one dish; a single-core computer playing music while you browse?",
 					"Parallelism needs things happening at literally the same instant.",
-					"Write a producer–consumer program: one task generates numbers, three workers square them, and one task collects the results, using channels (Go) or queues (Python).",
-					"Close the channel, or send a sentinel value, to tell the workers to stop.",
-					"Build a link checker that crawls a site you own (or a local test site) concurrently, with at most 10 requests in flight at a time, and reports broken links.",
-					"A semaphore or a fixed worker pool limits concurrency so you do not overload the server.",
+					"Write a producer–consumer program twice: in Go (one goroutine generates numbers, three workers square them over channels, one collects the results) and in Erlang (the same with processes and messages).",
+					"In Go, close the channel to tell the workers to stop; in Erlang, send each worker a stop message.",
+					"Build a link checker that crawls a site you own (or a local test site) concurrently, with at most 10 requests in flight at a time, and reports broken links, in Go or with JavaScript's async/await.",
+					"A buffered channel of size 10 (Go) or a small pool of workers pulling from a queue (JavaScript) limits concurrency so you do not overload the server.",
 				),
 			},
 		},
@@ -1173,6 +2352,15 @@ Kubernetes.`,
 			{"What is the difference between static and dynamic typing?", "Static typing checks types before running; dynamic typing checks them while running."},
 			{"How does Rust achieve memory safety without a garbage collector?", "Its ownership and borrowing rules are checked at compile time."},
 			{"What is the difference between concurrency and parallelism?", "Concurrency is structuring work as independent tasks; parallelism is executing them simultaneously."},
+			{"Why does Haskell's take 5 (map (^2) [1 ..]) finish although [1 ..] is infinite?", "Haskell is lazy: elements are computed only when needed, so only the first five squares are ever produced."},
+			{"What does type inference do?", "The compiler works out the types you did not write from how values are used, as OCaml does for f x = x + 1 (int -> int)."},
+			{"What is a closure?", "A function together with the variables it captured where it was created, so that two closures from the same code can each keep their own state."},
+			{"Why does a tail-recursive function not overflow the stack in OCaml or Erlang?", "The recursive call is the last thing it does, so the compiler turns it into a jump that reuses the current stack frame."},
+			{"What is the difference between monomorphisation and dynamic dispatch?", "Monomorphisation compiles a separate copy of generic code for each type; dynamic dispatch shares one copy that calls type-specific functions through a table of pointers."},
+			{"What does Java's type erasure mean?", "Generic type parameters exist only at compile time: List<String> and List<Integer> are the same class at run time."},
+			{"Why are Java exceptions expensive and OCaml exceptions cheap?", "A Java exception records a stack trace when it is created; an OCaml exception is little more than a jump to the handler."},
+			{"What does Rust's ? operator do?", "If the Result is an Err, it returns that error from the current function at once; otherwise it unwraps the Ok value."},
+			{"Why can a server give each connection an Erlang process or a goroutine, but not an OS thread?", "They start with a stack of a few kilobytes and are switched by the language's own scheduler; an OS thread reserves megabytes and needs the kernel to switch."},
 		},
 	},
 }

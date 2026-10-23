@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -69,6 +70,30 @@ type CheckCase struct {
 	Files     map[string]string // files in the folder the program runs in (paths may have folders)
 	WantFiles map[string]string // files that must hold exactly this afterwards
 	Explain   string            // shown when this case fails: the likely cause
+
+	// Gen, when set, makes Stdin and Want when the case is first run.
+	// Big generated inputs would otherwise be built every time the
+	// program starts. Wrap it in generated so it runs once.
+	Gen func() (stdin, want string)
+}
+
+// generated memoises gen for CheckCase.Gen.
+func generated(gen func() (stdin, want string)) func() (string, string) {
+	var once sync.Once
+	var stdin, want string
+	return func() (string, string) {
+		once.Do(func() { stdin, want = gen() })
+		return stdin, want
+	}
+}
+
+// resolved returns c with Stdin and Want made by Gen, if it has one.
+func (c CheckCase) resolved() CheckCase {
+	if c.Gen != nil {
+		c.Stdin, c.Want = c.Gen()
+		c.Gen = nil
+	}
+	return c
 }
 
 // checks are all checked exercises, in teaching order.
@@ -241,7 +266,7 @@ int main(int argc, char **argv) {
 				Explain: "With no input, print nothing at all."},
 			{Name: "accents and digits are ignored", Stdin: "Café 42 naïve\n", Want: "a 2\nc 1\ne 1\nf 1\nn 1\nv 1\n",
 				Explain: "é and ï are not ASCII letters: in UTF-8 each is two bytes above 127. Passing such a byte, stored in a plain char, to isalpha or tolower is undefined behaviour; use an int from getchar, or cast to unsigned char."},
-			{Name: "a long input", Stdin: strings.Repeat("ab", 100000), Want: "a 100000\nb 100000\n",
+			{Name: "a long input", Gen: generated(func() (string, string) { return strings.Repeat("ab", 100000), "a 100000\nb 100000\n" }),
 				Explain: "Read character by character (getchar until EOF) instead of into a fixed-size buffer."},
 		},
 		Hints: []string{
@@ -587,7 +612,9 @@ int main(void) {
 			{Name: "upper and lower case", Stdin: "Apple apple APPLE banana\n", Want: "3 apple\n1 banana\n"},
 			{Name: "a 5000-letter word", Stdin: strings.Repeat("a", 5000) + " x " + strings.Repeat("a", 5000) + "\n", Want: "2 " + strings.Repeat("a", 5000) + "\n1 x\n",
 				Explain: "A fixed-size word buffer overflows here: grow the buffer for the current word with realloc."},
-			{Name: "200,000 words", Stdin: manyWords(), Want: "2000 aa\n2000 ab\n2000 ac\n2000 ad\n2000 ae\n2000 af\n2000 ag\n2000 ah\n2000 ai\n2000 aj\n",
+			{Name: "200,000 words", Gen: generated(func() (string, string) {
+				return manyWords(), "2000 aa\n2000 ab\n2000 ac\n2000 ad\n2000 ae\n2000 af\n2000 ag\n2000 ah\n2000 ai\n2000 aj\n"
+			}),
 				Explain: "Every word appears 2000 times, so the ten shown are the first ten alphabetically."},
 		},
 		Hints: []string{
@@ -659,6 +686,8 @@ func manyWords() string {
 func init() {
 	checks = append(checks, coreChecks...)
 	checks = append(checks, systemsChecks...)
+	checks = append(checks, foundationsChecks...)
+	checks = append(checks, softwareChecks...)
 	sort.SliceStable(checks, func(i, j int) bool { return checks[i].Stage < checks[j].Stage })
 }
 

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"strings"
 	"testing"
 )
@@ -74,6 +75,27 @@ func TestWrapKeepsCodeVerbatim(t *testing.T) {
 	for _, l := range wrap("  "+strings.Repeat("x", 100), 40, "") {
 		if visibleLen(l) > 40 {
 			t.Fatalf("long code line not broken: %q", l)
+		}
+	}
+}
+
+// Every concept card, in every stage, fits the terminal at the widths the
+// academy supports: nothing is cut off at the right edge.
+func TestConceptCardsFitTheScreen(t *testing.T) {
+	reg := seedRegistry()
+	for _, w := range []int{40, 60, 80} {
+		for id, g := range curriculum {
+			for i, c := range g.Concepts {
+				var out bytes.Buffer
+				a := &App{reg: reg, width: w, con: &console{out: &out}}
+				builds := reg.prereqsOf(c.Name)
+				a.renderConcept(c, i+1, len(g.Concepts), g.Glossary, make([]bool, len(c.Exercises)), "", 0, builds, []string{"○ a checked exercise (not run yet)"})
+				for _, l := range strings.Split(out.String(), "\n") {
+					if n := visibleLen(l); n > w {
+						t.Errorf("%d columns, Stage %d %q: a line is %d wide: %q", w, id, c.Name, n, stripANSI(l))
+					}
+				}
+			}
 		}
 	}
 }

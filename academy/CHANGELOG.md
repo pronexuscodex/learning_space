@@ -4,7 +4,7 @@ All notable changes to the Systems & AI Academy are listed here. The
 format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 versions follow [Semantic Versioning](https://semver.org/).
 
-## [1.7.0] - 2026-10-22
+## [1.7.0] - 2026-10-23
 
 ### Changed
 After a walk through the app as a new learner, at 40, 80 and 160 columns:
@@ -32,7 +32,7 @@ After a walk through the app as a new learner, at 40, 80 and 160 columns:
   - **Files & Streams:** modes, fgets, fgetc and fread, perror, buffering, fclose;
   - **Headers, the Preprocessor & make:** separate compilation, include guards, static, the linker's symbols, macros, Makefiles.
 
-  Stage 1 now has twelve concepts, and the academy 122.
+  Stage 1 now has twelve concepts.
 - **Checked exercises: your C, compiled and tested for real.** Stage 1 has twelve, one per concept: `hello`, `types`, `fizzbuzz`, `temperature`, `swap`, `letters`, `scores`, `intvec`, `safe_number`, `count`, `stack` and `fix_average`. A project joins them all: `wordfreq`, the ten most frequent words of any text. You write the program in your own editor, in `Documents/Academy Labs/Stage 01/`. The academy then compiles it with your C compiler (`-std=c17 -Wall -Wextra -Werror`, plus AddressSanitizer and UBSan where available), runs it against the test cases, and explains each failure with the line that differs, the exit code, the sanitizer's report, or the usual cause.
   - **Where:** Study Hall → Checked exercises, or `academy -check ID` from another terminal (`academy -check list` shows them all).
   - **The tests catch what matters:**
@@ -57,9 +57,41 @@ After a walk through the app as a new learner, at 40, 80 and 160 columns:
   - Stage 7: `atomic_save` (temporary file, fsync, rename, fsync the folder) and `wal_kv` (a key-value store with a write-ahead log that survives a torn record);
   - Stage 17: `safe_join` (canonicalise, then check) and `copy_string` (a bounded copy like strlcpy).
 
-  That makes 28 in all. Checks can now give the program files in subfolders and examine the files it leaves behind.
+- **Stages 2, 3 and 4 completed, to the depth of Stage 1.** Ten new lessons, and every lesson in the three stages now has an *Under the hood* section built on real measurements (compiler output, timings, the bytes in memory), and exercises in C, the language you know from Stage 1, instead of Python:
+  - **Stage 2, Data Structures & Algorithms** (5 → 9 lessons): new *Recursion & Divide and Conquer*, *Searching: Linear & Binary Search*, *Greedy Algorithms* and *Dynamic Programming*;
+  - **Stage 3, Discrete Mathematics** (5 → 8): new *Modular Arithmetic & Number Theory*, *Recurrences: The Cost of Recursion* and *Graph Theory: Degrees, Trees & Paths*;
+  - **Stage 4, Computer Architecture** (5 → 8): new *Building an ALU: Adders, Subtraction & Flags*, *Finite State Machines & Sequential Logic* and *Instruction Sets & Machine Code*.
+
+  Their glossaries, outcomes and quizzes grow with them (new quiz questions are added at the end, so your review cards keep their history).
+- **Stages 5 to 8 completed, to the same depth.** Eleven new lessons, and every lesson in the four stages now has an *Under the hood* section measured on a real Linux machine, with C exercises instead of Python:
+  - **Stage 5, Computer Systems** (5 → 8 lessons): new *Linking, Loading & Shared Libraries*, *What the Optimizer Does* and *Profiling & Measuring Performance*; measured with `nm`, `readelf`, `objdump`, gcc at each `-O` level, Cachegrind and Callgrind;
+  - **Stage 6, Operating Systems** (5 → 8): new *Memory Allocators: How malloc Works*, *File Descriptors, Files & Pipes* and *Signals*; measured with strace and `/proc` (ASLR, lazy allocation and 262,143 page faults, brk against mmap, the cost of a system call and a context switch, a data race at `-O0` and `-O1`);
+  - **Stage 7, Storage Engines** (6 → 8): new *Pages, Records & the Buffer Pool* and *Query Planning & Join Algorithms*; measured with fsync timings and SQLite (its file header, B-tree depth from `dbstat`, commit cost per journal mode, an MVCC snapshot, `EXPLAIN QUERY PLAN` before and after an index, a nested loop against an automatic index);
+  - **Stage 8, Networks** (6 → 9): new *IP Addressing, Routing & NAT*, *Partitioning & Consistent Hashing* and *Timeouts, Retries & Idempotency*; packets captured on loopback and decoded byte by byte, the routing table, Nagle against delayed ACKs (43 ms against 0.07 ms), SYN retransmissions, and simulations of Raft elections, consistent hashing and retry storms.
+
+- **Stages 9, 11 and 12 completed, to the same depth.** Nine new lessons, an *Under the hood* section in every lesson of the three stages, and exercises in the languages each idea belongs to:
+  - **Stage 9, Software Engineering** (5 → 8 lessons): new *Shell Scripting & Automation*, *Build Systems & Dependencies* and *Debugging Tools: gdb, Core Dumps & git bisect*; measured with strace (bash searching PATH), Git's own object files (a blob ID recomputed with sha1sum), make's incremental and parallel builds, gcov coverage against a million random tests, gdb, git bisect over 1,000 commits, and Linux namespaces with unshare;
+  - **Stage 11, Theory of Computation** (5 → 8): new *NFAs, DFAs & How Regex Engines Work*, *Reductions & NP-Completeness* and *Approximation & Heuristics for Hard Problems*; measured with Python's backtracking regex against grep, the subset construction's 2ⁿ states, JSON nesting limits in three languages, the 5-state busy beaver (47,176,870 steps), a Sudoku solved as SAT, and 2-opt against the optimum;
+  - **Stage 12, Programming Languages** (5 → 8): new *Recursion, Closures & Higher-Order Functions*, *Generics & Polymorphism* and *Error Handling: Exceptions, Results & Error Codes*. Its examples and exercises now use the languages built around each idea (C, Java, OCaml, Haskell, Rust, Go, Erlang, JavaScript and SQL, with Python where reference counting or dynamic typing is the point), all run for these lessons: one task in six languages, type inference and exhaustiveness errors, recursion limits, monomorphisation, the cost of exceptions, Go's garbage collector, fib(35) in eleven runtimes, and 100,000 Erlang processes and goroutines.
+
+  The academy now has 152 concepts and 456 exercises.
+- **Stage 10, Security: three new lessons.** *Reading Research Papers* (the three-pass method), *Reading CVEs, CWEs & Advisories* (CVE IDs, CWE classes, CVSS scoring, and prioritising with the CISA KEV catalogue over the raw score) and *Vulnerability Research & Coordinated Disclosure* (how researchers find an unknown bug by fuzzing, code audit and patch diffing, and report it responsibly within the law). Exercises use the legal practice targets the stage already points to (pwn.college, picoCTF, OWASP Juice Shop) and real tools (fuzzers, sanitizers, the NVD). New glossary terms (CVE, CWE, CVSS, zero-day, fuzzing, coordinated disclosure), two new outcomes and six appended quiz questions. New check `cvss`: a CVSS v3.1 base-score calculator, checked against the official formula on every combination of the eight base metrics. The academy now has 155 concepts and 465 exercises.
+- **Checked exercises for Stages 2 to 4.** Eighteen more, each timed on inputs where only the efficient idea passes:
+  - Stage 2: `duplicates` (O(n log n), not O(n²)), `hanoi`, `bsearch` (the first match, 100,000 lookups), `intervals` (greedy by end time) and `edit_distance` (a 2,000 × 2,000 table), so every Stage 2 lesson has one;
+  - Stage 3: `sat_count`, `bitsets`, `binomial` (exact up to C(67, 33)), `modpow` (exponents up to 10¹⁸), `inversions`, `euler` and `birthday`;
+  - Stage 4: `bases`, `nand_gates` (the checker counts your NAND gates), `alu` (zero, negative, carry and overflow flags), `number_fsm`, `cpu` (an emulator) and `rv_decode` (real RISC-V machine code).
+
+- **Checked exercises for Stages 5 to 8.** Eleven more:
+  - Stage 5: `linkage` (names kept private with `static`, linked against the checker's own) and `checked_add` (overflow checks that cannot overflow);
+  - Stage 6: `arena` (a bump allocator), `pipeline` (`A | B` with pipe, dup2 and fork) and `graceful` (SIGTERM and SIGINT, and a blocking read interrupted);
+  - Stage 7: `buffer_pool` (LRU with pins and dirty pages), `bloom` (a Bloom filter's false-positive rate) and `hash_join` (100,000 rows each);
+  - Stage 8: `routes` (longest-prefix match), `retry` (backoff with jitter) and `ring` (consistent hashing).
+
+- **Checked exercises for Stages 9, 11 and 12.** Nine more: `git_blob`, `make_order` and `bisect`; `nfa_match`, `turing` and `dpll`; `higher_order`, `refcount` and `stack_vm`.
+
+  That makes 67 in all (adding Stage 10's `cvss`). Checks can now give the program files in subfolders and examine the files it leaves behind.
 - **Mastery counts real code.** A concept with a checked exercise reaches "mastered" only once that check has passed (with or without hints). Concepts you had mastered before stay at "retained" until you pass their check. Where checks cannot run (Windows), nothing changes.
-- **Concept prerequisites.** Concepts now list the earlier concepts they build on (174 links across 117 concepts in all 21 stages). The list sits at the top of each card, with a tick for each one you have marked as understood.
+- **Concept prerequisites.** Concepts now list the earlier concepts they build on (248 links across 150 concepts in all 21 stages). The list sits at the top of each card, with a tick for each one you have marked as understood.
   - **What's next and Today's workout** use them. When the next concept builds on one you have not marked yet, they send you to the first missing step and say which concept it leads to. They do not stop you reading anything.
   - **Tests check the graph:** every name is a real concept, every prerequisite comes earlier and agrees with the stage prerequisites (so there can be no cycle), and every concept from Stage 1 on lists at least one.
 - **Get hired: the career center** (`e`). It turns learning into the three things companies hire on: foundations, finished projects and interview skill.
@@ -89,6 +121,7 @@ After a walk through the app as a new learner, at 40, 80 and 160 columns:
   - On Windows, or with `ACADEMY_PAGER=inline`, the line pager is used as before.
 
 ### Fixed
+- **The academy starts at once again.** The checked exercises' big test inputs (a million buffer-pool accesses, 100,000-row tables, a 1000 × 1000 maze) were built every time the program started, which had grown to almost 3 seconds; they are now made the first time a check runs. A test keeps it that way, and another checks that every starter compiles as it is, so your first build fails only for what you have not written yet.
 - The link check (`-check-links` and the weekly Links workflow) failed whenever a site's own server was failing, such as Complexity Zoo answering 503 for hours. A server error (5xx) that persists after the retry is now a warning, like a site that does not answer; a 404, a moved page or a fake PDF still fails.
 - A full correctness pass over the teaching content. Every coding drill was solved, the reference solutions were checked, and every quiz answer, exercise hint, type-in program and number in the lessons was recomputed. Four wordings were fixed:
   - the dictionary's List example could be read as `append` returning the new list;

@@ -2,6 +2,7 @@
 /academy
 /academy.exe
 academy_campus_registry.json
+academy_checks.jsonl
 .academy-registry-*.tmp
 academy_notes.md
 academy_backups/

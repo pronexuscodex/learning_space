@@ -347,7 +347,7 @@ int main(int argc, char **argv) {
 			{Name: "the shortest, not the first found", Stdin: openMaze(50, 50, 0, 0, 0, 49), Want: "49\n",
 				Explain: "Depth-first search finds a path, not the shortest one: explore in rings with a queue instead."},
 			{Name: "a winding corridor", Stdin: serpentine(), Want: fmt.Sprint(serpentineSteps()) + "\n"},
-			{Name: "a 1000 by 1000 maze", Stdin: openMaze(1000, 1000, 0, 0, 999, 999), Want: "1998\n",
+			{Name: "a 1000 by 1000 maze", Gen: generated(func() (string, string) { return openMaze(1000, 1000, 0, 0, 999, 999), "1998\n" }),
 				Explain: "A recursive search a million cells deep overflows the stack, and per-cell queues of your own are too slow: use one array as a queue, with a head and a tail index."},
 		},
 		Hints: []string{

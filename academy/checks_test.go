@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -31,6 +32,7 @@ func TestChecksAreWellFormed(t *testing.T) {
 		}
 		names := map[string]bool{}
 		for _, c := range ch.Cases {
+			c = c.resolved()
 			if c.Name == "" || names[c.Name] {
 				t.Errorf("%s: missing or duplicate case name %q", ch.ID, c.Name)
 			}
@@ -44,7 +46,7 @@ func TestChecksAreWellFormed(t *testing.T) {
 		}
 	}
 	total := 0
-	for _, id := range []int{1, 2, 5, 6, 7, 8, 17} {
+	for _, id := range []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 17} {
 		if len(checksFor(id)) == 0 {
 			t.Errorf("Stage %d has no checked exercises", id)
 		}
@@ -1713,4 +1715,36 @@ size_t copy_string(char *dst, size_t size, const char *src) {
 }
 `
 	failsWith(t, "copy_string", strncpyCopy, "cut short", "NOT TERMINATED")
+}
+
+// Big generated inputs are made when a case first runs (Gen), not when
+// the program starts: building them all at start-up once took 2.8 s.
+func TestBigCaseInputsAreGeneratedLazily(t *testing.T) {
+	for _, ch := range checks {
+		for _, c := range ch.Cases {
+			if len(c.Stdin)+len(c.Want) > 100<<10 {
+				t.Errorf("%s/%s: %d bytes built at start-up; use Gen: generated(…)", ch.ID, c.Name, len(c.Stdin)+len(c.Want))
+			}
+		}
+	}
+}
+
+// Every starter compiles as it is, with the runner's flags, so a learner's
+// first build fails only for what they have not written yet (a missing
+// main or function shows up at link time), never for the starter itself:
+// an unused static helper is an error under -Werror.
+func TestStartersCompile(t *testing.T) {
+	needCompiler(t)
+	cc, _ := findCompiler(os.Getenv)
+	dir := t.TempDir()
+	for _, ch := range checks {
+		src := filepath.Join(dir, ch.ID+".c")
+		if err := os.WriteFile(src, []byte(ch.Starter), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		args := append([]string{"-std=c17", "-Wall", "-Wextra", "-Werror", "-c", src, "-o", src + ".o"}, ch.Flags...)
+		if out, err := cc.command(context.Background(), args...).CombinedOutput(); err != nil {
+			t.Errorf("%s: the starter does not compile:\n%s", ch.ID, out)
+		}
+	}
 }

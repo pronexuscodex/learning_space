@@ -200,7 +200,7 @@ Checked-exercise files live in `Documents/Academy Labs` (`$ACADEMY_LABS` chooses
 | | 19 | Network Defence & Monitoring |
 | | 20 | Incident Response, Forensics & Privacy |
 
-That is **122 concepts** and **366 exercises**, plus a glossary, a resource library, lab blueprints, a quiz and a mastery check for every stage. Start Here also lists electives for afterwards: graphics, quantum computing, embedded systems and bioinformatics.
+That is **155 concepts** and **465 exercises**, plus a glossary, a resource library, lab blueprints, a quiz and a mastery check for every stage. Start Here also lists electives for afterwards: graphics, quantum computing, embedded systems and bioinformatics.
 
 ## How computers work (Stage 0)
 
@@ -328,14 +328,53 @@ The later stages have checked exercises too, written with C and POSIX only, so t
 | `hashmap` | 2: Hash tables | string keys copied, replacing, removing, colliding keys, a table that must grow for 100,000 keys, and no leaks |
 | `heap_sort` | 2: Heaps & sorting | an in-place heap sort: edge cases, sorted and reversed input, and a million numbers in the time limit (a quadratic sort cannot) |
 | `bfs` | 2: Graphs | the shortest path through a maze of up to 1000 × 1000: steps not cells, no path, the shortest rather than the first found |
+| `duplicates` | 2: Big-O | the first repeated number among 200,000: nested loops (O(n²)) run out of time, and a comparison written as `a - b` overflows |
+| `hanoi` | 2: Recursion | the Towers of Hanoi: every one of the 65,535 moves for 16 disks, and 0 disks |
+| `bsearch` | 2: Binary search | the first match among repeats, empty arrays, and 100,000 lookups in 200,000 numbers (a linear scan runs out of time) |
+| `intervals` | 2: Greedy algorithms | the most meetings in one room: back-to-back meetings, and the greedy rules that look right and fail (by start time, by length) |
+| `edit_distance` | 2: Dynamic programming | empty lines, sentences, and two 2,000-character lines (the plain recursion is exponential) |
+| `sat_count` | 3: Logic | rows of a truth table over 16 variables: variables numbered from 1, empty clauses, contradictions |
+| `bitsets` | 3: Sets | sets as `uint64_t` bits: union, intersection, differences, subsets, the empty set, and members 31 to 63 (`1 << i` is an int) |
+| `binomial` | 3: Counting | C(n, k) exactly up to C(67, 33): the factorial formula fails from 21!, and multiplying before dividing overflows |
+| `modpow` | 3: Modular arithmetic | aᵉ mod m with e up to 10¹⁸ (square and multiply), m = 1, and a bigger than m |
+| `inversions` | 3: Recurrences | inversions in 200,000 numbers with merge sort: ties, and counts above 2³¹ |
+| `euler` | 3: Graph theory | circuit, path or none: Königsberg, two separate triangles (degrees alone are not enough), lonely vertices, a ring of 100,000 |
+| `birthday` | 3: Probability | the exact birthday probability: integer division, and more than 365 people |
+| `bases` | 4: Binary | decimal, hex and binary in and out, 0, and 4,294,967,295 (which an `int` prints as -1) |
+| `nand_gates` | 4: Logic gates | NOT, AND, OR and XOR from NAND with the fewest gates (the checker counts them), and an 8-bit ripple-carry adder |
+| `alu` | 4: The ALU | the zero, negative, carry and overflow flags for addition, subtraction and logic, against a million random operations |
+| `number_fsm` | 4: State machines | valid decimal numbers: `5.` and `.5` but not `.`, exponents that need digits, spaces, and 400 generated lines |
+| `cpu` | 4: The CPU | an emulator for a tiny CPU: jumps by instruction number, 64-bit registers, and a step limit for endless loops |
+| `rv_decode` | 4: Machine code | real RISC-V machine code (from LLVM's assembler): sign-extended immediates, add vs sub in bit 30, and unknown words |
 | `bits` | 5: Integers & floating point in bits | popcount, rotating by 0 (a shift by 32 is undefined), powers of two, and the raw IEEE 754 fields of 1.0, -2.5, 0.1 and -0.0 |
 | `calc` | 5: Parsing | a recursive-descent calculator: precedence, left-to-right order (10 - 4 - 3 is 3), unary minus, truncating division, malformed lines, division by zero, 500 levels of parentheses |
+| `linkage` | 5: Linking | three functions linked with the checker's own file, which already defines `count` and `total`: a global of yours clashes at link time (built with `-fno-common` everywhere) |
+| `checked_add` | 5: The optimizer | overflow checks for `+` and `*` that never overflow themselves: `INT_MIN * -1`, checks written after the overflow (the sanitizer stops them), a million random pairs |
 | `run` | 6: Processes | fork, execvp and waitpid: exit codes, death by a signal, arguments passed on, a program that does not exist (127) |
 | `rawcopy` | 6: System calls | a copy with `read` and `write` only: short writes, and half a megabyte of every byte value |
 | `counter` | 6: Synchronisation | threads sharing a counter: without a mutex, increments are lost |
+| `arena` | 6: Memory allocators | a bump allocator: 16-byte alignment, failed requests that use no space, `used + n` wrapping past `SIZE_MAX`, a million nodes, and the block freed |
+| `pipeline` | 6: File descriptors & pipes | `A \| B` with pipe, dup2, fork and execvp: a forgotten close (cat waits forever), more than the pipe's 64 KiB, `yes \| head`, B's exit status |
+| `graceful` | 6: Signals | SIGTERM and SIGINT recorded by a handler: sent by the program itself and by another process, and a blocking read interrupted (SA_RESTART must be off) |
 | `atomic_save` | 7: Durability | a temporary file in the same folder, fsync, rename, fsync the folder: exact bytes, nothing left behind, failure leaves nothing |
 | `wal_kv` | 7: Write-ahead logging | a key-value store that appends every change to `data.log` before answering, replays it at start, and cuts off a record torn by a crash (the checker reads the log afterwards) |
+| `buffer_pool` | 7: Pages & the buffer pool | LRU eviction with pins and dirty write-backs, frames that are all pinned, a scan that floods LRU, and a million accesses |
+| `bloom` | 7: LSM-trees | a Bloom filter: no false negatives, under 1.5% false positives at 10 bits per key, and 1,001 bits (`m / 8` bytes is one short) |
+| `hash_join` | 7: Query planning | a join of two 100,000-row tables (a nested loop runs out of time), duplicate keys on both sides in order, and negative keys (a negative bucket index) |
 | `upper_server` | 8: Sockets | a TCP server on a real 127.0.0.1 socket: partial reads of 300 KB, a client that sends nothing, bytes above 127 |
+| `routes` | 8: IP routing | longest-prefix match: the default route, /32 and /0 (a shift by 32 is undefined), host bits in a prefix, and 100,000 routes |
+| `retry` | 8: Timeouts & retries | backoff with jitter: permanent failures not retried, no wait after the last attempt, the cap, and 70 attempts (doubling a `long` overflows) |
+| `ring` | 8: Consistent hashing | keys placed on a ring of virtual nodes: wrapping past the largest point, and 100,000 points searched in sorted order |
+| `git_blob` | 9: Git | SHA-1 written by hand, matching `git hash-object`: the empty file, the 55-, 56- and 64-byte padding boundaries, a three-digit length, and 2 MB of every byte value |
+| `make_order` | 9: Build systems | the order make builds in: depth-first, each target once, cycles (exit 1), a missing rule (exit 2), and 100,000 rules |
+| `bisect` | 9: Debugging tools | git bisect as a function: at most ⌈log₂ n⌉ tests, never the known ends, and a midpoint that cannot overflow near `LONG_MAX` |
+| `cvss` | 10: Reading CVEs | a CVSS v3.1 base-score calculator: scope-dependent weights, round-up (not round-to-nearest), zero-impact vectors, and thousands of combinations against the official formula |
+| `nfa_match` | 11: Regex engines | a regex engine that never backtracks: precedence, whole-line matches, `(a+)+b` on 30 a's, 100,000-character lines, invalid patterns |
+| `turing` | 11: Turing machines | a Turing-machine simulator: the move into H counts, the 1s left on the tape, step limits, and the 5-state busy beaver's 47,176,870 steps |
+| `dpll` | 11: Reductions | a SAT solver for DIMACS CNF: clauses across lines, pigeonholes (UNSAT), and the Inkala Sudoku as 11,988 clauses |
+| `higher_order` | 12: Closures & higher-order functions | map, filter and fold with a `void *` context, C's closures: the context passed on, left-to-right folds, empty arrays |
+| `refcount` | 12: Memory management | reference-counted strings: shared holders, a copy of the text, no use after free, and nothing leaked |
+| `stack_vm` | 12: Interpreters | a bytecode VM: operand order, loops with JZ, 90 million instructions, and programs refused before they run |
 | `safe_join` | 17: Untrusted input | canonicalise, then check: `a/./b//c.txt` is fine, `a/../../etc/passwd` and `/etc/passwd` are refused, and the output buffer is never overrun |
 | `copy_string` | 17: Memory-safe code | an strlcpy of your own: always terminated, never past the buffer, size 0, and the full length returned |
 | `http_request` | 8: HTTP | parsing a request head: header names in any case, trimmed values, bare newlines, a 7,000-byte path, a missing Host, wrong versions, a head that never ends |
@@ -771,7 +810,7 @@ The tests check:
 - **The v1 → v2 migration and stage merging.**
 - **Retention:** the scheduler's intervals grow and reset on a lapse; deck unlocking and due cards; each step of the mastery ladder.
 - **Classic Mode:** every stage has a complete classic corner with HTTPS links; the struggle clock's thresholds and early unlock; notebook and type-in progress survive a save round trip.
-- **Checked exercises:** each check's reference solution passes every case, with gcc and with clang (28 checks, including a real loopback TCP server, forked processes and a write-ahead log the checker reads back). Mastery waits for a concept's check to pass. Typical mistakes fail with the right explanation:
+- **Checked exercises:** each check's reference solution passes every case, with gcc and with clang (67 checks, including a real loopback TCP server, forked processes and a write-ahead log the checker reads back). Mastery waits for a concept's check to pass. Typical mistakes fail with the right explanation:
   - the XOR swap;
   - `9 / 5` in integers;
   - an endless loop;
@@ -833,6 +872,8 @@ One package, one build target:
 | `checks.go` | checked exercises: tasks, test cases, hints, harnesses |
 | `checks_core.go` | checked exercises for Stages 2, 7 and 17: lists, hash maps, heaps, graphs, durable files, a write-ahead log, safe paths and strings |
 | `checks_systems.go` | checked exercises for Stages 5, 6 and 8: bits, a parser, processes, system calls, threads, sockets, HTTP |
+| `checks_foundations.go` | checked exercises added when Stages 2 to 8 were deepened, from Big-O and recursion to signals, Bloom filters and consistent hashing, with the generators of their big inputs |
+| `checks_software.go` | checked exercises for Stages 9 to 12: Git's object IDs, build order, bisection, a regex engine, a Turing machine, a SAT solver, closures, reference counting and a bytecode VM |
 | `runner.go`, `runner_*.go` | compile with the learner's C compiler, run each case with limits, explain failures |
 | `checklog.go` | the labs folder, starter files, and the append-only log of runs and hints |
 | `checksui.go` | checked-exercise screens and `-check` |

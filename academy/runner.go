@@ -329,6 +329,7 @@ func extraPaths(dir string, ch Check) []string {
 
 // runCase runs the program once and judges the result.
 func runCase(prog, dir string, c CheckCase, timeout time.Duration, leaks bool) CaseResult {
+	c = c.resolved()
 	res := CaseResult{Case: c}
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
