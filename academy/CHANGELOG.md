@@ -4,15 +4,6 @@ All notable changes to the Systems & AI Academy are listed here. The
 format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 versions follow [Semantic Versioning](https://semver.org/).
 
-## [1.8.0] - 2026-10-23
-
-### Added
-- **Stage 13 (Mathematical Foundations) at Stage 1's depth: 8 lessons, up from 5.** Every lesson has an "Under the hood" section built on real measurements: the same 1,024 × 1,024 matrix multiplication at 0.95 GFLOP/s (i-j-k loops), 5.9 (i-k-j), 16.5 (cache-blocked, AVX-512) and 183 (BLAS); power iteration matching NumPy to ten digits in ten steps; an SVD that finds two signal components in a noisy image; a finite-difference gradient check that gets worse as h shrinks; a naive softmax returning NaN; and gradient descent slowing in proportion to the condition number while momentum and Adam do not.
-  - New lessons: **Vectors, Dot Products & Similarity** (why random high-dimensional vectors are nearly perpendicular), **Linear Systems, Least Squares & Conditioning** (the Hilbert matrix losing every digit at size 12) and **Floating Point for Numerical Computing** (ten million 0.1s summing to 1,087,937, Kahan summation, and `-ffast-math` silently undoing it).
-  - Three new checked C exercises: `softmax`, `power_iter` and `kahan_sum`, with reference solutions and mutation tests for the typical mistakes.
-  - Eight glossary terms, three outcomes, seven quiz questions, prerequisites and related-concept links for the new lessons; the matrix lesson's middle exercise is now a C loop-order benchmark.
-- Checks can name libraries to link (`Libs`, such as `-lm`), placed after the sources where the linker needs them.
-
 ## [1.7.0] - 2026-10-23
 
 ### Changed
@@ -99,8 +90,14 @@ After a walk through the app as a new learner, at 40, 80 and 160 columns:
 - **Checked exercises for Stages 9, 11 and 12.** Nine more: `git_blob`, `make_order` and `bisect`; `nfa_match`, `turing` and `dpll`; `higher_order`, `refcount` and `stack_vm`.
 
   That makes 67 in all (adding Stage 10's `cvss`). Checks can now give the program files in subfolders and examine the files it leaves behind.
+- **Stage 13 (Mathematical Foundations) at Stage 1's depth: 8 lessons, up from 5.** Every lesson has an "Under the hood" section built on real measurements: the same 1,024 × 1,024 matrix multiplication at 0.95 GFLOP/s (i-j-k loops), 5.9 (i-k-j), 16.5 (cache-blocked, AVX-512) and 183 (BLAS); power iteration matching NumPy to ten digits in ten steps; an SVD that finds two signal components in a noisy image; a finite-difference gradient check that gets worse as h shrinks; a naive softmax returning NaN; and gradient descent slowing in proportion to the condition number while momentum and Adam do not.
+  - New lessons: **Vectors, Dot Products & Similarity** (why random high-dimensional vectors are nearly perpendicular), **Linear Systems, Least Squares & Conditioning** (the Hilbert matrix losing every digit at size 12) and **Floating Point for Numerical Computing** (ten million 0.1s summing to 1,087,937, Kahan summation, and `-ffast-math` silently undoing it).
+  - Three new checked C exercises: `softmax`, `power_iter` and `kahan_sum`, with reference solutions and mutation tests for the typical mistakes.
+  - Eight glossary terms, three outcomes, seven quiz questions, prerequisites and related-concept links for the new lessons; the matrix lesson's middle exercise is now a C loop-order benchmark.
+  The academy now has 158 concepts and 474 exercises.
+- Checks can name libraries to link (`Libs`, such as `-lm`), placed after the sources where the linker needs them.
 - **Mastery counts real code.** A concept with a checked exercise reaches "mastered" only once that check has passed (with or without hints). Concepts you had mastered before stay at "retained" until you pass their check. Where checks cannot run (Windows), nothing changes.
-- **Concept prerequisites.** Concepts now list the earlier concepts they build on (248 links across 150 concepts in all 21 stages). The list sits at the top of each card, with a tick for each one you have marked as understood.
+- **Concept prerequisites.** Concepts now list the earlier concepts they build on (254 links across 153 concepts in all 21 stages). The list sits at the top of each card, with a tick for each one you have marked as understood.
   - **What's next and Today's workout** use them. When the next concept builds on one you have not marked yet, they send you to the first missing step and say which concept it leads to. They do not stop you reading anything.
   - **Tests check the graph:** every name is a real concept, every prerequisite comes earlier and agrees with the stage prerequisites (so there can be no cycle), and every concept from Stage 1 on lists at least one.
 - **Get hired: the career center** (`e`). It turns learning into the three things companies hire on: foundations, finished projects and interview skill.
