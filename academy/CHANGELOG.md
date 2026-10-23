@@ -4,6 +4,15 @@ All notable changes to the Systems & AI Academy are listed here. The
 format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 versions follow [Semantic Versioning](https://semver.org/).
 
+## [1.8.0] - 2026-10-23
+
+### Added
+- **Stage 13 (Mathematical Foundations) at Stage 1's depth: 8 lessons, up from 5.** Every lesson has an "Under the hood" section built on real measurements: the same 1,024 × 1,024 matrix multiplication at 0.95 GFLOP/s (i-j-k loops), 5.9 (i-k-j), 16.5 (cache-blocked, AVX-512) and 183 (BLAS); power iteration matching NumPy to ten digits in ten steps; an SVD that finds two signal components in a noisy image; a finite-difference gradient check that gets worse as h shrinks; a naive softmax returning NaN; and gradient descent slowing in proportion to the condition number while momentum and Adam do not.
+  - New lessons: **Vectors, Dot Products & Similarity** (why random high-dimensional vectors are nearly perpendicular), **Linear Systems, Least Squares & Conditioning** (the Hilbert matrix losing every digit at size 12) and **Floating Point for Numerical Computing** (ten million 0.1s summing to 1,087,937, Kahan summation, and `-ffast-math` silently undoing it).
+  - Three new checked C exercises: `softmax`, `power_iter` and `kahan_sum`, with reference solutions and mutation tests for the typical mistakes.
+  - Eight glossary terms, three outcomes, seven quiz questions, prerequisites and related-concept links for the new lessons; the matrix lesson's middle exercise is now a C loop-order benchmark.
+- Checks can name libraries to link (`Libs`, such as `-lm`), placed after the sources where the linker needs them.
+
 ## [1.7.0] - 2026-10-23
 
 ### Changed

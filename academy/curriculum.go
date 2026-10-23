@@ -2090,11 +2090,73 @@ storms: clients retrying all at once kept a recovering system down.`,
 
 	// -----------------------------------------------------------------
 	13: {
-		Overview: `Deep learning is linear algebra plus the chain rule, run at scale. This
-stage builds fluent intuition for matrices as transformations and for
-derivatives of functions of vectors and matrices, so that every
-backward pass in Stage 15 is something you can derive on paper.`,
+		Overview: `Deep learning is linear algebra plus the chain rule, run at scale, in
+floating-point arithmetic. This stage builds fluent intuition for vectors
+and similarity, matrices as transformations, solving linear systems, the
+SVD, derivatives of functions of vectors and matrices, and the numerical
+traps of floating point, so that every backward pass in Stage 15 is
+something you can derive on paper and trust in code. Each lesson is
+measured: matrix multiplication at 1 and 183 GFLOP/s, a gradient check
+that fails when the step is too small, and a softmax that returns NaN.`,
 		Concepts: []Concept{
+			{
+				Name:    "Vectors, Dot Products & Similarity",
+				Summary: "A vector is a list of numbers that is also an arrow; the dot product measures how much two arrows agree.",
+				Body: `A vector in n dimensions is a list of n numbers: a point, a direction, or
+a set of features. The dot product a·b = Σ aᵢbᵢ = ‖a‖‖b‖cos θ combines
+length and angle; dividing by both lengths gives the cosine similarity,
+from −1 (opposite) through 0 (unrelated) to 1 (same direction).
+
+Machine learning represents words, images and users as vectors
+(embeddings) so that "similar" becomes "close": search engines, recommender
+systems and retrieval for language models all rank by cosine similarity
+or dot product. The norm ‖a‖ = √(a·a) is the length; normalising vectors
+to length 1 makes the dot product and the cosine the same thing.
+
+High dimensions behave strangely: almost all the volume of a cube is near
+its corners, and two random directions are almost always nearly
+perpendicular. That is why a dot product between unrelated embeddings is
+close to 0, and why a large one is meaningful.`,
+				Diagram: `              b
+             ╱
+            ╱ θ
+  ─────────●────────▶ a        a·b = ‖a‖ ‖b‖ cos θ
+                                 θ = 0°   cos 1   same direction
+                                 θ = 90°  cos 0   unrelated
+                                 θ = 180° cos −1  opposite`,
+				UnderTheHood: `How similar are random vectors? NumPy drew 2,000 pairs of random vectors
+(normally distributed coordinates) and measured the cosine of the angle
+between each pair:
+
+  dimensions   mean |cos θ|   largest |cos θ| of 2,000 pairs
+          3       0.511          0.998
+        100       0.079          0.307
+     10,000       0.0078         0.034
+
+In 3 dimensions random arrows are often nearly parallel. In 10,000, not
+one of 2,000 pairs came within 88° of each other. The typical cosine
+shrinks like 1/√n, so in an embedding space with hundreds or thousands
+of dimensions a cosine of 0.5 is a strong signal, not a coincidence.`,
+				MentalModel: "The dot product is agreement: large when two vectors point the same way, near zero when they are unrelated.",
+				TryIt:       "Compute the cosine similarity of (1, 2, 3) and (2, 4, 6), then of (1, 0) and (0, 1), and explain both answers.",
+				Analogy: `Two people describing their taste in films with scores for action,
+comedy and drama. The dot product of their score lists is high when
+they love and hate the same genres; the cosine ignores how strongly each
+person feels and asks only whether their tastes point the same way.`,
+				Example: `Search engines, Spotify-style recommendations and the retrieval step
+of chatbots that "look things up" all store items as embedding vectors
+and return the nearest ones by cosine similarity. Vector databases such
+as FAISS, pgvector and Pinecone exist to find the nearest vectors among
+billions quickly.`,
+				Exercises: trio(
+					"Normalise (3, 4) to length 1, then compute its dot product with (0.6, 0.8). What does the result tell you?",
+					"(3, 4) has length 5, so it becomes (0.6, 0.8); the dot product is 1: the same direction.",
+					"In C, write dot, norm and cosine for double arrays, then find, among 1,000 random 100-dimensional vectors, the pair with the largest cosine. Compare it with the 3-dimensional case.",
+					"Generate coordinates as the sum of 12 uniform random numbers minus 6: close enough to normally distributed for this.",
+					"Build a tiny semantic search: represent 20 short documents as word-count vectors over a shared vocabulary, normalise them, and return the top 3 by cosine similarity for a query. Then try removing very common words and compare the results.",
+					"Common words make every document look alike; removing them (or weighting by TF-IDF) is the classic fix.",
+				),
+			},
 			{
 				Name:    "Matrices as Linear Maps",
 				Summary: "A matrix is a function that transforms space.",
@@ -2105,9 +2167,94 @@ shapes chain: (m×n)(n×p) = (m×p).
 
 The determinant is the factor by which volumes scale (0 means some
 dimension is squashed). The rank is the dimension of the output space.
-A neural network layer y = Wx + b is exactly such a map, plus a shift.`,
+A neural network layer y = Wx + b is exactly such a map, plus a shift.
+
+Multiplying two n×n matrices takes 2n³ floating-point operations, so it
+dominates the cost of deep learning, and how it is computed matters as
+much as how often: the same arithmetic can run a hundred times faster
+when it is arranged to use the cache and the vector units.`,
+				Diagram: `  (m×n) · (n×p) = (m×p)          C[i][j] = Σₖ A[i][k] · B[k][j]
+   A        B       C
+  ┌───┐   ┌─────┐   ┌─────┐       2·n³ operations for n×n matrices
+  │ ─▶│ · │ │   │ = │  ●  │       (n = 1,024: about 2.1 billion)
+  └───┘   └─▼───┘   └─────┘`,
+				UnderTheHood: `Multiplying two 1,024 × 1,024 matrices of doubles, 2.1 billion
+floating-point operations, in C on one core:
+
+  loop order i-j-k, -O2          2.26 s     0.95 GFLOP/s
+  loop order i-k-j, -O2          0.36 s     5.93 GFLOP/s
+  i-k-j, -O3 -march=native       0.30 s     7.16 GFLOP/s
+  64×64 blocks, -O3 -march=native 0.13 s   16.45 GFLOP/s
+  NumPy A @ B (OpenBLAS, 4 cores) 0.012 s  183 GFLOP/s
+
+Every version computed the same C[7][9] = 246.164315. i-j-k walks down a
+column of B, jumping 8 KB between elements, so nearly every read misses
+the cache (Stage 5). i-k-j walks along rows instead, six times faster
+for the same arithmetic. Blocking keeps small tiles in the cache, and
+-march=native lets the compiler use AVX-512 vector instructions. BLAS
+adds hand-tuned kernels and all four cores: 190 times the naive loop.
+This is why every machine-learning framework calls a BLAS (or, on a
+GPU, cuBLAS) instead of looping itself.`,
 				MentalModel: "Columns are where the axes go; multiplication is composition.",
 				TryIt:       "Draw the 2×2 matrices for a rotation, a shear and a projection, and compute each one's determinant.",
+			},
+			{
+				Name:    "Linear Systems, Least Squares & Conditioning",
+				Summary: "Solving Ax = b, fitting a line through noisy data, and knowing when the answer can be trusted.",
+				Body: `Solving Ax = b, n equations in n unknowns, is done by Gaussian
+elimination: subtract multiples of rows to make A triangular, then solve
+backwards. Factoring A = LU once lets you solve for many right-hand sides
+cheaply. Never compute A⁻¹ to solve a system: it is slower and less
+accurate than solving directly.
+
+With more equations than unknowns (fitting a line to 1,000 noisy points)
+there is usually no exact solution; least squares finds the x that
+minimises ‖Ax − b‖². It is what linear regression computes (Stage 14),
+solved with a QR factorisation or the SVD.
+
+How much can you trust the answer? The condition number κ(A) measures how
+much errors in b (or rounding in the computer) are magnified in x: a
+rule of thumb is that you lose about log₁₀ κ of your 16 significant
+digits. A well-conditioned system has κ near 1; a nearly singular one,
+where two equations say almost the same thing, has an enormous κ.`,
+				Diagram: `well conditioned            ill conditioned
+   ╲   ╱                      ═══════
+    ╲ ╱   lines cross          ═══════   lines nearly parallel:
+     ╳    clearly               a tiny change moves the crossing far
+    ╱ ╲`,
+				UnderTheHood: `The Hilbert matrix, H[i][j] = 1 / (i + j + 1), is a famous trap: perfectly
+regular, and terribly conditioned. NumPy built b = H · (1, 1, …, 1), then
+solved H x = b, so the right answer is all ones:
+
+  size   condition number   largest error in x
+     4      1.55 × 10⁴         5.4 × 10⁻¹⁴
+     8      1.53 × 10¹⁰        7.2 × 10⁻⁸
+    12      1.64 × 10¹⁶        0.28
+
+At size 12 the condition number passes 10¹⁶, the precision of a double,
+and the "solution" is wrong in the first decimal place, with no error
+message or warning. The rule of thumb held: κ ≈ 10¹⁰ cost about 10 of the
+16 digits. Real problems hit this when features are nearly redundant
+(height in metres and in centimetres in the same regression).`,
+				MentalModel: "Solve, do not invert; and check the condition number before you believe the digits.",
+				TryIt:       "Solve the 2×2 system x + y = 2, x + 1.0001y = 2.0001 by hand, then change the last 2.0001 to 2.0002 and see how far the answer moves.",
+				Analogy: `Locating a ship from two lighthouse bearings. If the lighthouses are at
+right angles to you, a small error in each bearing barely moves the
+fix. If they are almost in line, the two bearing lines are nearly
+parallel, and a tiny error slides the crossing point miles along them.`,
+				Example: `Every linear regression, every GPS position fix, every finite-element
+simulation of a bridge or a wing, and the Kalman filters in phones and
+aircraft solve linear systems or least-squares problems, and serious
+numerical code reports the condition number with the answer. LAPACK,
+the library NumPy and MATLAB call, has done this for decades.`,
+				Exercises: trio(
+					"Why does solving Ax = b by computing A⁻¹ and multiplying lose to Gaussian elimination, in speed and in accuracy?",
+					"Inverting costs about three times as many operations as one solve, and every extra operation adds rounding error; LU then solves each new b in only O(n²).",
+					"In C, implement Gaussian elimination with partial pivoting (swap in the row with the largest pivot) for an n×n system, and test it on the Hilbert matrix for n = 4, 8 and 12 against the known all-ones answer.",
+					"Without pivoting, a zero or tiny pivot divides by almost nothing; picking the largest available pivot in the column keeps the multipliers at most 1.",
+					"Fit a straight line to real noisy data (temperature against time, height against age) by least squares, solving the 2×2 normal equations yourself, and compare with a spreadsheet's trend line or numpy.polyfit.",
+					"The normal equations are AᵀA x = Aᵀb; for a line, A has a column of ones and a column of the x values.",
+				),
 			},
 			{
 				Name:    "Eigenvectors & the SVD",
@@ -2119,7 +2266,33 @@ decomposition A = UΣVᵀ applies to every matrix. Vᵀ rotates the input,
 Keeping only the largest k singular values gives the best rank-k
 approximation. That idea underlies PCA and compression, and it is also
 the idea behind LoRA fine-tuning, which learns a low-rank update ΔW = BA
-instead of a full matrix.`,
+instead of a full matrix.
+
+The simplest way to find the largest eigenvector is power iteration:
+multiply a vector by A again and again, normalising each time; the
+direction with the largest eigenvalue grows fastest and takes over.
+Google's original PageRank was power iteration on the web's link matrix.`,
+				UnderTheHood: `Power iteration on a random symmetric 50×50 matrix, starting from all
+ones, estimating λ from each new vector:
+
+  after  1 step    λ = 49.6677317084
+  after  5 steps   λ = 49.7859456765
+  after 10 steps   λ = 49.7859456766    (= NumPy's eigvalsh, 10 digits)
+
+It converged in about ten steps because the largest eigenvalue dwarfs
+the next one; the speed depends on that ratio.
+
+The SVD of a 200×200 "image" built from two smooth patterns plus random
+noise found exactly that structure:
+
+  singular values   117.5   14.7   1.39   1.37   1.36   1.34 …
+  rank  1   relative error 0.149    401 numbers instead of 40,000
+  rank  2   relative error 0.083    802 numbers
+  rank 20   relative error 0.070  8,020 numbers
+
+Two large singular values, then a flat floor of noise. Rank 2 kept the
+picture in 2% of the storage; adding 18 more components bought almost
+nothing, because they only describe the noise.`,
 				MentalModel: "The singular values tell you how much each direction matters.",
 				TryIt:       "Compress a greyscale image with rank-k SVD for k = 5, 20 and 50, and compare quality with storage.",
 			},
@@ -2137,11 +2310,95 @@ The identities to know by heart, for y = Wx:
 - ∂L/∂b = ∂L/∂y (summed over the batch)
 
 Shape-checking is your best debugger. If the dimensions do not match,
-the formula is wrong.`,
+the formula is wrong. And check every hand-derived gradient numerically,
+with a finite difference, before trusting it.`,
 				Diagram: `  x (n)  ──[ W (m×n) ]──▶  y (m)  ──▶ … ──▶  L (scalar)
   ∂L/∂x = Wᵀ ∂L/∂y  ◀──────── ∂L/∂y (m) ◀──── upstream gradient`,
+				UnderTheHood: `Checking a derivative numerically: f(x) = sin(x)·eˣ at x = 1, whose exact
+derivative is 3.756049227094727, against the forward difference
+(f(x+h) − f(x)) / h and the central difference (f(x+h) − f(x−h)) / 2h:
+
+  h          forward error    central error
+  10⁻¹       1.4 × 10⁻¹       2.7 × 10⁻³
+  10⁻³       1.5 × 10⁻³       2.7 × 10⁻⁷
+  10⁻⁵       1.5 × 10⁻⁵       2.9 × 10⁻¹¹   ◀ central at its best
+  10⁻⁸       2.2 × 10⁻⁸       1.1 × 10⁻¹⁰   ◀ forward at its best
+  10⁻¹¹      1.3 × 10⁻⁵       9.3 × 10⁻⁶
+  10⁻¹⁵      2.4 × 10⁻¹       2.4 × 10⁻¹
+
+Shrinking h helps until rounding takes over: f(x+h) and f(x) agree in
+almost every digit, and subtracting them cancels the digits that were
+right (the next lesson). The central difference is far more accurate
+for the same h, with its best near h = 10⁻⁵. A gradient checker that
+uses h = 10⁻¹⁵ "finds" a bug in a correct gradient.`,
 				MentalModel: "Gradients flow backwards through the transpose.",
-				TryIt:       "Derive ∂L/∂W for L = ‖Wx − t‖² by hand, then verify it with finite differences.",
+				TryIt:       "Derive ∂L/∂W for L = ‖Wx − t‖² by hand, then verify it with central finite differences at h = 10⁻⁵.",
+			},
+			{
+				Name:    "Floating Point for Numerical Computing",
+				Summary: "Computers approximate real numbers; know where the approximation breaks.",
+				Body: `A double has 53 bits of mantissa: about 16 significant decimal digits,
+over a huge range. A float (float32) has 24 bits: about 7 digits. Every
+arithmetic result is rounded to the nearest representable number, so
+floating-point addition is not associative: (a + b) + c can differ from
+a + (b + c).
+
+Three effects to watch for:
+- absorption: adding a small number to a big one can change nothing
+  (above 2²⁴ = 16,777,216, a float cannot even count by 1);
+- accumulated error: summing millions of numbers in order lets rounding
+  errors build up; Kahan (compensated) summation carries the lost low
+  bits along in a second variable, and pairwise summation keeps the
+  partial sums similar in size;
+- catastrophic cancellation: subtracting two nearly equal numbers keeps
+  only their few differing digits, all of them contaminated by earlier
+  rounding.
+
+Machine learning increasingly trains in lower precision (float16,
+bfloat16, even 8-bit formats) for speed and memory, and survives by
+keeping sums and master weights in float32 and scaling losses so that
+small gradients do not round to zero.`,
+				Diagram: `float32:  1 sign │ 8 exponent │ 23 mantissa   ≈ 7 digits
+float64:  1 sign │ 11 exponent │ 52 mantissa  ≈ 16 digits
+bfloat16: 1 sign │ 8 exponent │ 7 mantissa    ≈ 2 digits, float32's range
+
+16777216.0f + 1.0f == 16777216.0f       the 1 falls off the end`,
+				UnderTheHood: `Adding 0.1f ten million times in C, where the exact answer is about
+1,000,000 (0.1f itself is 0.100000001490116):
+
+  plain float sum            1,087,937.0     8.8% too much
+  Kahan summation, float     1,000,000.0
+  double sum                 1,000,000.0149
+  Kahan, built with -ffast-math   1,087,937.0   ← broken
+
+The plain sum drifts because once the total is large, each 0.1f is
+rounded to a coarser step. Kahan's algorithm recovers the lost bits,
+and float becomes as good as double here. But -ffast-math lets the
+compiler assume addition is associative, and it simplified the
+correction term (t − sum) − y to zero, silently turning Kahan back into
+the plain sum. Two more facts from the same program:
+16777216.0f + 1 = 16777216.0, and in double, 10¹⁶ + 1 − 10¹⁶ = 0.0.`,
+				MentalModel: "Every operation rounds; order, magnitude and compiler flags decide how much the rounding costs.",
+				TryIt:       "In C, print 0.1 + 0.2 with %.17g, then compare (0.1 + 0.2) + 0.3 with 0.1 + (0.2 + 0.3).",
+				Analogy: `Measuring with a ruler marked only in centimetres. One reading is off by
+at most half a centimetre, harmless. Add up a thousand readings and the
+errors pile up; add a hair's width to a 10-metre length and the ruler
+cannot show it at all; and the difference between two almost equal long
+measurements is mostly the errors.`,
+				Example: `In 1991 a Patriot missile battery failed to intercept a Scud because its
+clock counted in tenths of a second in 24-bit fixed point; after 100
+hours the accumulated error was a third of a second, enough to miss.
+The Vancouver Stock Exchange index fell from 1,000 to about 520 over 22
+months in the early 1980s because each update truncated instead of
+rounding; recomputed correctly it was about 1,098.`,
+				Exercises: trio(
+					"Why is 16777216.0f + 1.0f equal to 16777216.0f, while 16777215.0f + 1.0f is exact?",
+					"A float has 24 bits of mantissa: above 2²⁴ the spacing between representable numbers is 2, so the result is rounded back.",
+					"In C, sum the series 1/k² for k = 1 to 10,000,000 in float from k = 1 upwards and from k = 10,000,000 downwards, and compare both with π²/6. Explain which order is more accurate and why.",
+					"Adding the small terms first lets them accumulate before they meet the large total.",
+					"Compute the sample variance of 1,000,000 values near 10⁹ (for example 10⁹ plus a random number between 0 and 1) with the one-pass formula E[x²] − E[x]², and with Welford's algorithm. Explain the difference.",
+					"The one-pass formula subtracts two huge, nearly equal numbers: catastrophic cancellation. Welford's update avoids it.",
+				),
 			},
 			{
 				Name:    "Probability, Softmax & Cross-Entropy",
@@ -2155,6 +2412,21 @@ the one-hot target). For numerical stability, subtract max(z) before
 exponentiating. The result is unchanged, because softmax is invariant to
 shifts, and overflow disappears. The log-sum-exp trick does the same job
 for log-probabilities.`,
+				UnderTheHood: `exp of a double overflows just past 709: exp(709) = 8.2 × 10³⁰⁷, and
+exp(710) is inf. So, in NumPy:
+
+  softmax([1000, 1001, 1002]), naive     [nan nan nan]
+  after subtracting the max (1002)       [0.0900 0.2447 0.6652]
+  log-sum-exp                            1002.4076059644
+  cross-entropy if the true class is 0   2.407606
+
+The naive version computed inf / inf = NaN for every entry, and a NaN
+in a loss spreads to every weight it touches in one backward pass: the
+classic way a training run dies. Subtracting the maximum makes the
+largest exponent exp(0) = 1, so nothing can overflow, and the answer
+is unchanged. The cross-entropy is computed from log-sum-exp directly
+(z_max + log Σ exp(zᵢ − z_max) − z_target), never by taking the log of
+a probability that may have rounded to 0.`,
 				MentalModel: "The gradient of softmax plus cross-entropy is prediction minus truth.",
 				TryIt:       "Implement softmax naively and compute softmax([1000, 1001]); then fix it with the max-subtraction trick.",
 			},
@@ -2169,7 +2441,29 @@ through ravines.
 Adam keeps running estimates of each parameter's gradient mean and
 variance and scales every step individually. AdamW decouples weight
 decay from that scaling. Neural-network loss landscapes are non-convex,
-yet in practice SGD-family methods find good minima.`,
+yet in practice SGD-family methods find good minima.
+
+The difficulty of a problem for gradient descent is its conditioning:
+the ratio between the steepest and the flattest curvature. A long,
+narrow valley forces a small step (to avoid bouncing off the steep
+walls) that then crawls along the flat floor.`,
+				UnderTheHood: `Gradient descent on the valley f(x, y) = (a·x² + y²) / 2, from (1, 1)
+until within 10⁻⁶ of the minimum, with the largest stable step 1/a; a is
+the condition number:
+
+  condition    plain GD     momentum 0.9    Adam (step 0.01)
+        1           1               1
+       10         132             249
+      100       1,375             264
+    1,000      13,809           1,246               351
+
+Plain gradient descent slowed in proportion to the condition number:
+ten times narrower, ten times longer. Momentum turned that into roughly
+its square root at high condition, though at condition 10 it overshot
+and was slower than plain descent. Adam rescaled each coordinate by its
+own gradient size and finished the hardest case in 351 steps. And a step
+of 2.1/a, just past the stability limit 2/a, never converged: every step
+bounced further up the walls.`,
 				MentalModel: "The learning rate is the single most important hyperparameter; tune it first.",
 				TryIt:       "Minimise the Rosenbrock function with SGD, momentum and Adam, and plot the paths.",
 			},
@@ -2195,6 +2489,13 @@ yet in practice SGD-family methods find good minima.`,
 			{"Why subtract max(z) before a softmax?", "To avoid exp overflow. Softmax is invariant to adding a constant to every logit, so the result is unchanged."},
 			{"What does the number of non-zero singular values tell you?", "The rank of the matrix."},
 			{"What is the gradient of cross-entropy with respect to the logits after softmax?", "p − y: the predicted probabilities minus the one-hot target."},
+			{"What does a cosine similarity near 0 mean, and why is it the usual value between random high-dimensional vectors?", "The vectors are nearly perpendicular: unrelated. In n dimensions the cosine of random directions is typically about 1/√n."},
+			{"Why can the same matrix multiplication run six times faster with the loops in a different order?", "i-k-j reads both matrices along rows, which uses every byte of each cache line; i-j-k walks down columns of B, missing the cache on almost every read."},
+			{"What does a condition number of 10¹⁰ tell you about a linear system solved in double precision?", "Errors can be magnified about 10¹⁰ times: expect to lose about 10 of the 16 significant digits."},
+			{"Why does a finite-difference gradient check get worse when h is very small?", "f(x + h) and f(x) agree in almost every digit, so subtracting them cancels the correct digits and leaves rounding error."},
+			{"Why does 16777216.0f + 1.0f equal 16777216.0f?", "A float has a 24-bit mantissa; above 2²⁴ the gap between representable numbers is 2, so adding 1 rounds back."},
+			{"What does Kahan summation do, and why can -ffast-math break it?", "It carries the low-order bits lost by each addition in a correction variable. -ffast-math lets the compiler treat addition as associative and simplify that correction to zero."},
+			{"How does the condition number of a valley affect gradient descent?", "The step must be small enough for the steepest direction, so the number of steps grows roughly in proportion to the condition number."},
 		},
 	},
 

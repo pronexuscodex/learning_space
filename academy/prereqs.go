@@ -156,10 +156,13 @@ var conceptPrereqs = map[string][]string{
 	"Concurrency Models":                                {"Paradigms: Imperative, Object-Oriented & Functional"},
 
 	// ---- Stage 13
-	"Matrices as Linear Maps":                      {"Sets, Functions & Relations"},
+	"Vectors, Dot Products & Similarity":           {"Sets, Functions & Relations"},
+	"Matrices as Linear Maps":                      {"Sets, Functions & Relations", "Vectors, Dot Products & Similarity"},
+	"Linear Systems, Least Squares & Conditioning": {"Matrices as Linear Maps"},
+	"Floating Point for Numerical Computing":       {"Bits & Bytes: Everything Is a Number", "Values, Types & Variables"},
 	"Eigenvectors & the SVD":                       {"Matrices as Linear Maps"},
 	"Gradients, Jacobians & the Matrix Chain Rule": {"Matrices as Linear Maps"},
-	"Probability, Softmax & Cross-Entropy":         {"Probability for Programmers"},
+	"Probability, Softmax & Cross-Entropy":         {"Probability for Programmers", "Floating Point for Numerical Computing"},
 	"Optimisation: From Gradient Descent to Adam":  {"Gradients, Jacobians & the Matrix Chain Rule"},
 
 	// ---- Stage 14

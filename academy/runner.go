@@ -268,6 +268,9 @@ func runCheck(ch Check, src string) (CheckRun, error) {
 		}
 		args = append(args, h)
 	}
+	// Libraries go after the sources: the linker only takes from a library
+	// the symbols that files before it still need.
+	args = append(args, ch.Libs...)
 
 	ctx, cancel := context.WithTimeout(context.Background(), compileTimeout)
 	defer cancel()

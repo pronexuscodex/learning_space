@@ -178,8 +178,8 @@ var conceptExercises = map[string][]Exercise{
 	"Matrices as Linear Maps": trio(
 		"What does the matrix [[0, −1], [1, 0]] do to the point (1, 0)? And to (0, 1)?",
 		"It rotates them 90° anticlockwise, to (0, 1) and (−1, 0).",
-		"Apply rotation, scaling and shear matrices to the corners of a square and draw the results, including a combination made by multiplying two matrices.",
-		"Order matters: rotating then scaling is not the same as scaling then rotating.",
+		"In C, multiply two 1,024 × 1,024 matrices of doubles with the loops in i-j-k and in i-k-j order, time both, and explain the difference from the way each walks through memory.",
+		"Print one element (say C[7][9]) from both versions to prove they compute the same thing; then try -O3 -march=native.",
 		"Write two photo filters: greyscale, and a sepia filter that multiplies every pixel's (R, G, B) vector by a fixed 3×3 matrix.",
 		"new = M × (r, g, b), then clip each value to 0–255.",
 	),
