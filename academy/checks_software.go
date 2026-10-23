@@ -541,7 +541,9 @@ int main(int argc, char **argv) {
 				Explain: "Check the whole program before running any of it: nothing may be printed for a program that does not load."},
 			{Name: "a jump outside the program", Stdin: "PUSH 0\nJZ 99\n", WantExit: 2, Stderr: true},
 		},
-		Timeout: 5 * time.Second,
+		// The reference takes about 1.4 s with the sanitizers; reparsing
+		// each instruction on every step takes about 30 s.
+		Timeout: 10 * time.Second,
 		Hints: []string{
 			"An enum for the operations, and a table of names to look them up while loading.",
 			"Keep the stack in an array with a top index; check top before every pop, and grow the array (or set a generous limit) when pushing.",
