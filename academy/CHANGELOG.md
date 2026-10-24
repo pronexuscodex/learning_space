@@ -4,7 +4,7 @@ All notable changes to the Systems & AI Academy are listed here. The
 format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 versions follow [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [1.8.0] - 2026-10-24
 
 ### Added
 - **Stage 14 (Probability, Statistics & Classical Machine Learning) at Stage 1's depth: 8 lessons, up from 5.** Every lesson has an "Under the hood" section built on real measurements: Anscombe's quartet recomputed; an A/A test whose 4.7% false-positive rate becomes 37.5% when you peek; a medical test that is right only 16.7% of the time it says positive; gradient descent that diverges, or "converges" to an intercept of 42 instead of 46,215, until the features are scaled; a single tree at 0.767 against a forest at 0.870; k-means++ against random starts; and a leaked feature that lifts AUC from 0.894 to 0.992.
