@@ -18,16 +18,17 @@ Rules for every screen and feature:
   and none may need the arrow keys only: offer the letter keys too.
 - **Use the classic bindings, the same everywhere.** Readers use the keys
   of `less` and `man` (Space/b, j/k, d/u, g/G, /word, n/N, q, h or ?).
-  Text input uses the Emacs and readline keys of the shell (Ctrl-U,
-  Ctrl-W, Ctrl-L, Ctrl-D today; Ctrl-A, Ctrl-E, Ctrl-K, ←/→ and ↑/↓
-  history are the known gaps to close). One key means one thing across
+  Text input uses the Emacs and readline keys of the shell (lineedit.go:
+  ←/→, Ctrl-A/E/B/F, Alt-B/F, Ctrl-U/K/W/Y, Ctrl-D, Ctrl-L, ↑/↓ history),
+  at every prompt and in the pager's / line. One key means one thing across
   the app: `q` goes back or quits, `?` shows the keys, `/` searches.
 - **Single keys act at once where it is safe** (menus, the pager);
   anything destructive asks first.
-- **Discoverable, then fast.** Every screen shows its main keys, the
-  "All screens & keys" page and the pager's `h` list them all, and the
-  hints say where the same key works outside the academy (man, less,
-  bash, vi).
+- **Discoverable, then fast.** Every prompt has the key bar above it
+  (keybar.go: only keys that really work there, fitted to the width),
+  every screen shows its main keys, the "All screens & keys" page and
+  the pager's `h` list them all, and the hints say where the same key
+  works outside the academy (man, less, bash, zsh, Python, psql).
 - **Teach the keys, not only use them.** Where a lesson or exercise
   touches a tool (the shell, an editor, git, a pager), name the keys and
   have the learner use them.

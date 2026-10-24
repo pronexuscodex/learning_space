@@ -405,35 +405,38 @@ fit:
 }
 
 // ask reads a line in the status line (the text to find), like less.
-// Enter accepts it; Esc or an empty line cancels.
+// Enter accepts it; Esc, or Backspace on an empty line, cancels. The other
+// keys edit as at every prompt, and ↑ brings back earlier searches. The
+// caller holds c.mu.
 func (p *fullPager) ask(label string) (string, bool) {
 	c := p.a.con
-	var buf []rune
-	show := func() {
-		fmt.Fprint(c.out, "\r\x1b[2K"+label+string(buf)+"\x1b[?25h")
-	}
-	show()
+	fmt.Fprint(c.out, "\r\x1b[2K\x1b[?25h")
 	defer fmt.Fprint(c.out, "\x1b[?25l")
+	c.inline = true // one row: no new line on Enter, no wrapping
+	c.history, c.searches = c.searches, c.history
+	c.curPrompt, c.curBuf, c.cur, c.curRow = label, nil, 0, 0
+	c.histPos, c.histDraft = len(c.history), nil
+	c.paint(label)
+	defer func() {
+		c.inline = false
+		c.history, c.searches = c.searches, c.history
+	}()
 	for {
-		r, name, err := c.readKey()
+		r, _, err := c.in.ReadRune()
 		switch {
-		case err != nil || name == keyEsc || r == keyCtrlC:
+		case err != nil || r == keyCtrlC || r == keyCtrlD && len(c.curBuf) == 0:
 			return "", false
-		case r == '\n' || r == '\r':
-			return strings.TrimSpace(string(buf)), true
-		case r == keyBackspace || r == keyDelete:
-			if len(buf) == 0 {
-				return "", false
-			}
-			buf = buf[:len(buf)-1]
-		case r == keyCtrlU:
-			buf = buf[:0]
-		case name == "" && unicode.IsPrint(r):
-			if len(buf) < 60 {
-				buf = append(buf, r)
-			}
+		case r == keyEscape && c.in.Buffered() == 0: // a lone Esc
+			return "", false
+		case (r == keyBackspace || r == keyDelete) && len(c.curBuf) == 0:
+			return "", false
+		case r == keyCtrlL: // the page is redrawn after the search anyway
+			continue
 		}
-		show()
+		line, done, _ := c.editKey(r, nil)
+		if done {
+			return line, true
+		}
 	}
 }
 
@@ -449,6 +452,7 @@ var pagerHelp = []string{
 	"  g  <  Home          the start",
 	"  G  >  End           the end",
 	"  /word               find a word (every match is highlighted)",
+	"  /  ↑                an earlier search (edit it as at any prompt)",
 	"  n  /  N             next / previous match",
 	"  q  Esc              quit and continue",
 	"  a number or key     quit, and use it as your answer to what comes next",

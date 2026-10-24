@@ -26,6 +26,7 @@ TOKENS = (
     + ["type casting\r", "memory cache\r", "pointer\r", "https://example.invalid/x.pdf\r", "../../etc/passwd\r"]
     + ["é漢字🙂 text\r", "x" * 700 + "\r", "'; DROP TABLE users; --\r", "%s%n%x\r"]
     + ["\x0c", "\x7f", "\x7f\x7f", "\x15", "\x17", "\x1b[A", "\x1b[D", "\x1b[3~", "\x1bOP", "p", "s"]
+    + ["\x01", "\x05", "\x02", "\x06", "\x0b", "\x19", "\x10", "\x0e", "\x1b[B", "\x1b[C", "\x1b[H", "\x1b[F", "\x1b[1;5D", "\x1b[1;5C", "\x1bb", "\x1bf", "\x1b[1~", "\x1bOH"]
     + ["RESIZE"] * 3
 )
 # Go's own crash output. Bare words such as "SIGSEGV" or "runtime error"

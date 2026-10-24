@@ -68,6 +68,7 @@ func (a *App) applySettings() {
 	st := a.reg.Settings
 	a.mu.Unlock()
 	sty.theme = st.Theme
+	a.con.hideBar = st.HideKeyBar
 	base := a.con.out
 	if pw, ok := base.(plainWriter); ok {
 		base = pw.w
@@ -114,9 +115,10 @@ func (a *App) settingsScreen() error {
 			"Classic Mode: " + onOff(classic) + sty.Gray(" · struggle clock, notebook, type-ins"),
 			"Tidy screen: " + onOff(tidy) + sty.Gray(" · each action on a clean screen"),
 			"Home screen: " + sty.Bold(homeName) + sty.Gray(" · simple shows the daily essentials, detailed every menu item"),
+			"Key bar: " + onOff(!st.HideKeyBar) + sty.Gray(" · the keys to use, above each prompt"),
 			"Back",
 		})
-		if err != nil || choice == 6 {
+		if err != nil || choice == 7 {
 			if err == errCancel {
 				return nil
 			}
@@ -144,6 +146,10 @@ func (a *App) settingsScreen() error {
 		case 5:
 			a.mutate(func(r *Registry) { r.Settings.DetailedHome = !r.Settings.DetailedHome })
 			a.con.ok("Home screen changed. Every key works either way; ? lists them all.")
+		case 6:
+			a.mutate(func(r *Registry) { r.Settings.HideKeyBar = !r.Settings.HideKeyBar })
+			a.applySettings()
+			a.con.ok("Saved. Every key still works, and ? lists them all.")
 		}
 	}
 }
