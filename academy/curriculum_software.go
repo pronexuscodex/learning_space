@@ -636,6 +636,20 @@ Principles: least privilege (give each part only the access it needs),
 defence in depth (several independent layers), fail securely, and never
 rely on keeping the design secret. The weakest link is often human:
 phishing and reused passwords cause a large share of breaches.`,
+				UnderTheHood: `Threat modelling this academy itself. Its assets: your progress, notes,
+reflections and career files; the C programs it compiles and runs; and
+the releases you install. Its entry points: the files it reads, the web
+pages and PDFs it downloads, the code you write, and the installer.
+
+Walking those against what can go wrong found a real problem. Every file
+the academy saved was created with mode 0644: readable by every account
+on the machine, including notes and job applications. Nothing had ever
+gone wrong, which is exactly why no test had noticed. The fix was one
+line (the files are now 0600, owner only) and a test that keeps it so.
+Other entries came out fine and stay on the list to re-check: releases
+are verified against SHA256SUMS before installing, and checked
+exercises run only your own code, in a fresh temporary folder, with a
+time limit.`,
 				MentalModel: "Assume the attacker knows your system, and protect what matters most first.",
 				TryIt:       "Write a threat model for your own email account: assets, attackers, entry points and defences.",
 				Analogy: `Securing a house: locks on the doors (authentication), a safe for
@@ -672,6 +686,20 @@ insecure deserialisation. The OWASP Top 10 lists the most common.`,
 				Diagram: `intended:  SELECT * FROM users WHERE name = 'alice'
 input:     ' OR '1'='1
 injected:  SELECT * FROM users WHERE name = '' OR '1'='1'   ◀ always true`,
+				UnderTheHood: `The same lookup two ways, in Python with SQLite, on a table of 1,000
+users, given the name nobody' OR '1'='1:
+
+  "select * from users where name = '" + name + "'"    1,000 rows
+  "select * from users where name = ?", (name,)            0 rows
+
+Pasted into the query text, the quote ends the string and OR '1'='1'
+becomes part of the condition, true for every row. Passed as a
+parameter, the whole thing is only ever a name, and no user has that
+name. On the HTML side, Python's html.escape turns
+<img src=x onerror="alert(1)"> into
+&lt;img src=x onerror=&quot;alert(1)&quot;&gt;, which a browser shows as
+text instead of running. In both cases the fix is the same: data goes
+through a channel that cannot be read as code.`,
 				MentalModel: "Data is data and code is code; keep them in separate channels.",
 				TryIt:       "Complete the SQL injection labs on PortSwigger's free Web Security Academy.",
 				Analogy: `A cheque that reads "Pay ____ to the bearer". If you let a stranger fill
@@ -707,6 +735,20 @@ user, so identical passwords get different hashes and precomputed
 underpin Git and blockchains.`,
 				Diagram: `"hunter2" + salt "x9Qa" ─▶ [ Argon2, slow on purpose ] ─▶ $argon2id$…Kq7
 login: hash the typed password with the same salt, then compare`,
+				UnderTheHood: `What one guess costs, on one core of this machine, in Python's hashlib:
+
+  stored as                            one guess    10 million guesses
+  SHA-256 with a salt                  0.5 µs       5 seconds
+  scrypt (n = 2^14, r = 8, p = 1)      44 ms        5 days
+  PBKDF2-SHA256, 600,000 iterations    153 ms       18 days
+
+A fast hash is designed to be fast, so a leaked table of SHA-256
+password hashes lets an attacker try every common password against
+every account in minutes. A deliberately slow, salted hash makes the
+same work take days per account, and attackers' GPUs are fast at
+SHA-256 but slowed by scrypt's memory use. Your login pays the cost once
+(a sixth of a second); someone trying billions of guesses pays it every
+time. OWASP recommends 600,000 PBKDF2-SHA256 iterations, or Argon2id.`,
 				MentalModel: "Make guessing expensive for attackers but cheap enough for honest logins.",
 				TryIt:       `Hash "hello" and "hello!" with SHA-256 and compare: one character changes everything.`,
 				Analogy: `A fingerprint identifies a person, but you cannot rebuild the person from
@@ -744,6 +786,21 @@ invent your own cryptography; use well-reviewed libraries.`,
   │                                     │
   │ ◀──────── message + signature ──────│ signed with Bob's PRIVATE key
   │ verify with Bob's PUBLIC key        │`,
+				UnderTheHood: `Why the mode of a cipher matters, measured with openssl: 1 MB made of
+one 16-byte block repeated (like a flat area of an image), encrypted
+with AES-128 in two modes:
+
+  mode                     ciphertext blocks   distinct
+  ECB (each block alone)        65,536             1
+  CTR (with a counter)          65,536        65,536
+
+With ECB, equal plaintext blocks give equal ciphertext blocks, so the
+picture's outline survives encryption; CTR, GCM and every modern mode
+mix in a counter or nonce, and the output looks random. Cost is no
+excuse either: AES-256-GCM ran at 10.8 GB/s on one core here, and an
+ECDSA P-256 signature took 30 µs to make and 88 µs to check, against
+RSA-2048's 0.39 ms to sign. Use an authenticated mode such as AES-GCM
+from a well-tested library, never ECB, and never a cipher of your own.`,
 				MentalModel: "Public key locks, private key unlocks; private key signs, public key verifies.",
 				TryIt:       "Implement a Caesar cipher and break it by trying all 26 keys, and see why real ciphers need enormous key spaces.",
 				Analogy: `A padlock you hand out freely (the public key): anyone can snap it shut
@@ -778,6 +835,22 @@ authenticator app or a hardware security key), or passkeys, which use
 public-key cryptography so there is no password to steal or phish.
 Sessions and tokens (cookies, JWTs) remember that you logged in, and
 must be protected too.`,
+				UnderTheHood: `Certificate checks, tested with openssl against a local server whose
+certificate was signed by a private test authority:
+
+  client trusts                       asks for       result
+  the test authority                  localhost      Verify return code: 0 (ok)
+  only the system's usual roots       localhost      error 20: unable to get
+                                                     local issuer certificate
+  the test authority                  example.com    error 62: hostname mismatch
+
+A correct client refuses both failures: a certificate from an
+authority it does not trust, and a valid certificate for a different
+name. Code that turns verification off to make an error go away (curl
+-k, verify=False, InsecureSkipVerify) accepts anyone at all as the
+server, which is exactly what TLS exists to prevent. A full TLS 1.3
+handshake cost about 0.8 ms of CPU here: there is no performance reason
+to skip it either.`,
 				MentalModel: `The padlock means "private and untampered, with this server", not that the site is honest.`,
 				TryIt:       "Click the padlock in your browser on three sites and read who issued each certificate and when it expires.",
 				Analogy: `A passport check: the certificate is the passport, the CA is the
@@ -901,6 +974,20 @@ groups permissions into roles such as viewer, editor and admin.`,
                │ yes
                ▼
              do it`,
+				UnderTheHood: `Unix file permissions, tested by a program that drops to the
+unprivileged nobody account before trying to read three files:
+
+  file mode                  as nobody     as root
+  0644 (everyone may read)   read          read
+  0640 (owner and group)     refused       read
+  0600 (owner only)          refused       read
+
+The kernel checks every open, every time, which is complete mediation
+in practice; and root passes every check, which is why services run as
+their own unprivileged accounts. The same idea applies inside
+applications: a web request for invoice 1042 must be checked against
+the logged-in user on the server, not trusted because the page only
+showed that user their own invoice numbers.`,
 				MentalModel: "For every request ask three things: who is this, what are they doing, and do they own it?",
 				TryIt:       "In any web app you built, log in as one user, copy a URL containing an ID, then open it logged in as another user. Does the server refuse?",
 				Analogy: `A hotel key card. The front desk checks your passport once
@@ -947,6 +1034,20 @@ watch the traffic for anything unusual.`,
 
 a port scan from outside finds only 443; the database is never
 reachable from the internet`,
+				UnderTheHood: `Rate limiting as a defence, measured in a private network namespace with
+nftables, against a local server receiving new connections as fast as
+one client could open them:
+
+  firewall                                        accepted a second
+  no limit                                              14,101
+  limit rate over 100/second drop (new only)                96
+
+One rule held new connections to the limit, while connections already
+open were untouched. That is how servers keep a flood of connection
+attempts, or one misbehaving client, from using up everything; real
+deployments limit per source address and in several layers (the
+network, the load balancer, the application), since a single limit for
+everyone also locks out legitimate users during a flood.`,
 				MentalModel: "Every open port is a door; close the ones you do not use and lock the rest.",
 				TryIt:       "Run nmap -sV scanme.nmap.org (the Nmap project allows scanning that host) and nmap localhost, and explain every open port you find.",
 				Analogy: `A castle: a moat and one gate (the firewall), guards who check everyone
@@ -994,6 +1095,20 @@ packages ───┼──▶ build server ──▶ release file ──▶ use
 compiler ───┘        ▲                 ▲
   each arrow is a place to attack; checksums and signatures
   let the user check that nothing was swapped on the way`,
+				UnderTheHood: `Can you check that a release was built from its published source?
+Building this academy twice, measured with SHA-256:
+
+  build                                               same binary?
+  twice in the same folder, same flags                yes
+  from a copy of the source in another folder         no
+  both with -trimpath and -buildvcs=false             yes
+
+The copy differed only because Go stamps the Git commit (and whether
+the tree had uncommitted changes) into the binary, and the copy had no
+Git folder. With paths and that stamp left out, the builds were
+byte-for-byte identical. That is a reproducible build: anyone can
+rebuild a release from its source and compare the hash, so a tampered
+build server cannot slip in a different binary unnoticed.`,
 				MentalModel: "Trust is transitive: everything you depend on can act as you.",
 				TryIt:       "Run your language's audit tool (npm audit, pip-audit or govulncheck) on a project, and read one advisory in full.",
 				Analogy: `Poisoning the flour at the mill instead of breaking into every bakery.
@@ -1035,6 +1150,20 @@ wiping a machine first destroys the record of how the attacker got in.`,
    ▲                                                   │
    │                                                   ▼
    └────────── improve defences ◀──────────── lessons learned`,
+				UnderTheHood: `File-integrity monitoring, the simplest detection there is: record a
+SHA-256 for every program, then compare later. A baseline of this
+machine's /usr/bin:
+
+  files hashed        707
+  data read           661 MB
+  time taken          3.6 s
+
+A few seconds a day finds any changed system program, but only if the
+baseline is kept where an intruder on the machine cannot rewrite it
+(another machine, or read-only storage), and only if someone looks at
+the differences. Tools such as AIDE and Tripwire do exactly this, and
+package managers can do the same for their own files (dpkg --verify,
+rpm -V).`,
 				MentalModel: "You cannot respond to what you never logged.",
 				TryIt:       "On Linux, run journalctl -u ssh (or read /var/log/auth.log) on a machine with SSH open to the internet, and count the failed login attempts from strangers.",
 				Analogy: `A smoke detector and a fire drill. The detector (logging and alerts)
@@ -1083,6 +1212,19 @@ single paper is a claim, not a settled fact.`,
 pass 2 (1 hr)    whole paper, skip proofs, study figures and tables
 pass 3 (hours)   re-derive and re-implement; find hidden assumptions
                  most papers: stop after pass 1`,
+				UnderTheHood: `The best test of a paper is to reproduce one of its numbers. Burton
+Bloom's 1970 paper predicts the false-positive rate of his filter; in the
+modern form, (1 − e^(−kn/m))^k. A Bloom filter of 100,000 bits with 7
+hash functions and 10,000 keys, built in Python and probed with 200,000
+keys that were never added:
+
+  measured false positives      0.79%
+  the formula                   0.82%
+
+Fifty years later, the claim holds on a laptop in a few lines of code.
+When a reproduction does not match, that is worth a careful look: a
+misread parameter, an assumption the paper states in passing (here,
+independent hash functions), or occasionally an error in the paper.`,
 				MentalModel: "A paper is an argument to interrogate, read in passes, not a chapter to absorb front to back.",
 				TryIt:       "Give a famous short paper (Dijkstra's \"Go To Statement Considered Harmful\", or the original RSA paper) a five-minute first pass and write down its one claim.",
 				Analogy: `Watching a match before studying the players. First you see the whole
@@ -1134,6 +1276,20 @@ what is being exploited and reachable first".`,
   └ CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H  = 10.0   the score
   └ affected: Log4j 2.0-beta9 .. 2.14.1;  fixed in 2.15.0 (then 2.17.1)
   └ on CISA KEV: yes  → being exploited: patch now`,
+				UnderTheHood: `CVSS v3.1 base scores computed from the specification's formulas, in a
+few lines of Python, for three vectors:
+
+  vulnerability                     vector                          score
+  Log4Shell (CVE-2021-44228)        AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H  10.0
+  Heartbleed (CVE-2014-0160)        AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N   7.5
+  a local bug needing a user click  AV:L/AC:L/PR:N/UI:R/S:U/C:H/I:H/A:H   7.8
+
+The first two match the NVD's published scores. The third shows the
+score's limits: a local bug that needs someone to open a file scores
+above Heartbleed, which leaked private keys from a sixth of the web's
+secure servers. The score measures the bug's properties, not whether
+anyone is exploiting it, which is what CISA's catalogue of known
+exploited vulnerabilities adds.`,
 				MentalModel: "A CVE names the bug, a CWE names its family, CVSS scores it, and KEV tells you if it is on fire.",
 				TryIt:       "Look up CVE-2021-44228 on the NVD and read its CVSS vector field by field.",
 				Analogy: `A disease registry. The CVE is the case number, the CWE is the diagnosis
@@ -1197,6 +1353,21 @@ exists to prevent.`,
           report privately to the vendor ─▶ they fix it ─▶ CVE issued
                               │  (≈90 days)            │
                               └─ no fix in time ───────┴─▶ publish`,
+				UnderTheHood: `Finding and minimising a bug in a toy parser written for the purpose,
+with a one-character off-by-one in its bounds check (a length of 32 is
+let through for a 32-slot buffer that also needs a terminator):
+
+  random inputs tried before the first crash        73
+  size of that input                                118 bytes
+  after minimising (dropping pieces while it
+    still crashes)                                   33 bytes: a length
+                                                     of 32, then 32 bytes
+
+The minimised input is the report: it names the exact boundary, lets the
+maintainer reproduce it in seconds, and shows the fix (> 32 must be
+>= 32). Coordinated disclosure sends that, privately, to the maintainer,
+with a deadline for the fix, instead of a working attack published for
+everyone.`,
 				MentalModel: "Find it, prove it minimally, report it privately, and let the fix ship before the world hears.",
 				TryIt:       "Read a published Project Zero write-up end to end and note the timeline from report to fix to disclosure.",
 				Analogy: `Finding a faulty lock on a neighbour's door. The responsible thing is to
@@ -1260,6 +1431,10 @@ legal; some single high-impact reports have paid over $100,000.`,
 			{"What is a zero-day?", "A vulnerability the vendor does not yet know about, so no patch exists; finding and responsibly reporting one before attackers use it is the work of a security researcher."},
 			{"What is coordinated disclosure, and why the delay before publishing?", "Report the flaw privately to the vendor and give them a reasonable time (often 90 days) to fix it, publishing only after a fix exists, so attackers do not get a working exploit against unpatched systems."},
 			{"Why is testing a system you do not own a crime even with good intentions?", "Laws such as the US CFAA and the UK Computer Misuse Act forbid unauthorised access regardless of intent; practise only on your own systems, deliberately vulnerable targets, or within an explicit bug-bounty or engagement scope."},
+			{"A search box builds its SQL by joining strings. What does a name such as x' OR '1'='1 do, and what is the fix?", "It turns the condition true for every row; pass the input as a query parameter, so it can only ever be a value."},
+			{"Why store passwords with PBKDF2, scrypt or Argon2 rather than SHA-256?", "SHA-256 is fast, so a leaked table can be guessed at millions a second; a deliberately slow, salted hash makes each guess cost milliseconds."},
+			{"What does encrypting with AES in ECB mode leak?", "Equal plaintext blocks give equal ciphertext blocks, so patterns in the data survive encryption."},
+			{"A TLS client reports \"hostname mismatch\". What does that mean, and is it safe to switch verification off?", "The certificate is valid but for another name; switching verification off would accept any server, which defeats TLS."},
 		},
 	},
 

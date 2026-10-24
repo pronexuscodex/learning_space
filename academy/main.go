@@ -975,7 +975,9 @@ func atomicWriteFile(path string, data []byte) (err error) {
 	if err = tmp.Close(); err != nil {
 		return fmt.Errorf("close temp file: %w", err)
 	}
-	if err = os.Chmod(tmpName, 0o644); err != nil {
+	// Owner only: progress, notes, reflections and career files are
+	// personal, and other accounts on the machine have no need to read them.
+	if err = os.Chmod(tmpName, 0o600); err != nil {
 		return fmt.Errorf("chmod temp file: %w", err)
 	}
 	if err = os.Rename(tmpName, path); err != nil {
