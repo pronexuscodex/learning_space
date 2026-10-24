@@ -93,7 +93,19 @@ func (a *App) nextHint() string {
 	if len(steps) == 0 {
 		return ""
 	}
-	return sty.Green("➜ Next:") + " " + truncate(steps[0].Title, a.cols()-24) + sty.Gray("  (press n)")
+	return sty.Green("➜ Next:") + " " + shortenKeepingTag(steps[0].Title, a.cols()-24) + sty.Gray("  (press n)")
+}
+
+// shortenKeepingTag truncates text to n columns, cutting into the name
+// rather than a closing tag such as " (Stage 3)", which stays whole.
+func shortenKeepingTag(text string, n int) string {
+	if visibleLen(text) <= n {
+		return text
+	}
+	if i := strings.LastIndex(text, " ("); i > 0 && strings.HasSuffix(text, ")") && visibleLen(text[i:]) < n/2 {
+		return truncate(text[:i], n-visibleLen(text[i:])) + text[i:]
+	}
+	return truncate(text, n)
 }
 
 // ---------------------------------------------------------------------------
@@ -134,8 +146,23 @@ func (a *App) searchScreen() error {
 			case h.Stage < 0:
 				where = "general "
 			}
+			num := sty.Cyan(fmt.Sprintf("%2d.", i+1))
+			if a.cols() < 60 {
+				// Narrow: the title gets the whole line; kind and stage
+				// lead the line below it.
+				a.printf("  %s %s\n", num, sty.Bold(truncate(h.Title, a.cols()-7)))
+				sub := kind(h.Kind) + sty.Gray(" · "+strings.TrimSpace(where))
+				if h.Snippet != "" {
+					sub += sty.Gray(" · " + truncate(h.Snippet, a.cols()-8-visibleLen(sub)-3))
+				}
+				a.printf("      %s\n", sub)
+				continue
+			}
 			head := fmt.Sprintf("%s %s %s", kind(padRight(h.Kind, 9)), sty.Gray(where), sty.Bold(h.Title))
-			a.printf("  %s %s\n", sty.Cyan(fmt.Sprintf("%2d.", i+1)), truncate(stripANSI(head), a.cols()-7))
+			if visibleLen(head) > a.cols()-7 {
+				head = truncate(stripANSI(head), a.cols()-7)
+			}
+			a.printf("  %s %s\n", num, head)
 			if h.Snippet != "" {
 				a.printf("      %s\n", sty.Gray(truncate(h.Snippet, a.cols()-8)))
 			}

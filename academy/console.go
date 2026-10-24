@@ -119,6 +119,11 @@ var layoutWidth = func() int { return 80 }
 // a list of choices ("a add · e edit · q back") breaks only between
 // choices. A hint that does not fit goes on its own line above.
 func promptLabel(label, hint string) string {
+	// One set of brackets: "Which concept? (1–12, q cancel)", not
+	// "Which concept? (1–12) (q cancel)".
+	if i := strings.LastIndex(label, " ("); hint != "" && i >= 0 && strings.HasSuffix(label, ")") && !strings.ContainsAny(label[i+2:len(label)-1], "()") {
+		label, hint = label[:i], label[i+2:len(label)-1]+", "+hint
+	}
 	w := layoutWidth()
 	room := max(24, w-12) // the input shares the last line
 	lines := breakChoices(label, room)
@@ -133,7 +138,7 @@ func promptLabel(label, hint string) string {
 			// Too long to share the line: the hint goes on its own line
 			// above the question, never dropped (it often says what to type).
 			var above []string
-			for _, l := range breakChoices(hint, w-4) {
+			for _, l := range breakChoices("("+hint+")", w-4) {
 				above = append(above, sty.Gray("  "+l))
 			}
 			s = strings.Join(above, "\n") + "\n" + s
@@ -271,17 +276,34 @@ func (c *console) promptInt(label string, valid func(int) error) (int, error) {
 
 // promptChoice shows a numbered list and returns the chosen zero-based index.
 func (c *console) promptChoice(label string, options []string) (int, error) {
+	// Numbers are padded to the widest ("[9] " lines up with "[10]"). A
+	// long option wraps to a second line under its own text; on narrow
+	// screens, where that would double the menu's height, it is cut.
+	numW := len(fmt.Sprintf("[%d]", len(options)))
 	for i, opt := range options {
 		num := fmt.Sprintf("[%d]", i+1)
-		for j, part := range strings.Split(opt, "\n") { // an option may span lines
-			room := c.width() - 5 - len(num)
+		pad := strings.Repeat(" ", numW-len(num))
+		room := c.width() - 5 - numW
+		first := true
+		for _, part := range strings.Split(opt, "\n") { // an option may span lines
+			part = strings.TrimLeft(part, " ")
+			lines := []string{part}
 			if visibleLen(part) > room {
-				part = truncate(stripANSI(part), room)
+				lines = []string{truncate(stripANSI(part), room)}
+				if c.width() >= 60 {
+					lines = wrap(stripANSI(part), room, "")
+					if len(lines) > 2 {
+						lines = []string{lines[0], truncate(strings.Join(lines[1:], " "), room)}
+					}
+				}
 			}
-			if j == 0 {
-				fmt.Fprintf(c.out, "    %s %s\n", sty.Cyan(num), part)
-			} else {
-				fmt.Fprintf(c.out, "    %s %s\n", strings.Repeat(" ", len(num)), strings.TrimLeft(part, " "))
+			for _, l := range lines {
+				if first {
+					fmt.Fprintf(c.out, "    %s%s %s\n", sty.Cyan(num), pad, l)
+					first = false
+				} else {
+					fmt.Fprintf(c.out, "    %s %s\n", strings.Repeat(" ", numW), l)
+				}
 			}
 		}
 	}

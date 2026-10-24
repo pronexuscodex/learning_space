@@ -287,3 +287,19 @@ func TestRegistryPathFor(t *testing.T) {
 		}
 	}
 }
+
+// A day of real work in the Daily Workout keeps the streak alive; a day on
+// which every step was empty or skipped does not.
+func TestWorkoutDaysCountTowardsTheStreak(t *testing.T) {
+	r := seedRegistry()
+	now := time.Now()
+	day := now.Format("2006-01-02")
+	r.Workouts = []WorkoutDay{{Date: day, Done: []string{StepReview, StepRecall, StepPractice}, Skipped: []string{StepReview, StepRecall, StepPractice}}}
+	if s := r.stats(now, 1).streak; s != 0 {
+		t.Fatalf("a day of skipped steps must not count: streak %d", s)
+	}
+	r.Workouts[0].Done = append(r.Workouts[0].Done, StepLearn)
+	if s := r.stats(now, 1).streak; s != 1 {
+		t.Fatalf("learning a concept in the workout must count: streak %d, want 1", s)
+	}
+}

@@ -133,6 +133,18 @@ After a walk through the app as a new learner, at 40, 80 and 160 columns:
   - the dictionary's List example could be read as `append` returning the new list;
   - Commit and Migration still described saving and schema versions from before 1.6.0;
   - the Stage 5 glossary said the CPU can do maths only on registers.
+- **A second UX audit, screen by screen at 40, 80 and 120 columns:**
+  - **Lesson text no longer splits words.** In 18 lessons, a bullet that went on over a second line was laid out as code: at 40 columns it was cut mid-word ("defi" / "nes"). A paragraph right after a list no longer joins its last bullet, and numbered rules show their numbers ("1. Think first", not "• 1.").
+  - **Glossaries and "Words to know" stay readable on narrow screens.** The meaning moves under the word instead of being squeezed into a column a dozen letters wide. "Programmer words here" shows each word's first sentence whole instead of a cut one.
+  - **The full-screen pager's status line** keeps the page's name on every page (it vanished halfway, and never showed at 80 columns), never shows a cut name, always names Space on narrow screens, and stops offering Space on the last page, where it does nothing.
+  - **Menus line up and stop cutting labels:** "[9]" and "[10]" align, and a long option wraps to a second line (at 60 columns and wider) instead of ending in "…".
+  - **Prompts use one pair of brackets** ("Which concept? (1–12 from the list above, q cancel)", "(Enter to skip, :q cancel)"), and a hint moved above its question keeps them.
+  - **Today's workout counts towards your streak.** A day spent learning, practising or reflecting in the workout no longer shows "No streak yet". Steps with nothing to do show as "–", not as work done, and Mixed practice no longer promises "a different topic" when you have understood only one.
+  - **The hint ladder says what its first option does** ("I've worked on it: no more help", not "Back to work"), and answering no to "Mark this exercise as done?" says where to find it again.
+  - **Review:** a warm-up card's reveal is labelled "How to check your answer", since it is a method, not a model answer.
+  - **Checked exercises:** an empty starter explains the linker's "undefined reference to main" in plain words, compiler messages are wrapped instead of cut, and a program that does not compile shows "does not compile yet", not "0/1 cases passing".
+  - **Start Here** sends beginners to Stage 0 (it said Stage 1 or 5), lists Stage 0 in the tracks, and no longer says "no exams" next to the Mastery Check.
+  - **Smaller things:** the 40-column menu says "All keys" (it said "All & keys"); the Study Hall list drops a stage's bracketed subtitle on narrow screens before cutting its name; search results keep their colours and, at 40 columns, give the title its own line; search excerpts no longer show the text's "- " list markers; the next-step line keeps "(Stage N)" whole; the dictionary's word of the day names the key that opens it there (t, not d); the very first concept says it needs no earlier knowledge; and the Stage 1 overview's run-on sentence is two sentences.
 
 ## [1.6.2] - 2026-10-15
 

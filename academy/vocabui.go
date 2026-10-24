@@ -10,15 +10,16 @@ import (
 	"time"
 )
 
-// wordOfTheDayLine is the dashboard's word of the day.
-func (a *App) wordOfTheDayLine() string {
+// wordOfTheDayLine is the word of the day, with the key that opens it
+// where the line is shown: d on the dashboard, t inside the dictionary.
+func (a *App) wordOfTheDayLine(key string) string {
 	w := wordOfTheDay(time.Now())
 	width := a.cols()
 	label := "🔤 Word of the day: "
 	if width < 60 {
 		label = "🔤 Word: "
 	}
-	tail := sty.Gray("  (d)")
+	tail := sty.Gray("  (" + key + ")")
 	room := width - 2 - visibleLen(label) - visibleLen(tail)
 	head := sty.Cyan(label) + sty.Bold(truncate(w.Word, room))
 	if mean := room - visibleLen(w.Word) - 3; mean >= 12 {
@@ -108,7 +109,7 @@ func (a *App) showWord(w Word) error {
 		}
 		hint := action + " · Enter back"
 		if len(w.See) > 0 {
-			hint = fmt.Sprintf("1-%d related · ", len(w.See)) + hint
+			hint = fmt.Sprintf("1–%d related · ", len(w.See)) + hint
 		}
 		s, err := a.con.readLine(promptLabel("Word", hint))
 		if err != nil {
@@ -177,7 +178,7 @@ func (a *App) dictionary() error {
 	}
 	for {
 		a.println("")
-		a.println(a.wordOfTheDayLine())
+		a.println(a.wordOfTheDayLine("t"))
 		s, err := a.con.readLine(promptLabel("Type a word to look up · c categories · a A–Z · t today's word · m my deck", "q back"))
 		if err != nil {
 			return err

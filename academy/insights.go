@@ -151,6 +151,9 @@ func (r *Registry) nextSteps(now time.Time) []Suggestion {
 		case s != nil:
 			if studied, _ := conceptProgress(s); studied == 0 {
 				why = "A good place to start: the stages this one builds on are covered."
+				if len(stagePrereqs[id]) == 0 {
+					why = "The very beginning: no earlier knowledge needed."
+				}
 			}
 		}
 		out = append(out, Suggestion{Kind: SuggestConcept, Stage: id, Concept: i,
@@ -257,7 +260,14 @@ type Hit struct {
 
 // snippet returns a short excerpt of text around the first query word.
 func snippet(text, word string, width int) string {
-	flat := strings.Join(strings.Fields(text), " ")
+	// Flatten the text as it reads, without the source's markup: bullet
+	// dashes and the marks on preformatted lines.
+	var parts []string
+	for _, l := range reflow(text) {
+		l = strings.TrimPrefix(strings.TrimPrefix(l, preMark), "- ")
+		parts = append(parts, l)
+	}
+	flat := strings.Join(strings.Fields(strings.Join(parts, " ")), " ")
 	i := strings.Index(strings.ToLower(flat), word)
 	if i < 0 {
 		return truncate(flat, width)

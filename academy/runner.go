@@ -284,6 +284,10 @@ func runCheck(ch Check, src string) (CheckRun, error) {
 		if ch.Harness != "" && (strings.Contains(run.BuildLog, "multiple definition of `main'") || strings.Contains(run.BuildLog, "duplicate symbol") && strings.Contains(run.BuildLog, "_main")) {
 			run.BuildLog += "\n\nYour file must not define main: the checker supplies its own and calls your functions."
 		}
+		if ch.Harness == "" && (strings.Contains(run.BuildLog, "undefined reference to `main'") || strings.Contains(run.BuildLog, "Undefined symbols") && strings.Contains(run.BuildLog, "_main")) {
+			// The linker's words for an empty starter file.
+			run.BuildLog += "\n\nYour program has no main function yet. Every C program starts running in main: add int main(void) { ... return 0; }."
+		}
 		for _, h := range ch.BuildHints {
 			if strings.Contains(run.BuildLog, h.Match) {
 				run.BuildLog += "\n\n" + h.Note

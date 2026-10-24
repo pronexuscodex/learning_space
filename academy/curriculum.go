@@ -2096,8 +2096,9 @@ and similarity, matrices as transformations, solving linear systems, the
 SVD, derivatives of functions of vectors and matrices, and the numerical
 traps of floating point, so that every backward pass in Stage 15 is
 something you can derive on paper and trust in code. Each lesson is
-measured: matrix multiplication at 1 and 183 GFLOP/s, a gradient check
-that fails when the step is too small, and a softmax that returns NaN.`,
+measured: the same matrix multiplication at 0.95 GFLOP/s and at 183, a
+gradient check that fails when the step is too small, and a softmax that
+returns NaN.`,
 		Concepts: []Concept{
 			{
 				Name:    "Vectors, Dot Products & Similarity",

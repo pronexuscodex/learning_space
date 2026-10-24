@@ -99,3 +99,85 @@ func TestConceptCardsFitTheScreen(t *testing.T) {
 		}
 	}
 }
+
+// A bullet's continuation lines, indented by two spaces in the source,
+// reflow with the bullet; an unindented line after a bullet starts a new
+// paragraph instead of joining it.
+func TestWrapBulletContinuationsAndParagraphs(t *testing.T) {
+	text := "- first item that goes on\n  and continues here;\n- second item.\nA new paragraph."
+	got := wrap(text, 80, "")
+	want := []string{"• first item that goes on and continues here;", "• second item.", "A new paragraph."}
+	if strings.Join(got, "|") != strings.Join(want, "|") {
+		t.Fatalf("wrap =\n%q\nwant\n%q", got, want)
+	}
+}
+
+// No prose word in a lesson is ever split across two lines at a narrow
+// width: only code and words longer than the line may be broken.
+func TestLessonProseNeverSplitsWords(t *testing.T) {
+	const w = 40
+	for id, g := range curriculum {
+		for _, c := range g.Concepts {
+			for _, text := range []string{c.Body, c.UnderTheHood, c.Analogy, c.Example} {
+				// The prose words, straight from the source: every line
+				// except code (indented, and not continuing a bullet).
+				var want []string
+				inBullet := false
+				for _, raw := range strings.Split(text, "\n") {
+					switch {
+					case strings.HasPrefix(raw, "- "):
+						inBullet = true
+					case strings.HasPrefix(raw, "  ") && !(inBullet && len(raw) > 2 && raw[2] != ' '):
+						inBullet = false
+						continue
+					case !strings.HasPrefix(raw, "  "):
+						inBullet = false
+					}
+					want = append(want, strings.Fields(strings.TrimPrefix(raw, "- "))...)
+				}
+				got := map[string]bool{}
+				for _, l := range wrap(text, w-4, "  ") {
+					for _, f := range strings.Fields(strings.TrimPrefix(strings.TrimSpace(l), "• ")) {
+						got[f] = true
+					}
+				}
+				for _, word := range want {
+					if visibleLen(word) < w-8 && !got[word] {
+						t.Errorf("Stage %d %q: %q is split across lines at %d columns", id, c.Name, word, w)
+						break
+					}
+				}
+			}
+		}
+	}
+}
+
+// A stage's glossary stays readable at every width: no meaning is squeezed
+// into a column so narrow that words split or lines start with a comma.
+func TestGlossaryNeverSplitsWords(t *testing.T) {
+	for _, w := range []int{40, 80} {
+		for id, g := range curriculum {
+			var out bytes.Buffer
+			a := &App{reg: seedRegistry(), width: w, con: &console{out: &out}}
+			a.showGlossary(g)
+			text := stripANSI(out.String())
+			got := map[string]bool{}
+			for _, l := range strings.Split(text, "\n") {
+				if s := strings.TrimSpace(l); s != "" && (strings.ContainsAny(s[:1], ",;:)") || s == "." || strings.HasPrefix(s, ". ")) {
+					t.Errorf("%d columns, Stage %d: a line starts with punctuation: %q", w, id, l)
+				}
+				for _, f := range strings.Fields(l) {
+					got[f] = true
+				}
+			}
+			for _, term := range g.Glossary {
+				for _, word := range strings.Fields(term.Meaning) {
+					if !got[word] {
+						t.Errorf("%d columns, Stage %d %q: %q is split across lines", w, id, term.Word, word)
+						break
+					}
+				}
+			}
+		}
+	}
+}

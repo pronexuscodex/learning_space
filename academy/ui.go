@@ -95,6 +95,11 @@ const (
 // width (so a resize takes effect on the next screen), else $COLUMNS,
 // else 80, clamped to [minWidth, maxWidth].
 func termWidth() int {
+	return max(minWidth, min(screenWidth()-1, maxWidth)) // -1: never touch the last column, which makes some terminals wrap
+}
+
+// screenWidth is the terminal's real width in columns (80 when unknown).
+func screenWidth() int {
 	w, _, ok := terminalSize(int(os.Stdout.Fd()))
 	if !ok {
 		if env, err := strconv.Atoi(os.Getenv("COLUMNS")); err == nil && env > 0 {
@@ -103,7 +108,7 @@ func termWidth() int {
 			w = 80
 		}
 	}
-	return max(minWidth, min(w-1, maxWidth)) // -1: never touch the last column, which makes some terminals wrap
+	return w
 }
 
 // stripANSI removes SGR escape sequences so visible width can be measured.
@@ -278,7 +283,13 @@ func reflow(text string) []string {
 	}
 	for _, raw := range strings.Split(text, "\n") {
 		line := strings.TrimSpace(raw)
+		bullet := strings.HasPrefix(cur, "- ")
 		switch {
+		// A bullet's own continuation lines are indented by two spaces,
+		// to line up with its text: they are part of the bullet, not
+		// preformatted, so they reflow with it.
+		case bullet && line != "" && strings.HasPrefix(raw, "  ") && raw[2] != ' ':
+			cur += " " + line
 		case line != "" && strings.HasPrefix(raw, "  "):
 			flush()
 			out = append(out, preMark+strings.TrimRight(raw[2:], " "))
@@ -291,6 +302,10 @@ func reflow(text string) []string {
 		case isHeadingLine(line):
 			flush()
 			out = append(out, line)
+		case bullet:
+			// An unindented line after a bullet starts a new paragraph.
+			flush()
+			cur = line
 		case cur == "":
 			cur = line
 		default:
@@ -327,6 +342,12 @@ func wrap(text string, width int, indent string) []string {
 			first = indent + "• "
 			rest = indent + "  "
 			logical = strings.TrimPrefix(logical, "- ")
+			// "- 1. Think first" is a numbered item: the number is its marker.
+			if num, after, ok := strings.Cut(logical, ". "); ok && num != "" && strings.Trim(num, "0123456789") == "" {
+				first = indent + num + ". "
+				rest = indent + strings.Repeat(" ", len(num)+2)
+				logical = after
+			}
 		}
 		line, prefix := "", first
 		for _, long := range strings.Fields(logical) {

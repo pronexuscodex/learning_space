@@ -70,6 +70,8 @@ func checkMark(s CheckStatus) (string, string) {
 		return sty.Green("✓"), "passed on your own"
 	case s.Passed:
 		return sty.Green("✓"), "passed, with hints"
+	case s.Runs > 0 && !s.LastBuilt && s.LastCount == 0:
+		return sty.Yellow("◐"), "does not compile yet"
 	case s.Runs > 0:
 		return sty.Yellow("◐"), fmt.Sprintf("%d/%d cases passing", s.LastCount, s.Total)
 	}
@@ -230,7 +232,11 @@ func writeCheckRun(w io.Writer, run CheckRun, width int) {
 				fmt.Fprintf(w, "    %s\n", sty.Gray(fmt.Sprintf("… %d more lines", len(lines)-40)))
 				break
 			}
-			fmt.Fprintf(w, "    %s\n", truncate(l, width-6))
+			// Wrapped, never cut: the end of a compiler message is
+			// often the part that explains it.
+			for _, part := range wrap(l, width-6, "") {
+				fmt.Fprintf(w, "    %s\n", part)
+			}
 		}
 		fmt.Fprintln(w)
 		for _, l := range wrap("Read the first error first: it gives the file, line and column. Later errors are often caused by it.", width-4, "  ") {

@@ -55,7 +55,7 @@ func (a *App) studyHallFor(stageID int) error {
 					passed++
 				}
 			}
-			options = append(options, fmt.Sprintf("%s %s", sty.Bold("Checked exercises"), sty.Gray(fmt.Sprintf("(%d/%d passed · your code, compiled and tested for real)", passed, len(cs)))))
+			options = append(options, fmt.Sprintf("%s %s", sty.Bold("Checked exercises"), sty.Gray(fmt.Sprintf("(%d/%d passed · compiled and tested for real)", passed, len(cs)))))
 		}
 		choice, err := a.con.promptChoice("Study Hall", options)
 		if errors.Is(err, errCancel) {
@@ -149,7 +149,11 @@ func (a *App) renderStageSyllabus(stageID int, g StageGuide, full bool) {
 			a.printf("  %s%s\n", lead, sty.Gray(l))
 		}
 		if weak > 0 {
-			for _, l := range wrap("Tip: you have covered less than half of some of these. A quick visit there first will make this stage easier.", a.cols()-16, "") {
+			tip := "Tip: you have covered less than half of some of these. A quick visit there first will make this stage easier."
+			if len(prereqs) == 1 {
+				tip = "Tip: you have covered less than half of it. A quick visit there first will make this stage easier."
+			}
+			for _, l := range wrap(tip, a.cols()-16, "") {
 				a.printf("  %s%s\n", strings.Repeat(" ", 14), sty.Yellow(l))
 			}
 		}
@@ -207,7 +211,7 @@ func (a *App) renderStageSyllabus(stageID int, g StageGuide, full bool) {
 // refresh their explanation.
 func (a *App) studyConcept(stageID int, g StageGuide) error {
 	// The concepts are listed, numbered, just above.
-	n, err := a.con.promptInt(fmt.Sprintf("Which concept? (1–%d, from the list above)", len(g.Concepts)), func(n int) error {
+	n, err := a.con.promptInt(fmt.Sprintf("Which concept? (1–%d from the list above)", len(g.Concepts)), func(n int) error {
 		if n < 1 || n > len(g.Concepts) {
 			return fmt.Errorf("choose a concept from 1 to %d", len(g.Concepts))
 		}
@@ -367,7 +371,7 @@ func (a *App) renderConcept(c Concept, n, total int, glossary []Term, done []boo
 		for _, p := range builds {
 			mark, tag := sty.Green("✓"), fmt.Sprintf(" (Stage %d)", p.Stage)
 			if !p.Met {
-				mark, tag, unmet = sty.Yellow("○"), fmt.Sprintf(" (Stage %d, not yet)", p.Stage), unmet+1
+				mark, tag, unmet = sty.Yellow("○"), fmt.Sprintf(" (Stage %d, not understood yet)", p.Stage), unmet+1
 			}
 			if visibleLen(p.Name+tag) <= w-10 {
 				a.printf("  %s   %s %s\n", edge, mark, p.Name+sty.Gray(tag))
@@ -462,8 +466,15 @@ func (a *App) renderConcept(c Concept, n, total int, glossary []Term, done []boo
 	if terms := termsIn(glossary, c.Summary, c.Analogy, c.Example, c.Body); len(terms) > 0 {
 		section("📖 Words to know", sty.Blue)
 		for _, t := range terms {
-			for i, l := range wrap(t.Meaning, w-10-len(t.Word), "") {
-				lead := strings.Repeat(" ", len(t.Word)+3)
+			if w-10-visibleLen(t.Word) < 24 { // narrow: the meaning goes below the word
+				a.printf("  %s   %s\n", edge, sty.Bold(t.Word))
+				for _, l := range wrap(t.Meaning, w-12, "") {
+					a.printf("  %s     %s\n", edge, sty.Gray(l))
+				}
+				continue
+			}
+			for i, l := range wrap(t.Meaning, w-10-visibleLen(t.Word), "") {
+				lead := strings.Repeat(" ", visibleLen(t.Word)+3)
 				if i == 0 {
 					lead = sty.Bold(t.Word) + " — "
 				}
@@ -478,20 +489,41 @@ func (a *App) renderConcept(c Concept, n, total int, glossary []Term, done []boo
 	if words := wordsIn(5, skip, c.Summary, c.Analogy, c.Example, c.Body); len(words) > 0 {
 		section("🔤 Programmer words here", sty.Cyan)
 		for _, pw := range words {
+			// The first sentence, whole: the dictionary has the rest.
+			means := firstSentence(pw.Means)
 			lead := sty.Bold(pw.Word) + " — "
-			if room := w - 10 - visibleLen(lead); room >= 10 {
-				a.printf("  %s   %s%s\n", edge, lead, sty.Gray(truncate(pw.Means, room)))
+			if room := w - 10 - visibleLen(lead); room >= 24 {
+				for i, l := range wrap(means, room, "") {
+					if i > 0 {
+						lead = strings.Repeat(" ", visibleLen(pw.Word)+3)
+					}
+					a.printf("  %s   %s%s\n", edge, lead, sty.Gray(l))
+				}
 				continue
 			}
-			// A long word on a narrow screen: the meaning goes on its own line.
+			// A long word on a narrow screen: the meaning goes below it.
 			a.printf("  %s   %s\n", edge, sty.Bold(truncate(pw.Word, w-10)))
-			a.printf("  %s     %s\n", edge, sty.Gray(truncate(pw.Means, w-12)))
+			for _, l := range wrap(means, w-12, "") {
+				a.printf("  %s     %s\n", edge, sty.Gray(l))
+			}
 		}
 		for _, l := range wrap("Full explanations with code: the dictionary [d] on the main menu.", w-8, "") {
 			a.printf("  %s   %s\n", edge, sty.Gray(l))
 		}
 	}
 	a.println("  " + sty.Blue("┗"+strings.Repeat("━", w-4)))
+}
+
+// firstSentence is text up to and including the full stop that ends its
+// first sentence ("e.g." and "3.5" do not), or all of it. A very short
+// first sentence ("Code-review shorthand.") brings the next one with it.
+func firstSentence(text string) string {
+	for i := 0; i+1 < len(text); i++ {
+		if text[i] == '.' && text[i+1] == ' ' && i >= 40 && !strings.HasSuffix(text[:i], "e.g") && !strings.HasSuffix(text[:i], "i.e") {
+			return text[:i+1]
+		}
+	}
+	return text
 }
 
 // levelBadge renders an exercise level as a coloured label.
@@ -649,8 +681,14 @@ func (a *App) workExercise(stageID int, c Concept, i int) error {
 		label = "Already done. Untick it?"
 	}
 	yes, err := a.con.confirm(label)
-	if err != nil || !yes {
+	if err != nil {
 		return err
+	}
+	if !yes {
+		if !already {
+			a.con.note("It stays open. Come back to it any time from the Exercise gym.")
+		}
+		return nil
 	}
 	if classic && !already {
 		observed, err := a.con.promptText("What happened? Did your plan or prediction hold? (Enter to skip)", maxNotesLen, false)
@@ -712,6 +750,18 @@ func (a *App) showGlossary(g StageGuide) {
 	for _, t := range g.Glossary {
 		width = max(width, len([]rune(t.Word)))
 	}
+	if a.cols()-width-10 < 24 {
+		// Narrow: each word on its own line, its meaning below it, so the
+		// meaning keeps a readable width.
+		for _, t := range g.Glossary {
+			a.printf("    %s\n", sty.Bold(sty.Cyan(t.Word)))
+			for _, l := range wrap(t.Meaning, a.cols()-8, "") {
+				a.printf("      %s\n", l)
+			}
+		}
+		a.println("")
+		return
+	}
 	for _, t := range g.Glossary {
 		for i, l := range wrap(t.Meaning, a.cols()-width-10, "") {
 			lead := strings.Repeat(" ", width)
@@ -737,7 +787,7 @@ func (a *App) showStartHere() {
 		a.println(l)
 	}
 	a.println("")
-	a.con.note("Next step: open the Study Hall [6], pick Stage 1 or 5, and study concept 1.")
+	a.con.note("Next step: press j for today's workout, or open the Study Hall [6] and start with Stage 0.")
 }
 
 // showResources prints the resource library grouped by kind.

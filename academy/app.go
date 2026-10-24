@@ -233,7 +233,7 @@ func (a *App) printDashboard() {
 	for _, l := range a.goalsLine() {
 		a.println(l)
 	}
-	a.println(a.wordOfTheDayLine())
+	a.println(a.wordOfTheDayLine("d"))
 	a.mu.Lock()
 	day := a.reg.todayWorkout(time.Now())
 	a.mu.Unlock()
@@ -321,7 +321,7 @@ func (a *App) allScreens() []menuGroup {
 		}},
 		{"SETTINGS & EXIT", sty.Yellow, []menuEntry{
 			{item("o", "Settings"), hint("theme, symbols, home screen"), "Settings"},
-			{item("?", "All screens & keys"), "", "All & keys"},
+			{item("?", "All screens & keys"), "", "All keys"},
 			{item("c", "Classic Mode "+mode), "", "Classic " + stripANSI(mode)},
 			{item("t", "Tidy screen "+tidyMode), "", "Tidy " + stripANSI(tidyMode)},
 			{item("q", "Exit"), hint("progress saves itself; 5 works too"), "Exit"},
@@ -354,7 +354,7 @@ func (a *App) simpleMenu() []menuGroup {
 	return []menuGroup{
 		{"", sty.Green, learn},
 		{"", sty.Gray, []menuEntry{
-			{item("?", "All screens & keys"), "", "All & keys"},
+			{item("?", "All screens & keys"), "", "All keys"},
 			{item("o", "Settings"), "", "Settings"},
 			{item("q", "Exit"), "", "Exit"},
 		}},
@@ -661,12 +661,19 @@ func (a *App) listStages(track *Track) {
 	if w-14-countsW-1 >= 24 {
 		a.printf("%s\n", sty.Gray(fmt.Sprintf("%*s", w-1, "concepts · exercises")))
 	}
+	// Narrow screens: less indent, and a title too long for its line
+	// drops its bracketed subtitle ("The Iron Layer (Low-Level Systems &
+	// Compilers)" becomes "The Iron Layer") before anything is cut.
+	trackIndent, stageIndent := "    ", "      "
+	if w < 60 {
+		trackIndent, stageIndent = "  ", "  "
+	}
 	for _, t := range a.reg.Tracks {
 		if track != nil && t.ID != track.ID {
 			continue
 		}
 		color := trackColor(t.ID)
-		a.printf("    %s\n", color(sty.Bold(truncate("Track "+t.ID+" · "+t.Name, w-6))))
+		a.printf("%s%s\n", trackIndent, color(sty.Bold(truncate("Track "+t.ID+" · "+t.Name, w-2-len(trackIndent)))))
 		for si := range t.Stages {
 			s := &t.Stages[si]
 			studied, concepts := conceptProgress(s)
@@ -674,12 +681,19 @@ func (a *App) listStages(track *Track) {
 			state := a.reg.stageState(s)
 			mark := stateStyle(state)(stageStateGlyphs[state])
 			counts := fmt.Sprintf("%*s", countsW, fmt.Sprintf("%d/%d · %d/%d", studied, concepts, exDone, exTotal))
-			titleW := w - 14 - visibleLen(counts) - 1
+			titleW := w - 8 - len(stageIndent) - visibleLen(counts) - 1
 			if titleW < 24 { // too narrow for the counts: give the title the room
-				titleW, counts = w-14, ""
+				titleW, counts = w-8-len(stageIndent), ""
 			}
-			a.printf("      %s %s %s %s\n", color(padRight(fmt.Sprintf("[%d]", s.ID), 4)), mark,
-				padRight(truncate(s.Title, titleW), titleW), sty.Gray(counts))
+			title := s.Title
+			if i := strings.Index(title, " ("); i > 0 && visibleLen(title) > titleW {
+				title = title[:i]
+			}
+			line := fmt.Sprintf("%s%s %s %s", stageIndent, color(padRight(fmt.Sprintf("[%d]", s.ID), 4)), mark, truncate(title, titleW))
+			if counts != "" {
+				line += strings.Repeat(" ", titleW-visibleLen(truncate(title, titleW))) + " " + sty.Gray(counts)
+			}
+			a.println(line)
 		}
 	}
 }
