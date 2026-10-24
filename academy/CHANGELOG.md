@@ -4,6 +4,13 @@ All notable changes to the Systems & AI Academy are listed here. The
 format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 versions follow [Semantic Versioning](https://semver.org/).
 
+## [1.9.0] - 2026-10-24
+
+### Added
+- **Readline keys at every prompt, as in bash, zsh, Python and psql.** The line editor now has a cursor: ← → (Ctrl+B, Ctrl+F) and Ctrl+← → (Alt+B, Alt+F) move by character and word, Home and End (Ctrl+A, Ctrl+E) jump to the ends, Delete and Ctrl+D delete under the cursor, Ctrl+U and Ctrl+K cut to the start and to the end, Ctrl+W cuts the word before the cursor, Ctrl+Y pastes the last cut, and ↑ ↓ (Ctrl+P, Ctrl+N) bring back earlier answers from the session. Long answers that wrap over several rows keep the cursor in the right place. The `/` search line of long screens edits the same way, with its own history of searches, as in less.
+- **A key bar at the bottom of the screen.** The line above each prompt names the keys that work there, nano-style (`Enter answer  ←→ move  ↑↓ earlier answers  ^A ^E start, end …`), with the menu's own keys at the main menu and how to finish at multi-line answers. It shows only keys that really work (fewer where the terminal edits whole lines, as on Windows), fits from 40 columns, and disappears once you answer, so it leaves no trail. Settings can switch it off.
+- **"All screens & keys" teaches the editing keys and where else they work:** bash and zsh (plus Ctrl+R), python3, psql, sqlite3, gdb, less and man, Emacs, where these keys come from, and macOS text boxes.
+
 ## [1.8.0] - 2026-10-24
 
 ### Added
@@ -45,9 +52,6 @@ versions follow [Semantic Versioning](https://semver.org/).
 - **Stage 10 (Security) completed to Stage 1's depth: an "Under the hood" section in all 12 lessons,** built on measurements of programs and files created for the purpose: a query built by joining strings returning all 1,000 rows where the parameterised one returned none; one guess against SHA-256 at 0.5 µs against 153 ms with PBKDF2 at 600,000 iterations; ECB leaving a repeated block unchanged where CTR left none; certificate checks refusing an unknown issuer and a wrong host name; the kernel refusing an unprivileged account; an nftables rate limit holding 14,101 connections a second to 96; a reproducible build of this academy; a baseline of /usr/bin in 3.6 s; Bloom's 1970 formula reproduced to within 0.03 points; CVSS scores computed from the specification; and a toy parser's off-by-one found after 73 random inputs and cut down to 33 bytes.
   - Two new checked C exercises: `pbkdf2` and `html_escape`, with reference solutions and mutation tests. Four quiz questions are appended.
   Every lesson in every stage, 0 to 20, now has an "Under the hood" section.
-- **Readline keys at every prompt, as in bash, zsh, Python and psql.** The line editor now has a cursor: ← → (Ctrl+B, Ctrl+F) and Ctrl+← → (Alt+B, Alt+F) move by character and word, Home and End (Ctrl+A, Ctrl+E) jump to the ends, Delete and Ctrl+D delete under the cursor, Ctrl+U and Ctrl+K cut to the start and to the end, Ctrl+W cuts the word before the cursor, Ctrl+Y pastes the last cut, and ↑ ↓ (Ctrl+P, Ctrl+N) bring back earlier answers from the session. Long answers that wrap over several rows keep the cursor in the right place. The `/` search line of long screens edits the same way, with its own history of searches, as in less.
-- **A key bar at the bottom of the screen.** The line above each prompt names the keys that work there, nano-style (`Enter answer  ←→ move  ↑↓ earlier answers  ^A ^E start, end …`), with the menu's own keys at the main menu and how to finish at multi-line answers. It shows only keys that really work (fewer where the terminal edits whole lines, as on Windows), fits from 40 columns, and disappears once you answer, so it leaves no trail. Settings can switch it off.
-- **"All screens & keys" teaches the editing keys and where else they work:** bash and zsh (plus Ctrl+R), python3, psql, sqlite3, gdb, less and man, Emacs, where these keys come from, and macOS text boxes.
 - **More concept prerequisites:** 298 links across 174 concepts, up from 254 across 153, covering every new lesson.
 
 ### Fixed
