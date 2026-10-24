@@ -697,6 +697,7 @@ func init() {
 	checks = append(checks, identityChecks...)
 	checks = append(checks, monitorChecks...)
 	checks = append(checks, responseChecks...)
+	checks = append(checks, appsecChecks...)
 	sort.SliceStable(checks, func(i, j int) bool { return checks[i].Stage < checks[j].Stage })
 }
 

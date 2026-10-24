@@ -42,9 +42,14 @@ versions follow [Semantic Versioning](https://semver.org/).
   - Three new checked C exercises: `backup_verify`, `timeline` and `k_anon`, with reference solutions and mutation tests for the typical mistakes.
   - Nine glossary terms, three outcomes, six quiz questions, prerequisites and related-concept links for the new lessons.
   The academy now has 179 concepts and 537 exercises.
+- **Stage 10 (Security) completed to Stage 1's depth: an "Under the hood" section in all 12 lessons,** built on measurements of programs and files created for the purpose: a query built by joining strings returning all 1,000 rows where the parameterised one returned none; one guess against SHA-256 at 0.5 µs against 153 ms with PBKDF2 at 600,000 iterations; ECB leaving a repeated block unchanged where CTR left none; certificate checks refusing an unknown issuer and a wrong host name; the kernel refusing an unprivileged account; an nftables rate limit holding 14,101 connections a second to 96; a reproducible build of this academy; a baseline of /usr/bin in 3.6 s; Bloom's 1970 formula reproduced to within 0.03 points; CVSS scores computed from the specification; and a toy parser's off-by-one found after 73 random inputs and cut down to 33 bytes.
+  - Two new checked C exercises: `pbkdf2` and `html_escape`, with reference solutions and mutation tests. Four quiz questions are appended.
+  Every lesson in every stage, 0 to 20, now has an "Under the hood" section.
 - **More concept prerequisites:** 298 links across 174 concepts, up from 254 across 153, covering every new lesson.
 
 ### Fixed
+- **Your files are now readable only by you.** Progress, notes, reflections, goals, your resources and career exports were saved with mode 0644, readable by every account on the machine; they are now saved as 0600 (owner only), and a test keeps it so. Found by threat-modelling the academy itself, for Stage 10.
+- The `buffer_pool` check allows 10 seconds per case: its million accesses, with the sanitizers on, could take over 2 seconds on slower machines.
 - **A second UX audit, screen by screen at 40, 80 and 120 columns:**
   - **Lesson text no longer splits words.** In 18 lessons, a bullet that went on over a second line was laid out as code: at 40 columns it was cut mid-word ("defi" / "nes"). A paragraph right after a list no longer joins its last bullet, and numbered rules show their numbers ("1. Think first", not "• 1.").
   - **Glossaries and "Words to know" stay readable on narrow screens.** The meaning moves under the word instead of being squeezed into a column a dozen letters wide. "Programmer words here" shows each word's first sentence whole instead of a cut one.

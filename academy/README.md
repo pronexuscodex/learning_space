@@ -369,6 +369,8 @@ The later stages have checked exercises too, written with C and POSIX only, so t
 | `make_order` | 9: Build systems | the order make builds in: depth-first, each target once, cycles (exit 1), a missing rule (exit 2), and 100,000 rules |
 | `bisect` | 9: Debugging tools | git bisect as a function: at most ⌈log₂ n⌉ tests, never the known ends, and a midpoint that cannot overflow near `LONG_MAX` |
 | `cvss` | 10: Reading CVEs | a CVSS v3.1 base-score calculator: scope-dependent weights, round-up (not round-to-nearest), zero-impact vectors, and thousands of combinations against the official formula |
+| `pbkdf2` | 10: Password storage | PBKDF2-HMAC-SHA256 with your own SHA-256 and HMAC: RFC 7914's vector, a password longer than a block, verification with the stored iteration count, spaces kept, a cap on iterations, 200,000 iterations in about a second |
+| `html_escape` | 10: Injection & XSS | output encoding for HTML and URLs: the single quote that ends an attribute, escaping once, all 256 bytes, URL values with / ? & #, and high bytes through a signed char |
 | `nfa_match` | 11: Regex engines | a regex engine that never backtracks: precedence, whole-line matches, `(a+)+b` on 30 a's, 100,000-character lines, invalid patterns |
 | `turing` | 11: Turing machines | a Turing-machine simulator: the move into H counts, the 1s left on the tape, step limits, and the 5-state busy beaver's 47,176,870 steps |
 | `dpll` | 11: Reductions | a SAT solver for DIMACS CNF: clauses across lines, pigeonholes (UNSAT), and the Inkala Sudoku as 11,988 clauses |
@@ -834,7 +836,7 @@ The tests check:
 - **The v1 → v2 migration and stage merging.**
 - **Retention:** the scheduler's intervals grow and reset on a lapse; deck unlocking and due cards; each step of the mastery ladder.
 - **Classic Mode:** every stage has a complete classic corner with HTTPS links; the struggle clock's thresholds and early unlock; notebook and type-in progress survive a save round trip.
-- **Checked exercises:** each check's reference solution passes every case, with gcc and with clang (91 checks, including a real loopback TCP server, forked processes and a write-ahead log the checker reads back). Mastery waits for a concept's check to pass. Typical mistakes fail with the right explanation:
+- **Checked exercises:** each check's reference solution passes every case, with gcc and with clang (93 checks, including a real loopback TCP server, forked processes and a write-ahead log the checker reads back). Mastery waits for a concept's check to pass. Typical mistakes fail with the right explanation:
   - the XOR swap;
   - `9 / 5` in integers;
   - an endless loop;

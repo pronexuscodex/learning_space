@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -301,5 +302,22 @@ func TestWorkoutDaysCountTowardsTheStreak(t *testing.T) {
 	r.Workouts[0].Done = append(r.Workouts[0].Done, StepLearn)
 	if s := r.stats(now, 1).streak; s != 1 {
 		t.Fatalf("learning a concept in the workout must count: streak %d, want 1", s)
+	}
+}
+
+func TestSavedFilesAreOwnerOnly(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Unix permission bits")
+	}
+	path := filepath.Join(t.TempDir(), "academy_progress.json")
+	if err := atomicWriteFile(path, []byte("{}\n")); err != nil {
+		t.Fatal(err)
+	}
+	st, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if mode := st.Mode().Perm(); mode != 0o600 {
+		t.Errorf("saved with mode %#o, want 0600: other accounts could read the learner's notes", mode)
 	}
 }
