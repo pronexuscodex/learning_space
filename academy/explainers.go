@@ -583,6 +583,8 @@ var extras = map[int]stageExtras{
 			"Build a neural network library from nothing, including backpropagation",
 			"Train models that recognise handwritten digits",
 			"Explain, and build, a small GPT-style language model",
+			"Write reverse-mode autodiff, causal attention and a BPE tokeniser in C",
+			"Diagnose a network that will not train from its activation statistics and loss curves",
 		},
 		Glossary: []Term{
 			{"Neuron", "A tiny function: a weighted sum of its inputs passed through an activation function."},
@@ -593,6 +595,13 @@ var extras = map[int]stageExtras{
 			{"Batch", "A handful of training examples processed together in one step."},
 			{"Token", "A piece of text, such as a word or part of a word, that a language model reads and writes."},
 			{"Embedding", "A list of numbers that represents a token (or anything else) in a way the model can compute with."},
+			{"Autodiff", "Automatic differentiation: the program records each operation and computes exact derivatives by the chain rule, with no formulas written by hand."},
+			{"Initialisation", "The random starting values of the weights, scaled (Xavier, Kaiming) so that signals neither vanish nor explode through the layers."},
+			{"Residual connection", "Adding a block's input to its output, x + f(x), so the signal and its gradient have a direct path through the network."},
+			{"Convolution", "Sliding one small filter over every position of an image or sequence, reusing the same weights everywhere."},
+			{"Byte-pair encoding", "A tokeniser that starts from single bytes and repeatedly merges the most frequent adjacent pair into a new token."},
+			{"Temperature", "A number that divides the logits before sampling: below 1 the model picks safer tokens, above 1 more surprising ones."},
+			{"Top-p sampling", "Sampling only from the smallest set of tokens whose probabilities add up to p (also called nucleus sampling)."},
 		},
 	},
 	16: {

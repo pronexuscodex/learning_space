@@ -179,7 +179,10 @@ var conceptPrereqs = map[string][]string{
 	"Computational Graphs & Reverse-Mode Autodiff": {"Gradients, Jacobians & the Matrix Chain Rule"},
 	"MLPs, Activations & Initialisation":           {"Computational Graphs & Reverse-Mode Autodiff", "Matrices as Linear Maps"},
 	"Residual Connections & Normalisation":         {"MLPs, Activations & Initialisation"},
-	"Attention & the Transformer":                  {"Residual Connections & Normalisation", "Probability, Softmax & Cross-Entropy"},
+	"Convolutions & Weight Sharing":                {"MLPs, Activations & Initialisation", "Matrices as Linear Maps"},
+	"Tokenisation & Embeddings":                    {"Vectors, Dot Products & Similarity", "Collections: Lists, Dictionaries & Strings"},
+	"Attention & the Transformer":                  {"Residual Connections & Normalisation", "Probability, Softmax & Cross-Entropy", "Tokenisation & Embeddings"},
+	"Sampling & Decoding":                          {"Attention & the Transformer", "Probability, Softmax & Cross-Entropy"},
 	"The Training Loop & Generalisation":           {"MLPs, Activations & Initialisation", "Evaluating Models Honestly", "Optimisation: From Gradient Descent to Adam"},
 
 	// ---- Stage 16
