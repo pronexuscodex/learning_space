@@ -77,6 +77,20 @@ func TestFullScreenPager(t *testing.T) {
 		}
 	}
 
+	// The search line has the editing keys of every other prompt: here
+	// "ine 3" is typed, Ctrl+A goes to the start, l is put in front, and
+	// ↑ at the next / brings the search back.
+	out, a = fullRun(t, "/ine 3\x01l\r/\x1b[A\rq", false)
+	if strings.Count(out, "“line 3” 1/11") != 2 {
+		t.Errorf("search editing and history: %q", out)
+	}
+	if len(a.con.history) != 0 || len(a.con.searches) != 1 {
+		t.Errorf("searches have their own history: answers %q, searches %q", a.con.history, a.con.searches)
+	}
+	if _, a = fullRun(t, "/x\x7f\x7fq", false); a.con.inline {
+		t.Error("Backspace on an empty search line cancels it, as in less")
+	}
+
 	// A number leaves and answers the next prompt.
 	_, a = fullRun(t, "7\n", false)
 	if string(a.con.prefill) != "7" {

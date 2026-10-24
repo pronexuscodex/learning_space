@@ -389,6 +389,7 @@ type Settings struct {
 	PlainSymbols bool   `json:"plain_symbols,omitempty"` // replace emoji with plain characters
 	NoConfidence bool   `json:"no_confidence,omitempty"` // skip "how sure are you?" in reviews
 	DetailedHome bool   `json:"detailed_home,omitempty"` // the full dashboard and menu instead of the simple home
+	HideKeyBar   bool   `json:"hide_key_bar,omitempty"`  // no key bar above prompts
 }
 
 // normalize drops values a hand-edited file might hold.

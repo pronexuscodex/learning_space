@@ -195,7 +195,7 @@ func (a *App) readParagraph(label string, maxLen int) (string, error) {
 	var lines []string
 	total := 0
 	for {
-		l, err := a.con.readLine(sty.Cyan("  │ "))
+		l, err := a.con.readLineKeys(sty.Cyan("  │ "), paragraphBar)
 		if err != nil {
 			return strings.Join(lines, "\n"), err
 		}
