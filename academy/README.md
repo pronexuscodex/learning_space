@@ -749,7 +749,11 @@ Press **`c`** on the main menu. Classic Mode brings back the habits that made st
 
 These are the line-editing keys of GNU readline and of zsh's Emacs mode, so they are the same at the prompts of bash, zsh, Python, psql, sqlite3, gdb and many more, and in macOS text boxes; what you practise here works there, and the other way round. The pager's keys are those of `less` and `man`.
 
+![The key bar under the main menu](docs/key-bar.png)
+
 **The key bar.** At the bottom of the screen, on the line above each prompt, a bar names the keys that work there, as in nano: `Enter answer  ←→ move  ↑↓ earlier answers  ^A ^E start, end  …` (`^L` means Ctrl+L). At the main menu it shows the menu's keys instead. It disappears once you answer, so no trail of bars is left behind, and it keeps only what fits on narrow screens. Settings (`o`) can switch it off.
+
+![Every editing key, and where else it works](docs/keys.png)
 
 On Linux, macOS and the BSDs, the academy reads keys one at a time (a small built-in line editor using termios from Go's standard library), so every key above acts instantly and other keys are ignored instead of printing `^[[5~`. The terminal is always restored on exit, including after Ctrl+C. Elsewhere (for example Windows), input stays line-based and the terminal edits the line with its own keys: press **Ctrl+L then Enter**, or type `clear`.
 
@@ -949,7 +953,7 @@ The **Release** workflow (`.github/workflows/release.yml`) then:
 - publishes a GitHub release with the archives, `SHA256SUMS`, and that version's changelog section as the release notes. A tag with a hyphen, such as `v1.1.0-rc.1`, is published as a pre-release;
 - runs `tools/packages.py`, which rewrites `Formula/academy.rb` (Homebrew) and `bucket/academy.json` (Scoop) at the repository root with the new download links and checksums, and commits them to the default branch. Pre-releases are skipped, and an older tag never replaces a newer version. If the branch rules refuse the workflow's push, it opens a pull request with the two files instead; merge it to update `brew` and `scoop`.
 
-No terminal? Publish from the website instead: **Releases → Draft a new release**, type a new tag such as `v1.0.0`, paste the changelog section as the description, and click **Publish release**. The same workflow then builds the archives and attaches them to that release, usually within a few minutes.
+No terminal? Publish from the website instead: **Releases → Draft a new release**, type a new tag such as `v1.0.0`, and click **Publish release**. Leave the description empty and the workflow fills it with that version's changelog section, or write your own and it is kept. The same workflow then builds the archives and attaches them to that release, usually within a few minutes. To fill in the description of a release published earlier with none, run **Actions → Release notes → Run workflow** with its tag.
 
 Publishing from the website starts the workflow twice (once for the release, once for its new tag); the second run sees the files already attached and stops. To rebuild a release's files, delete its `SHA256SUMS` asset and re-run the workflow. The archives are reproducible: building the same commit again gives the same checksums.
 

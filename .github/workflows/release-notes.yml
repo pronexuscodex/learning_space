@@ -1,0 +1,44 @@
+name: Release notes
+
+# Fill a published release's description from its CHANGELOG.md section.
+# On the website: Actions → Release notes → Run workflow, type the tag
+# (for example v1.8.0). Notes someone wrote are kept unless "replace" is
+# ticked.
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag, for example v1.8.0"
+        required: true
+      replace:
+        description: "Replace a description that is not empty"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  notes:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: academy
+    steps:
+      - uses: actions/checkout@v7
+      - name: Write the notes
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag }}
+          REPLACE: ${{ inputs.replace }}
+        run: |
+          case "$TAG" in v[0-9]*.[0-9]*.[0-9]*) ;; *) echo "Not a release tag: $TAG"; exit 1 ;; esac
+          tools/release_notes.sh "$TAG" > notes.md
+          if [ ! -s notes.md ]; then echo "CHANGELOG.md has no section for $TAG."; exit 1; fi
+          body=$(gh release view "$TAG" --json body --jq .body)
+          if [ -n "$(printf '%s' "$body" | tr -d '[:space:]')" ] && [ "$REPLACE" != "true" ]; then
+            echo "$TAG already has a description; tick \"replace\" to overwrite it."
+            exit 0
+          fi
+          gh release edit "$TAG" --notes-file notes.md
+          echo "Release notes for $TAG written from CHANGELOG.md."

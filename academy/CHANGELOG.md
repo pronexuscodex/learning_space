@@ -11,6 +11,14 @@ versions follow [Semantic Versioning](https://semver.org/).
 - **A key bar at the bottom of the screen.** The line above each prompt names the keys that work there, nano-style (`Enter answer  ←→ move  ↑↓ earlier answers  ^A ^E start, end …`), with the menu's own keys at the main menu and how to finish at multi-line answers. It shows only keys that really work (fewer where the terminal edits whole lines, as on Windows), fits from 40 columns, and disappears once you answer, so it leaves no trail. Settings can switch it off.
 - **"All screens & keys" teaches the editing keys and where else they work:** bash and zsh (plus Ctrl+R), python3, psql, sqlite3, gdb, less and man, Emacs, where these keys come from, and macOS text boxes.
 
+![The key bar under the main menu](https://github.com/pronexuscodex/learning_space/raw/v1.9.0/academy/docs/key-bar.png)
+
+![Every editing key, and where else it works](https://github.com/pronexuscodex/learning_space/raw/v1.9.0/academy/docs/keys.png)
+
+### Changed
+- **Fresh screenshots** in the README, taken from this version: the Study Hall with all 21 stages, the key bar under each prompt, the hint ladder and the struggle clock as they work now. `tools/screenshots.py` follows the cursor moves the key bar uses, and finds the browsers Playwright installs today.
+- **Releases published from the website get their notes even when the description is left empty:** the release workflow fills it with the version's CHANGELOG section. A new **Release notes** workflow (Actions → Release notes → Run workflow) fills in a release published earlier without a description, such as v1.8.0.
+
 ## [1.8.0] - 2026-10-24
 
 ### Added

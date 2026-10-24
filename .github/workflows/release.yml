@@ -3,7 +3,8 @@ name: Release
 # Push a tag such as v1.0.0 to build every platform and publish a GitHub
 # release with the archives, SHA256SUMS and the matching CHANGELOG section.
 # It also runs when a release is published from the GitHub website: then it
-# attaches the archives to that release and keeps the notes you wrote.
+# attaches the archives to that release and keeps the notes you wrote, or,
+# when the description was left empty, fills it with the CHANGELOG section.
 on:
   push:
     tags: ["v*.*.*"]
@@ -71,11 +72,7 @@ jobs:
           subject-checksums: academy/dist/SHA256SUMS
       - name: Release notes from CHANGELOG.md
         run: |
-          version=${GITHUB_REF_NAME#v}
-          awk -v v="$version" '
-            /^## / { if (found) exit; if (index($0, "[" v "]") || index($0, " " v)) { found = 1; next } }
-            found { print }
-          ' CHANGELOG.md > notes.md
+          tools/release_notes.sh "$GITHUB_REF_NAME" > notes.md
           if [ ! -s notes.md ]; then echo "See CHANGELOG.md." > notes.md; fi
           cat notes.md
       - name: Publish the release
@@ -83,8 +80,12 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
-            # Published on the website (or re-run): just attach the files.
+            # Published on the website (or re-run): attach the files, and
+            # give it the CHANGELOG notes if its description is empty.
             gh release upload "$GITHUB_REF_NAME" dist/* --clobber
+            if [ -z "$(gh release view "$GITHUB_REF_NAME" --json body --jq .body | tr -d '[:space:]')" ]; then
+              gh release edit "$GITHUB_REF_NAME" --notes-file notes.md
+            fi
           else
             flags=""
             case "$GITHUB_REF_NAME" in *-*) flags="--prerelease" ;; esac

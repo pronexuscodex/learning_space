@@ -21,7 +21,9 @@ def find_chrome():
     if os.environ.get("CHROME"):
         return os.environ["CHROME"]
     for pattern in ["/opt/pw-browsers/chromium_headless_shell-*/chrome-linux/headless_shell",
-                    "/opt/pw-browsers/chromium-*/chrome-linux/chrome"]:
+                    "/opt/pw-browsers/chromium_headless_shell-*/chrome-headless-shell-linux64/chrome-headless-shell",
+                    "/opt/pw-browsers/chromium-*/chrome-linux/chrome",
+                    "/opt/pw-browsers/chromium-*/chrome-linux64/chrome"]:
         hits = sorted(glob.glob(pattern))
         if hits:
             return hits[-1]
@@ -36,7 +38,7 @@ def find_chrome():
 #        max lines[, which key's output to start from: -1 = the last])
 SHOTS = {
     "menu": (80, [], r"Today [0-9]+ min", r"└─", 40),
-    "stages": (80, ["6"], r"STUDY HALL", r"\[16\]", 40),
+    "stages": (80, ["6"], r"STUDY HALL", r"\[20\]", 40),
     "concept-card": (80, ["6", "1", "1", "5"], r"┏━", r"◆ Mental model", 70),
     "under-the-hood": (80, ["6", "1", "1", "6"], r"🔧 Under the hood", r"◆ Mental model", 30),
     "exercise-gym": (80, ["6", "0", "2", "3", "3"], r"REAL-WORLD", r"\(y/n\)|›", 30),
@@ -54,10 +56,12 @@ SHOTS = {
     "workout": (80, ["j"], r"TODAY'S WORKOUT", r"Ready\?", 30),
     "career": (80, ["e", "1", "1", "y"], r"GET HIRED", r"Back to the main menu", 32, -1),
     "hint-ladder": (80, ["6", "0", "2", "3", "3", "2", "2"], r"Stuck\?", r"this exercise\.", 40, -3),
-    "settings": (80, ["o", "1"], r"SETTINGS", r"Monochrome", 30, -2),
+    "settings": (80, ["o", "1"], r"SETTINGS", r"Theme.*›", 30, -2),
+    "key-bar": (80, [], r"\[\?\] All screens", r"academy ›", 8),
+    "keys": (80, ["?"], r"While typing", r"macOS", 40),
     "share-card": (80, ["k"], r"╭", r"learning_space", 25),
     "start-here": (80, ["0"], r"WHY WE START WITH C", r"GET A C COMPILER", 20),
-    "struggle-clock": (80, ["c", "y", "6", "1", "2", "5", "2", "y"], r"PRACTICE", r"learning happens", 30, -2),
+    "struggle-clock": (80, ["c", "y", "6", "1", "2", "5", "2", "2", "2", "2"], r"🔒", r"What now", 12),
 }
 
 SGR_COLORS = {"30": "#45475a", "31": "#f38ba8", "32": "#a6e3a1", "33": "#f9e2af", "34": "#89b4fa",
@@ -112,9 +116,17 @@ def run_session(cols, keys, registry, from_key=-1, rows=200):
 
 
 def terminal_lines(text):
-    """Apply the few control sequences the app uses; keep SGR colours."""
-    lines, cur = [], ""
-    saved = ([], "")
+    """Apply the control sequences the app uses; keep SGR colours.
+
+    A small row-based terminal: the cursor is on a row and at its end
+    (the app rewrites whole lines after \\r), and moves up and down (A, B),
+    deletes a row (M, the key bar), and clears (J, K, H)."""
+    rows, r = [""], 0
+    saved = ([""], 0)
+
+    def need(n):
+        while len(rows) <= n:
+            rows.append("")
     i = 0
     while i < len(text):
         ch = text[i]
@@ -122,42 +134,50 @@ def terminal_lines(text):
             m = CSI.match(text, i)
             if m:
                 params, cmd = m.groups()
+                n = int(params) if params.isdigit() else 1
                 if cmd == "m":
-                    cur += m.group(0)
-                elif cmd == "J":
-                    lines, cur = [], ""
+                    rows[r] += m.group(0)
                 elif cmd == "H":  # cursor home: the app redraws the whole screen
-                    lines, cur = [], ""
+                    rows, r = [""], 0
+                elif cmd == "J":
+                    if params == "2":
+                        rows, r = [""], 0
+                    else:  # to the end of the screen, from the start of the row
+                        rows[r] = ""
+                        del rows[r + 1:]
                 elif cmd == "h" and "1049" in params:  # alternate screen on
-                    saved, lines, cur = (lines, cur), [], ""
+                    saved, rows, r = (rows, r), [""], 0
                 elif cmd == "l" and "1049" in params:  # alternate screen off
-                    lines, cur = saved
+                    rows, r = saved
                 elif cmd == "K":
                     if params == "2":
-                        cur = ""
-                elif cmd == "A":  # cursor up: back onto earlier lines
-                    for _ in range(int(params or "1")):
-                        cur = lines.pop() if lines else ""
+                        rows[r] = ""
+                elif cmd == "A":
+                    r = max(0, r - n)
+                elif cmd == "B":
+                    r += n
+                    need(r)
+                elif cmd == "M":  # delete lines: the rows below move up
+                    del rows[r:r + n]
+                    need(r)
                 i = m.end()
                 continue
             i += 1
             continue
         if ch == "\n":
-            lines.append(cur)
-            cur = ""
+            r += 1
+            need(r)
         elif ch == "\r":
-            if i + 1 < len(text) and text[i + 1] == "\n":
-                pass
-            else:
-                cur = ""
+            if not (i + 1 < len(text) and text[i + 1] == "\n"):
+                rows[r] = ""
         elif ch == "\x07":
             pass
         else:
-            cur += ch
+            rows[r] += ch
         i += 1
-    if cur:
-        lines.append(cur)
-    return lines
+    while rows and not plain(rows[-1]).strip():
+        rows.pop()
+    return rows
 
 
 def plain(line):
