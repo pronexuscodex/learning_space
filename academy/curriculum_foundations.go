@@ -1075,10 +1075,10 @@ In C both are easiest on top of an array. A stack is an array and a top
 index. A queue is an array used as a ring: a head index where items
 leave and a tail index where they arrive, both wrapping around to 0 at
 the end, so nothing is ever shifted.`,
-				Diagram: `array:   [ 7 | 3 | 9 | 4 ]              index i → jump straight there
-linked:  7 → 3 → 9 → 4 → ∅              walk from the head
-stack:   push ▶ [ 4 | 9 | 3 | 7 ]        pop takes the 4  (last in, first out)
-queue:   in ▶ [ 4 | 9 | 3 | 7 ] ▶ out    7 leaves first   (first in, first out)`,
+				Diagram: `array:   [ 7 | 3 | 9 | 4 ]            index i: jump straight there
+linked:  7 → 3 → 9 → 4 → ∅            walk from the head
+stack:   push ▶ [ 4 | 9 | 3 | 7 ]     pop takes the 4: last in, first out
+queue:   in ▶ [ 4 | 9 | 3 | 7 ] ▶ out 7 leaves first: first in, first out`,
 				UnderTheHood: `On x86-64, struct node { int value; struct node *next; } is 16 bytes:
 4 for the int, 4 of padding so the pointer is 8-aligned, and 8 for the
 pointer. Each malloc(16) costs more than 16. In glibc, three nodes
@@ -2709,7 +2709,7 @@ why performance claims must be measured, not assumed.`,
 				Diagram: `time →      1    2    3    4    5    6
 instr 1:   [F]  [D]  [E]  [W]
 instr 2:        [F]  [D]  [E]  [W]
-instr 3:             [F]  [D]  [E]  [W]     one instruction finishes per tick`,
+instr 3:             [F]  [D]  [E]  [W]   one finishes every tick`,
 				UnderTheHood: `The famous experiment, re-run on a test machine: sum the bytes ≥ 128 of
 a 32 MB array, first in random order, then after sorting it.
 

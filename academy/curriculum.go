@@ -170,7 +170,7 @@ can stop it after any step and look at the result:
   gcc -c hello.c          an object file, hello.o
   gcc hello.o -o hello    linked into a program`,
 				Diagram: `source.c ─▶ [lexer] ─▶ tokens ─▶ [parser] ─▶ AST ─▶ [IR gen] ─▶ IR
-   ─▶ [optimizer] ─▶ [codegen] ─▶ .s ─▶ [assembler] ─▶ .o ─▶ [linker] ─▶ a.out`,
+   ─▶ [optimizer] ─▶ [codegen] ─▶ .s ─▶ [as] ─▶ .o ─▶ [linker] ─▶ a.out`,
 				UnderTheHood: `Following a six-line hello.c through gcc 13 on Linux:
 
   gcc -E hello.c | wc -l       819
@@ -949,10 +949,9 @@ act on it:
   sigaction(SIGTERM, &sa, NULL);
   while (!stop) { /* work */ }
   /* save, close, exit cleanly */`,
-				Diagram: `  kill -TERM pid
-       │
-       ▼                     main loop:  work ─ work ─ work ─ check stop ─▶ save, exit 0
-  kernel interrupts ─▶ on_term(): stop = 1 ─┘ (return to where it was)`,
+				Diagram: `  kill -TERM pid ─▶ kernel interrupts the program ─▶ on_term(): stop = 1
+                                                      then returns to it
+  main loop: work ─ work ─ work ─ check stop ─▶ stop is 1: save, exit 0`,
 				UnderTheHood: `A shell reports a process killed by signal n with exit status 128 + n.
 Measured in bash on Linux:
 
@@ -2006,9 +2005,9 @@ wait after each failure (up to a cap), and jitter randomises each wait,
 so that clients that failed together do not all retry together. Retry
 budgets and circuit breakers stop retrying altogether when a service is
 clearly down.`,
-				Diagram: `client ── charge £10, key=7f3a ──▶ server: charges, stores result for 7f3a
+				Diagram: `client ── charge £10, key=7f3a ──▶ server: charges, keeps result for 7f3a
 client ◀─────── reply lost ───────
-client ── charge £10, key=7f3a ──▶ server: 7f3a seen: returns stored result
+client ── charge £10, key=7f3a ──▶ server: 7f3a seen, sends that result
                                      (charged once, not twice)`,
 				UnderTheHood: `A Linux listening socket whose accept queue was full silently dropped
 new SYNs. A raw-socket capture recorded the client's attempts:

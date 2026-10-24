@@ -167,10 +167,13 @@ var conceptPrereqs = map[string][]string{
 
 	// ---- Stage 14
 	"Descriptive Statistics & Distributions": {"Probability for Programmers"},
+	"Bayes' Theorem & Base Rates":            {"Probability for Programmers", "Descriptive Statistics & Distributions"},
 	"Statistical Inference & Experiments":    {"Descriptive Statistics & Distributions"},
+	"The Bootstrap & Resampling":             {"Statistical Inference & Experiments"},
+	"Bias, Variance & Regularisation":        {"Linear & Logistic Regression", "Linear Systems, Least Squares & Conditioning"},
 	"Linear & Logistic Regression":           {"Descriptive Statistics & Distributions", "Optimisation: From Gradient Descent to Adam", "Probability, Softmax & Cross-Entropy"},
 	"Trees, Ensembles & Clustering":          {"Linear & Logistic Regression"},
-	"Evaluating Models Honestly":             {"Linear & Logistic Regression"},
+	"Evaluating Models Honestly":             {"Linear & Logistic Regression", "Bayes' Theorem & Base Rates"},
 
 	// ---- Stage 15
 	"Computational Graphs & Reverse-Mode Autodiff": {"Gradients, Jacobians & the Matrix Chain Rule"},

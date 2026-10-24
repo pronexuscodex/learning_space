@@ -301,6 +301,12 @@ var conceptLinks = map[string]links{
 	// ---- Stage 14
 	"Descriptive Statistics & Distributions": {[]string{"Probability for Programmers", "Evaluating Models Honestly"},
 		"Seeing Theory: Basic Probability and Probability Distributions. StatQuest's videos on histograms and distributions."},
+	"Bayes' Theorem & Base Rates": {[]string{"Probability for Programmers", "Evaluating Models Honestly"},
+		"Mathematics for Machine Learning: the section on Bayes' theorem. StatQuest's videos on Bayes' theorem and naive Bayes. Gerd Gigerenzer's Calculated Risks, on teaching base rates with natural frequencies."},
+	"The Bootstrap & Resampling": {[]string{"Statistical Inference & Experiments", "Trees, Ensembles & Clustering"},
+		"An Introduction to Statistical Learning: the section on the bootstrap in the resampling chapter. Efron & Tibshirani's An Introduction to the Bootstrap, chapters 1 to 6."},
+	"Bias, Variance & Regularisation": {[]string{"Linear & Logistic Regression", "The Training Loop & Generalisation"},
+		"An Introduction to Statistical Learning: the bias-variance trade-off, and the chapter on shrinkage methods (ridge and lasso)."},
 	"Statistical Inference & Experiments": {[]string{"Probability for Programmers", "Testing & Reliability"},
 		"Seeing Theory: Frequentist Inference. StatQuest on p-values and statistical power."},
 	"Linear & Logistic Regression": {[]string{"Optimisation: From Gradient Descent to Adam", "Probability, Softmax & Cross-Entropy"},
