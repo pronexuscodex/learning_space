@@ -567,6 +567,7 @@ kernel inside.`,
 			{"Book", "Code: The Hidden Language of Computer Hardware and Software", "https://www.codehiddenlanguage.com/", "Charles Petzold's gentle, story-like path from Morse code to a working computer."},
 			{"Article", "What happens when you type google.com into your browser and press Enter?", "https://github.com/alex/what-happens-when", "A famous, community-written answer that follows one keypress through every layer."},
 			{"Article", "Write your Own Virtual Machine (LC-3)", "https://www.jmeiners.com/lc3-vm/", "Build a simulator for a small real computer in about 250 lines of C, step by step."},
+			{"Site", "Teach Yourself Computer Science", "https://teachyourselfcs.com/", "Nine subjects, with the best book and lecture series for each. Every pick is in this academy, under the stage it belongs to."},
 		},
 		Blueprints: []Blueprint{
 			{"Binary & Hex Explorer (in C)", "A command-line tool that shows any number, character or string as decimal, binary and hex, and decodes bytes back into text.",

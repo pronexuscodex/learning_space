@@ -2514,6 +2514,8 @@ Kubernetes.`,
 			{"Book", "The Rust Programming Language (free)", "https://doc.rust-lang.org/book/", "Learn ownership, types and fearless concurrency."},
 			{"Paper", "Why Functional Programming Matters (Hughes)", "https://www.cse.chalmers.se/~rjmh/Papers/whyfp.html", "A classic, readable argument for functional style."},
 			{"Book", "Programming Languages: Application and Interpretation (free)", "https://www.plai.org/", "Understand languages by implementing them."},
+			{"Book", "Structure and Interpretation of Computer Programs (free)", "https://sarabander.github.io/sicp/", "The classic MIT text, in Scheme: abstraction, recursion, state and writing interpreters."},
+			{"Course", "Berkeley CS 61A: Structure and Interpretation of Computer Programs", "https://cs61a.org/", "SICP's ideas taught in Python, with the free book Composing Programs."},
 		},
 		Blueprints: []Blueprint{
 			{"Language with a Bytecode VM", "Design a small language with functions and closures, compile it to bytecode, and run it on your own VM with a garbage collector.",
