@@ -200,7 +200,7 @@ Checked-exercise files live in `Documents/Academy Labs` (`$ACADEMY_LABS` chooses
 | | 19 | Network Defence & Monitoring |
 | | 20 | Incident Response, Forensics & Privacy |
 
-That is **170 concepts** and **510 exercises**, plus a glossary, a resource library, lab blueprints, a quiz and a mastery check for every stage. Start Here also lists electives for afterwards: graphics, quantum computing, embedded systems and bioinformatics.
+That is **173 concepts** and **519 exercises**, plus a glossary, a resource library, lab blueprints, a quiz and a mastery check for every stage. Start Here also lists electives for afterwards: graphics, quantum computing, embedded systems and bioinformatics.
 
 ## How computers work (Stage 0)
 
@@ -392,6 +392,9 @@ The later stages have checked exercises too, written with C and POSIX only, so t
 | `tlv_parse` | 17: Safe parsing | type-length-value records that never trust a length: past the end of the input or of a list, signed length bytes, escaped output, nine nested lists, nothing printed for a bad file, and the 1 MB limit to the byte |
 | `secret_scan` | 17: Finding secrets | AWS keys, GitHub tokens, private keys and secret assignments by line and column, never printing the secret: lookalikes, upper-case names, three on one line, a 60,000-byte line, 5 MB of code |
 | `sha256` | 17: Integrity checks | SHA-256 from the standard and `-c` verification: the 55- and 56-byte padding boundary, binary data with zeros, a million a's, upper-case checksums, a tampered file that must exit non-zero, 16 MB |
+| `totp` | 18: MFA | RFC 6238 codes with your own SHA-1 and HMAC: the standard's test vectors, leading zeros, times after 2038 and steps beyond 2³², the top bit, the ±1 step window, an 80-byte secret, and 50,000 codes |
+| `jwt_verify` | 18: Tokens | an HS256 JWT verifier that decides the algorithm itself: alg none and HS512 refused, a changed payload, the wrong audience or issuer, expiry to the second, nbf, base64url's - and _, a 100-byte key, a key given twice |
+| `policy_eval` | 18: Policy as code | allow and deny rules with * wildcards: deny wins wherever it is, stars that match nothing or give characters back, line numbers with comments, and a pattern that takes a recursive matcher 20 seconds |
 | `http_request` | 8: HTTP | parsing a request head: header names in any case, trimmed values, bare newlines, a 7,000-byte path, a missing Host, wrong versions, a head that never ends |
 
 **What's next** suggests a check as soon as you mark its concept as understood: you've read it, now make it work. It suggests the project once the whole stage is understood.
@@ -825,7 +828,7 @@ The tests check:
 - **The v1 → v2 migration and stage merging.**
 - **Retention:** the scheduler's intervals grow and reset on a lapse; deck unlocking and due cards; each step of the mastery ladder.
 - **Classic Mode:** every stage has a complete classic corner with HTTPS links; the struggle clock's thresholds and early unlock; notebook and type-in progress survive a save round trip.
-- **Checked exercises:** each check's reference solution passes every case, with gcc and with clang (82 checks, including a real loopback TCP server, forked processes and a write-ahead log the checker reads back). Mastery waits for a concept's check to pass. Typical mistakes fail with the right explanation:
+- **Checked exercises:** each check's reference solution passes every case, with gcc and with clang (85 checks, including a real loopback TCP server, forked processes and a write-ahead log the checker reads back). Mastery waits for a concept's check to pass. Typical mistakes fail with the right explanation:
   - the XOR swap;
   - `9 / 5` in integers;
   - an endless loop;

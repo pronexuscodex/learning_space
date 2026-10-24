@@ -581,13 +581,20 @@ storage cause a large share of real incidents. This stage covers how
 people and programs prove who they are, how permissions are designed so
 one stolen account cannot do much damage, how to secure the cloud
 accounts that now run most software, and the zero-trust idea that no
-network location is trusted by itself.`,
+network location is trusted by itself. The measurements are real ones,
+made on programs written for the purpose: a JWT verifier that accepted a
+forged administrator token with no signature at all, a per-IP limit that
+did nothing against credential stuffing from 5,000 addresses, and three
+years of team moves that doubled everyone's permissions.`,
 		Outcomes: []string{
 			"Choose phishing-resistant authentication: MFA, hardware keys and passkeys",
 			"Explain sessions, OAuth 2.0 and OpenID Connect, and validate tokens correctly",
 			"Design roles and permissions around least privilege, and review them regularly",
 			"Secure a cloud account using the shared responsibility model",
 			"Explain zero trust and how it differs from trusting the office network",
+			"Defend logins against guessing and credential stuffing with limits, breach checks and MFA",
+			"Write authorization policies as code, test every allow and deny, and evaluate them safely",
+			"Keep secrets in a manager, prefer short-lived credentials, and implement TOTP and JWT checks in C",
 		},
 		Glossary: []Term{
 			{"MFA", "Multi-factor authentication: proving who you are with two or more different kinds of evidence."},
@@ -598,6 +605,16 @@ network location is trusted by itself.`,
 			{"RBAC", "Role-based access control: permissions are given to roles, and people are given roles."},
 			{"Shared responsibility", "The cloud provider secures its infrastructure; you secure your accounts, data and settings."},
 			{"Zero trust", "Checking every request's identity and device, instead of trusting anything inside the network."},
+			{"TOTP", "Time-based one-time password: a 6-digit code computed from a shared secret and the current 30-second step (RFC 6238)."},
+			{"HMAC", "A keyed hash: a fingerprint of a message that only holders of the key can make or check."},
+			{"Credential stuffing", "Trying username and password pairs leaked from one site against another, each account once."},
+			{"Rate limiting", "Capping how many requests a client, account or address may make in a period, such as with a token bucket."},
+			{"Token bucket", "A rate limiter that adds tokens at a steady rate up to a maximum; each request spends one, and an empty bucket refuses."},
+			{"Privilege creep", "The slow growth of a person's access as they change roles and keep the old permissions."},
+			{"Policy as code", "Authorization rules kept as files in version control, reviewed, tested and evaluated by an engine."},
+			{"Explicit deny", "A rule that refuses a request even when another rule allows it; in IAM-style policies, deny always wins."},
+			{"Short-lived credential", "A key or token that expires within minutes or hours, so a leaked copy is soon useless."},
+			{"Workload identity", "A program proving what it is (a CI job, a cloud VM) to get short-lived credentials, instead of storing a long-lived key."},
 		},
 		Concepts: []Concept{
 			{
@@ -623,6 +640,24 @@ routine password changes, which push people towards weak patterns.`,
 password + SMS code  ─▶ SIM swap, phishing
 password + app code  ─▶ phishing: the code is typed into the fake site
 security key/passkey ─▶ bound to the real site's name: phishing fails`,
+				UnderTheHood: `A TOTP code, as authenticator apps make it (RFC 6238): HMAC-SHA1 of the
+number of 30-second steps since 1970, keyed with a shared secret, cut
+down to 6 digits. A Python implementation reproduced the standard's
+test vectors exactly: at 59 seconds the 8-digit test code is 94287082.
+
+How well does a 6-digit code resist guessing? Against a server that
+accepts the codes for the current step and one either side, 3 million
+random guesses at 5 per 30-second step:
+
+  guesses that worked        13 of 3,000,000   (3 in a million expected)
+
+At 5 tries per step, an attacker who already has the password gets
+14,400 guesses a day: about a 4% chance of getting in each day, and
+better than even within a month. So limit failures per account, and lock
+or slow down after a handful. None of this helps against a phishing
+site, which simply asks the user for the current code and uses it at
+once; a passkey's signature covers the real site's name, so there is
+nothing to type into a fake one.`,
 				MentalModel: "The strongest factor is one that cannot be typed into the wrong website.",
 				TryIt:       "Turn on a passkey or a security key for your email account, then list which of your other accounts still rely on a password alone.",
 				Analogy: `A password is a spoken code word: anyone who overhears it can repeat it.
@@ -637,10 +672,71 @@ security keys, which will not sign in to a fake site.`,
 				Exercises: trio(
 					"Rank from weakest to strongest against phishing: password only, SMS code, authenticator app code, push approval with number matching, hardware security key.",
 					"Ask for each: can an attacker's fake site pass it on in real time?",
-					"Add TOTP two-factor authentication to a small web app you built: enrolment with a QR code, verification with a time window, and one-time recovery codes stored hashed.",
-					"Use a well-tested library for TOTP (RFC 6238); never invent the maths yourself.",
+					"In C, implement TOTP (RFC 6238) from its definition, with SHA-1 and HMAC written by you, and check it against the standard's test vectors; then explain why production code should still use a well-tested library.",
+					"Decode the Base32 secret, HMAC-SHA1 the 8-byte big-endian step counter, take 4 bytes at the offset given by the last nibble, mask the top bit, and take the remainder mod 1,000,000.",
 					"Do an account-security audit of your own digital life: every account that can reset others (email, phone carrier, password manager), its second factor, and its recovery options. Upgrade the weakest three.",
 					"Your email account can reset almost everything else, so protect it first and best.",
+				),
+			},
+			{
+				Name:    "Rate Limiting & Credential Stuffing Defences",
+				Summary: "Slow down guessing, and notice when stolen passwords are being tried.",
+				Body: `A login form is an oracle: it answers "right" or "wrong" to anyone.
+Two attacks use it. Guessing tries many passwords (or MFA codes)
+against one account; per-account limits stop it: a few failures, then
+growing delays or a temporary lock. Credential stuffing tries pairs
+leaked from other sites, each account once, from thousands of addresses;
+per-account limits never trigger, and per-address limits barely slow it.
+
+The defences against stuffing are different: refuse passwords found in
+breach lists (Have I Been Pwned's range API checks one without sending
+it), require MFA, and watch the pattern itself: many accounts, a high
+failure ratio, unfamiliar addresses and devices. A token bucket is the
+usual limiter: tokens refill at a steady rate up to a burst size, each
+attempt spends one, and an empty bucket answers 429 Too Many Requests.
+Locking accounts outright lets anyone lock out your users on purpose,
+so prefer delays and step-up checks.`,
+				Diagram: `token bucket: capacity 5, refill 1 every 12 s
+  attempt ─▶ token left? ─yes─▶ check password
+                         └no──▶ 429, try again later
+guessing  : 1 account × many passwords   ─▶ per-account limit stops it
+stuffing  : many accounts × 1 password   ─▶ breach check + MFA stop it`,
+				UnderTheHood: `Credential stuffing, worked through: an attacker with 1,000,000 leaked
+email and password pairs, 0.5% of them reused on your site, sending
+1,000 login attempts a second for a day:
+
+  defence                                  pairs tried   accounts lost
+  none                                      1,000,000        5,000
+  10 a minute per IP, 50 addresses            720,000        3,600
+  10 a minute per IP, 5,000 addresses       1,000,000        5,000
+  lock an account after 5 failures          1,000,000        5,000
+
+Every attempt is a different account, tried once, so the lockout never
+triggers, and addresses are cheap: residential proxy networks rent out
+thousands. Rejecting breached passwords at sign-up, or requiring MFA,
+takes the number of accounts lost to nearly zero. The per-account limit
+is still essential against the opposite attack: it is what keeps a
+6-digit code at the odds of the previous lesson. Without it, an
+attacker tries codes as fast as the server answers, and one Python core
+computes 367,000 codes a second.`,
+				MentalModel: "Limit guessing per account; stop stuffing with breach checks and MFA, because it never guesses twice.",
+				TryIt:       "Look up one of your old passwords' SHA-1 prefix in the Have I Been Pwned range API (only the first 5 hex digits are sent), and see whether it has appeared in a breach.",
+				Analogy: `A cash machine keeps the card after three wrong PINs: that stops
+someone guessing one card's PIN. It does nothing against a thief with a
+stack of stolen cards and their PINs who tries each card once; for
+that, the bank watches for unusual withdrawals.`,
+				Example: `In 2019 State Farm reset passwords after a credential-stuffing attack on
+its customer accounts. In 2023 the same technique against 23andMe
+logged in to accounts with reused passwords and, through a
+relatives-sharing feature, exposed the profiles of about 6.9 million
+people. 23andMe then required two-step verification for all customers.`,
+				Exercises: trio(
+					"Why does locking an account after 5 failed logins not stop credential stuffing, and what could it do to your users?",
+					"Each account is tried once; and anyone can lock out a victim by failing 5 times on purpose.",
+					"In C, implement a token bucket: allow(bucket, now) returns 1 and spends a token when one is left, refilling at R tokens a second up to a capacity C. Test it with bursts, steady traffic and long pauses.",
+					"Store the token count as a double and the time of the last refill; refill lazily on each call.",
+					"Add per-account and per-address rate limiting to the login of a web app you built, plus a breached-password check on sign-up using the Have I Been Pwned range API, and log every refused attempt.",
+					"Send only the first 5 hex digits of the password's SHA-1 hash, and compare the returned suffixes locally.",
 				),
 			},
 			{
@@ -666,6 +762,23 @@ you ─▶ identity provider: log in with MFA
 identity provider ─▶ app: signed ID token
                           (who, for which app, until when)
 app: verify signature, issuer, audience, expiry ─▶ start your session`,
+				UnderTheHood: `A signed token is only as strong as the code that checks it. An HS256
+JWT with six claims came to 237 bytes (a random 256-bit session ID is 43
+characters). Two verifiers, in Python, given four tokens:
+
+  token                             takes alg from     decides alg and
+                                    the token          checks iss, aud, exp
+  genuine                           accepted           accepted
+  forged: alg "none", role changed  ACCEPTED as        refused
+    to admin, no signature          admin
+  payload changed, old signature    refused            refused
+  genuine but expired               accepted           refused
+
+The first verifier did check signatures, but it let the token say how
+to check it, and "none" means not at all. Several JWT libraries shipped
+exactly this bug in 2015. Decide the algorithm and the key in your own
+code, never from the token, and check issuer, audience and expiry
+every time.`,
 				MentalModel: "A token is a signed promise: check who signed it, who it is for, and when it expires.",
 				TryIt:       "Paste a JWT from a tutorial into a decoder such as jwt.io and read its three parts. Note that anyone can read the claims; the signature only proves they were not changed.",
 				Analogy: `A concert wristband. The ticket office (identity provider) checks your
@@ -709,6 +822,20 @@ Service accounts and API keys need the same care as people.`,
       + attributes: owner? department? time? device?
                                           (ABAC: fine-grained)
 policy as code ─▶ reviewed ─▶ tested ─▶ deployed`,
+				UnderTheHood: `Privilege creep, simulated: 500 staff in 20 teams, each team needing 5
+permissions. Every month 3% of people move team and are given the new
+team's permissions. After three years:
+
+                           permissions   not needed   most held
+                           per person    any more     by anyone
+  never reviewed              10.2          5.2           25
+  reviewed every quarter       5.0          0.0            5
+
+Nobody was ever given too much on purpose. Half of the access in the
+unreviewed company is left over from old jobs, and the person holding
+the most could act in five teams, the account an attacker most wants
+to phish. Removing access is the step everyone forgets, so it has to be
+a scheduled job with an owner, not a good intention.`,
 				MentalModel: "Ask of every permission: who needs it, for how long, and who checks it is still needed?",
 				TryIt:       "Type in and run this stage's rbac.py, then add an 'auditor' role that can read everything but change nothing, and test it.",
 				Analogy: `A hospital: nurses can read the charts of patients on their ward, not
@@ -727,6 +854,68 @@ storage buckets with customer data.`,
 					"Write the denied cases first: they are the ones that protect you.",
 					"Do an access review of a real system you use (a GitHub organisation, a shared drive, a cloud account): list every person and key with write or admin access, when each last used it, and remove or reduce at least one.",
 					"GitHub shows organisation members' roles; cloud providers show when each access key was last used.",
+				),
+			},
+			{
+				Name:    "Policy as Code: Writing & Testing Authorization Rules",
+				Summary: "Authorization rules as reviewed, tested files, evaluated the same way every time.",
+				Body: `When permissions live in code scattered through an application, nobody
+can answer "who can delete invoices?". Policy as code moves them into
+rule files that an engine evaluates: AWS IAM policies, Open Policy
+Agent (Rego), Amazon's Cedar, Kubernetes RBAC. Each request (who, which
+action, which resource) goes to the engine, which answers allow or
+deny.
+
+The usual evaluation rules are worth knowing exactly: deny by default;
+an explicit deny beats any allow; wildcards match whole families of
+actions or resources, which is where most over-granting hides. Because
+rules are files, they go through pull requests, and they get tests:
+for every rule, a request that it must allow and one it must not. A
+policy engine is also a parser of untrusted patterns, so its matching
+must be linear: wildcards evaluated by naive backtracking can be made
+to take seconds per request.`,
+				Diagram: `request (principal, action, resource)
+   │
+   ▼  any deny rule matches?  ──yes──▶ DENY (explicit deny wins)
+   │ no
+   ▼  any allow rule matches? ──yes──▶ ALLOW
+   │ no
+   ▼  DENY (default)`,
+				UnderTheHood: `Matching a wildcard pattern such as *a*a*a*a*a*a*b against a resource
+name made of n a's, in C:
+
+  n                       40        60        80
+  naive recursion       0.11 s    2.3 s     23.5 s
+  greedy, one pass      37 ns     74 ns     70 ns
+
+The naive matcher tries every way of giving characters to every star;
+the greedy one remembers only the last star and moves forward. One
+pattern of 13 characters and an 80-character name kept a CPU busy for
+23 seconds per request: a policy engine (or a file-path matcher, or a
+router) that accepts patterns from users must match in linear time.
+
+The other lesson is about wildcards themselves. Over-broad actions
+such as storage:* or iam:* are where accidental access lives, which is
+why tests that enumerate what a policy allows find problems that
+reading it does not.`,
+				MentalModel: "Default deny, explicit deny wins, and every rule has a test that it allows what it should and nothing more.",
+				TryIt:       "Read one IAM policy from a cloud tutorial and write down every action its wildcards match; most people underestimate the count.",
+				Analogy: `A building's access list kept at the security desk instead of in each
+guard's head: written down, the same for every guard, changed only with
+a signature, and checked by someone trying the doors that should stay
+locked.`,
+				Example: `Amazon open-sourced Cedar in 2023, a policy language designed so its
+evaluator can be formally verified; AWS's IAM Access Analyzer uses
+automated reasoning to prove what a policy can and cannot allow.
+Kubernetes RBAC and Open Policy Agent are the usual tools for clusters
+and microservices.`,
+				Exercises: trio(
+					"A policy allows storage:* on reports/* and denies storage:Delete* on reports/2024/*. Is storage:DeleteObject on reports/2024/q1.pdf allowed? And on reports/2025/q1.pdf?",
+					"Explicit deny wins for 2024; for 2025 only the allow matches.",
+					"In C, write an evaluator for allow and deny rules with * wildcards in the principal, action and resource, with default deny and deny winning, and a linear-time wildcard matcher. Test it with a pattern that would make naive backtracking slow.",
+					"Remember the position of the last * and where it started matching; on a mismatch, give that star one more character.",
+					"Write the authorization rules of a small app in Open Policy Agent (or Cedar), with a test for every allowed and denied case, and run the tests in CI so a pull request that loosens a rule fails unless its tests change too.",
+					"opa test runs Rego tests; keep the policy and its tests in the same pull request.",
 				),
 			},
 			{
@@ -752,6 +941,19 @@ IaaS (VMs)   hardware, network,        OS patches, apps, data,
              hypervisor                accounts, firewall rules
 SaaS (email) almost everything         accounts, MFA, sharing
                                        settings, your data`,
+				UnderTheHood: `Encryption at rest costs almost nothing. openssl speed on this machine,
+one core, AES-256-GCM (the cipher used by cloud disks and storage):
+
+  block size     16 bytes    1 KB        8 KB
+  throughput     0.7 GB/s    6.7 GB/s    10.8 GB/s
+
+One core could encrypt a terabyte in about a minute and a half, thanks
+to the AES instructions built into the CPU, so there is no performance
+reason to store anything unencrypted. Turning it on is a setting, which
+is exactly why it is the customer's job. What it does not do is stop
+anyone with valid credentials: storage decrypts for whoever may read
+it, so permissions and public-access settings remain the real lock, as
+the misconfigured buckets in this lesson's examples show.`,
 				MentalModel: "If you can configure it, you are responsible for how it is configured.",
 				TryIt:       "In any cloud account you own (a free tier is enough), find the setting that blocks public access to storage and the audit log, and check that both are on.",
 				Analogy: `Renting a flat in a well-guarded building. The landlord maintains the
@@ -769,6 +971,70 @@ customer's fault, mostly misconfiguration.`,
 					"terraform plan shows exactly what would change; read it like a code review.",
 					"Harden a free-tier cloud account: hardware-key MFA on the owner account, a day-to-day user with limited rights, a budget alert, audit logging to a protected bucket, and a check with the provider's security advisor or a CIS Benchmark. Record what you changed.",
 					"A budget alert is also a security alarm: stolen accounts are often used to mine cryptocurrency.",
+				),
+			},
+			{
+				Name:    "Secrets Management & Short-Lived Credentials",
+				Summary: "Keep keys in a manager, hand out credentials that expire, and let workloads prove who they are.",
+				Body: `A secrets manager (HashiCorp Vault, AWS Secrets Manager, Azure Key
+Vault, Google Secret Manager) stores keys encrypted, hands them only to
+identities allowed to read them, logs every read, and can rotate them on
+a schedule. Better still is not storing a long-lived key at all. Cloud
+VMs and containers get credentials from their role; a CI job proves
+which repository and branch it is through OpenID Connect and receives
+credentials for an hour (workload identity federation); people get
+temporary elevated access with a reason.
+
+Short lifetimes change what a leak means: a key valid for a year is
+valid for six months on average after it leaks; a credential valid for
+an hour is useless before most leaks are even noticed. Keep secrets out
+of places they spread from: images, logs, URLs, crash reports and
+environment variables, which every child process inherits. Encrypt data
+with keys from a key management service (envelope encryption), so the
+master key never leaves it.`,
+				Diagram: `CI job ──OIDC token (repo, branch)──▶ cloud identity service
+                                       │ checks the trust policy
+       ◀── credentials valid for 1 hour ┘
+app ──role identity──▶ secrets manager ──▶ database password
+                       (logged, rotated)`,
+				UnderTheHood: `How long a leaked credential stays useful, if it leaks at a random
+moment of its life:
+
+  credential                    still valid, on average, after a leak
+  rotated yearly                  4,380 hours  (six months)
+  rotated every 90 days           1,080 hours  (45 days)
+  valid for 1 hour                    0.5 hours
+  valid for 15 minutes                0.1 hours
+
+Making them is cheap: one Python core signed 394,025 HMAC-SHA256
+tokens a second, so issuing fresh hourly credentials to 10,000 services
+costs a fraction of a second an hour.
+
+Where an environment variable goes, measured with a dummy secret in a
+shell: all 3 child programs started from it (sh, python3 and awk)
+received it, and it was readable in /proc/PID/environ by that user and
+by root. Every tool, plugin and crash reporter the process starts sees
+it. A secrets manager's read is logged and scoped; an environment
+variable is copied everywhere silently.`,
+				MentalModel: "The best secret is one that expires before anyone can use a stolen copy.",
+				TryIt:       "In a GitHub Actions workflow of yours, list every secret it uses and whether each could be replaced by OIDC federation with your cloud provider.",
+				Analogy: `A hotel key card that stops working at checkout, instead of a metal
+key that opens the room for as long as the lock is unchanged. Losing the
+card on the last day costs nothing; losing the metal key means changing
+the lock.`,
+				Example: `In 2022 attackers who had stolen an employee's session found
+hard-coded administrator credentials for Uber's privileged access
+management system in a network share script, and from there reached
+most of Uber's internal tools. GitHub Actions, GitLab CI and the major
+cloud providers now support OIDC federation so that CI pipelines need no
+stored cloud keys at all.`,
+				Exercises: trio(
+					"A deploy key with full access is stored as a CI secret and never rotated. List three ways it could leak and two changes that would make a leak far less harmful.",
+					"Logs, a forked pull request workflow, a developer's laptop; then short-lived credentials and a smaller scope.",
+					"In C, write a program that issues and checks short-lived tokens: subject, expiry, and an HMAC-SHA256 tag over both (reuse your sha256.c), refusing a token whose tag is wrong or whose expiry has passed.",
+					"HMAC(K, m) = H((K ^ opad) || H((K ^ ipad) || m)), with the key padded to 64 bytes.",
+					"Replace one stored long-lived cloud key in a CI pipeline of yours with OIDC federation (GitHub Actions to AWS, Azure or Google Cloud), restricted to one repository and branch, and delete the old key.",
+					"The cloud side's trust policy should check the token's repository and ref claims, not just its issuer.",
 				),
 			},
 			{
@@ -794,6 +1060,22 @@ zero trust:       any network ─▶ access proxy ─▶ one application
                                   │ checks: user identity + MFA,
                                   │ device health, policy
                                   └ every request, every time`,
+				UnderTheHood: `Zero trust checks every request. Can you afford it? Measured with
+openssl on this machine:
+
+  ECDSA P-256 signatures       33,333 a second   (30 µs each)
+  ECDSA P-256 verifications    11,421 a second   (88 µs each)
+  RSA-2048 signatures           2,572 a second   (0.39 ms each)
+  RSA-2048 verifications       43,826 a second
+  full TLS 1.3 handshakes      4,226 in 6 seconds, client and server
+                               on the same 4 cores: about 0.8 ms of
+                               client CPU each
+
+Checking a token's or a device certificate's signature costs tens of
+microseconds, and a whole mutual-TLS handshake under a millisecond,
+paid once per connection rather than per request. The cost of zero
+trust is in the engineering (an inventory of devices, an identity for
+every service), not in the cryptography.`,
 				MentalModel: "Being on the office network proves nothing; identity and device health prove something.",
 				TryIt:       "Draw how you reach your email today. Where is identity checked, where is the device checked, and where does being on a certain network make a difference?",
 				Analogy: `A hotel where your key card is checked at every door you open, not just
@@ -836,6 +1118,12 @@ products across the industry.`,
 			{"Name four things to check on a JWT before trusting it.", "The signature (with the expected key and algorithm), the issuer, the audience and the expiry."},
 			{"In the shared responsibility model, who is responsible for a storage bucket left public?", "The customer: it is a configuration they chose."},
 			{"What does zero trust stop trusting?", "Network location: being inside the office network grants nothing by itself."},
+			{"A server accepts TOTP codes for the current step and one either side, and allows 5 guesses per step. Roughly what chance does an attacker with the password have per day?", "About 4%: 14,400 guesses a day at 3 in a million each. Per-account limits and lockout are what keep it low."},
+			{"Why does a per-account lockout not stop credential stuffing?", "Each account is tried once with its leaked password, so no account ever reaches the failure limit."},
+			{"A JWT verifier reads the algorithm from the token's header. What can go wrong?", "A forged token can say alg none (or another algorithm) and be accepted without a valid signature: the verifier must decide the algorithm itself."},
+			{"In an IAM-style policy, a request matches both an allow and a deny rule. What is the decision?", "Deny: an explicit deny always wins, and anything matching no rule is denied by default."},
+			{"Why prefer a credential that lasts an hour to a key rotated every 90 days?", "A leaked copy is valid for about half an hour on average instead of about 45 days."},
+			{"What is privilege creep, and what stops it?", "Access accumulating as people change roles and keep old permissions; regular access reviews that remove what is not needed."},
 		},
 	},
 

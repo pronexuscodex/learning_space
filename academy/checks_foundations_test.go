@@ -997,8 +997,13 @@ int main(void) {
 }
 `
 	failsWith(t, "duplicates", nested, "200,000 different numbers", "did not finish")
-	// x - y as a comparison overflows for numbers far apart.
-	failsWith(t, "duplicates", mutate("duplicates", "return (x->value > y->value) - (x->value < y->value);", "return x->value - y->value;"), "extremes and negatives", "")
+	// x - y as a comparison overflows for numbers far apart. Only the
+	// sanitizers see it for certain: without them, what a wrapped
+	// comparison does to the sort depends on the C library's qsort.
+	wrapped := mutate("duplicates", "return (x->value > y->value) - (x->value < y->value);", "return x->value - y->value;")
+	if runSource(t, "duplicates", wrapped).Sanitizers {
+		failsWith(t, "duplicates", wrapped, "extremes and negatives", "")
+	}
 
 	// Swapping the pegs in the second call breaks the plan.
 	failsWith(t, "hanoi", mutate("hanoi", "    hanoi(n - 1, via, to, from);", "    hanoi(n - 1, via, from, to);"), "two disks", "")

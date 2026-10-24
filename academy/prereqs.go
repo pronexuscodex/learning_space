@@ -211,6 +211,9 @@ var conceptPrereqs = map[string][]string{
 	"Authorization Design: Roles, Attributes & Least Privilege": {"Access Control: Who May Do What"},
 	"Cloud Security & Shared Responsibility":                    {"Authorization Design: Roles, Attributes & Least Privilege"},
 	"Zero Trust: Never Trust the Network Alone":                 {"Strong Authentication: MFA & Passkeys", "Network Attacks & Defences"},
+	"Rate Limiting & Credential Stuffing Defences":              {"Strong Authentication: MFA & Passkeys", "Hashing & Password Storage"},
+	"Policy as Code: Writing & Testing Authorization Rules":     {"Authorization Design: Roles, Attributes & Least Privilege"},
+	"Secrets Management & Short-Lived Credentials":              {"Cloud Security & Shared Responsibility", "Secrets & the Software Supply Chain"},
 
 	// ---- Stage 19
 	"Firewalls & Network Segmentation":            {"Network Attacks & Defences"},

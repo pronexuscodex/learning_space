@@ -381,6 +381,12 @@ var conceptLinks = map[string]links{
 		"AWS IAM security best practices. Building Secure and Reliable Systems (Stage 17): the chapter on design for least privilege."},
 	"Zero Trust: Never Trust the Network Alone": {[]string{"Network Attacks & Defences", "TLS & Authentication on the Web", "Secure Design Principles"},
 		"NIST SP 800-207: the sections on tenets and logical components. The BeyondCorp paper (this stage's classic)."},
+	"Rate Limiting & Credential Stuffing Defences": {[]string{"Strong Authentication: MFA & Passkeys", "Hashing & Password Storage", "Probability for Programmers"},
+		"The OWASP Credential Stuffing Prevention Cheat Sheet. Troy Hunt's post on the Pwned Passwords k-anonymity range API."},
+	"Policy as Code: Writing & Testing Authorization Rules": {[]string{"Authorization Design: Roles, Attributes & Least Privilege", "Access Control: Who May Do What", "Finite Automata & Regular Expressions"},
+		"The AWS IAM documentation on policy evaluation logic. The Open Policy Agent policy-testing guide. Russ Cox's Glob Matching Can Be Simple And Fast Too."},
+	"Secrets Management & Short-Lived Credentials": {[]string{"Secrets & the Software Supply Chain", "Cloud Security & Shared Responsibility", "Encryption: Symmetric & Public-Key"},
+		"GitHub's documentation on security hardening with OpenID Connect. HashiCorp Vault's documentation on dynamic secrets."},
 
 	// ---- Stage 19
 	"Firewalls & Network Segmentation": {[]string{"Network Attacks & Defences", "The Layered Stack & Encapsulation", "Zero Trust: Never Trust the Network Alone"},
