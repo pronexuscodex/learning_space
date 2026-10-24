@@ -363,6 +363,12 @@ var conceptLinks = map[string]links{
 		"Building Secure and Reliable Systems: the chapters on writing code and testing code. OWASP ASVS, used as a review checklist."},
 	"Automated Security Testing": {[]string{"Testing & Reliability", "Secrets & the Software Supply Chain", "From Code to Production"},
 		"OSS-Fuzz documentation: the getting-started guide. The Go fuzzing tutorial."},
+	"Safe Parsing: Lengths, Limits & Binary Formats": {[]string{"Handling Untrusted Input", "Memory-Safety Bugs: Overflows & Use-After-Free", "Parsing: Recursive Descent & Pratt"},
+		"The Heartbleed write-up at heartbleed.com. LangSec's papers on parsers as the attack surface (langsec.org). The SEI CERT C rules on integers (INT)."},
+	"Finding Secrets: Patterns, Entropy & Git History": {[]string{"Secrets & the Software Supply Chain", "Version Control with Git", "Probability for Programmers"},
+		"GitHub's documentation on secret scanning and push protection. The gitleaks README, on its rules and on scanning history."},
+	"Integrity Checks: Hashes, Checksums & Signed Releases": {[]string{"Hashing & Password Storage", "Secrets & the Software Supply Chain", "Encryption: Symmetric & Public-Key"},
+		"FIPS 180-4, the Secure Hash Standard (the definition of SHA-256). The SLSA specification at slsa.dev. Sigstore's documentation on signing and verifying."},
 
 	// ---- Stage 18
 	"Strong Authentication: MFA & Passkeys": {[]string{"TLS & Authentication on the Web", "Encryption: Symmetric & Public-Key", "Hashing & Password Storage"},

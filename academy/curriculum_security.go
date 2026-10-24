@@ -12,14 +12,22 @@ var securityGuides = map[int]StageGuide{
 about writing code that stays safe when its input is hostile, and about
 catching problems before they ship: design principles that make whole
 classes of bugs impossible, careful handling of everything that comes
-from outside, memory-safe habits, reviewing code with an attacker's eye,
-and automated tools that look for trouble on every change.`,
+from outside, parsers that never trust a length, memory-safe habits,
+keeping secrets out of code, verifying what you download, reviewing code
+with an attacker's eye, and automated tools that look for trouble on
+every change. Everything here was measured on programs written for the
+purpose: a 17-byte name that silently made a user an administrator, a
+blocklist that let 6 of 11 path escapes through, and a fuzzer that ran
+106 million inputs without getting past a 4-byte header.`,
 		Outcomes: []string{
 			"Apply classic secure-design principles such as least privilege and fail-safe defaults",
 			"Handle untrusted input safely: canonicalise, validate against an allowlist, encode on output",
 			"Write C that is hard to exploit, and know when to choose a memory-safe language",
 			"Review a change for security problems with a repeatable checklist",
 			"Add static analysis, fuzzing and dependency scanning to a CI pipeline",
+			"Parse binary formats without trusting their length fields, with limits on size and depth",
+			"Find secrets in code and in history, and respond correctly when one leaks",
+			"Verify downloads with checksums and signatures, and implement SHA-256 in C",
 		},
 		Glossary: []Term{
 			{"Secure by default", "The safe setting is the one you get without doing anything."},
@@ -30,6 +38,17 @@ and automated tools that look for trouble on every change.`,
 			{"Static analysis", "Tools that read source code to find bugs without running it (SAST)."},
 			{"Fuzzing", "Feeding a program huge numbers of generated inputs to find crashes."},
 			{"Code review", "Another engineer reading a change before it is merged."},
+			{"umask", "The permission bits a Unix process removes from every file it creates; 022 makes new files readable by everyone."},
+			{"ReDoS", "Regular-expression denial of service: an input that makes a backtracking regex take exponential time."},
+			{"Type-length-value (TLV)", "A binary format in which each record is a type, a length, and that many bytes of value."},
+			{"Stack canary", "A secret value placed before a function's return address and checked before it returns, to detect stack overflows."},
+			{"FORTIFY_SOURCE", "A compiler and C library feature that replaces calls such as strcpy and memcpy with versions that check the destination's size."},
+			{"Sanitizer", "A compiler option (AddressSanitizer, UBSan) that adds checks to a program so memory and undefined-behaviour bugs stop it with a report."},
+			{"Secret scanning", "Searching code and its history for credentials, by their known formats and by how random they look."},
+			{"Key rotation", "Replacing a credential with a new one and revoking the old, done at once when a secret leaks."},
+			{"Checksum", "A short fingerprint of a file, such as its SHA-256 hash, published so downloads can be checked."},
+			{"Digital signature", "Proof made with a private key that a file came from its holder and was not changed; anyone can check it with the public key."},
+			{"Seed corpus", "Valid example inputs a fuzzer starts from, so it reaches the code behind headers and magic numbers."},
 		},
 		Concepts: []Concept{
 			{
@@ -48,6 +67,25 @@ acceptability: if the secure way is painful, people route around it.
 
 Modern practice adds secure defaults: ship with the safe setting on,
 so that someone who never reads the manual is still protected.`,
+				UnderTheHood: `Defaults, measured in C on Linux. With the usual umask of 022, the
+permissions each way of creating a file gives:
+
+  open(path, O_CREAT, 0666)     0644   readable by every user
+  fopen(path, "w")              0644   the same
+  open(path, O_CREAT, 0600)     0600   the owner only
+  mkstemp(template)             0600   the owner only
+
+fopen has no way to ask for less: a program that saves a token with
+fopen leaves it readable by every account on the machine, unless it
+sets the umask first or creates the file with open and mode 0600. The
+system itself follows least privilege: /etc/passwd, which every
+program reads, is 0644, while /etc/shadow, holding the password
+hashes, is 0640, readable only by root and the shadow group.
+
+One more honest measurement: the container these lessons were measured
+in runs everything as root (uid 0), and every one of those permission
+checks succeeds for root. Least privilege starts with not running as the
+most privileged user.`,
 				MentalModel: "Make the safe path the easy path, and make mistakes fail closed.",
 				TryIt:       "Pick one app you use daily and list its default settings for sharing, passwords and updates. Which defaults protect you, and which would you have to know to change?",
 				Analogy: `A well-designed building: fire doors that close by themselves when the
@@ -63,8 +101,8 @@ after years of data leaks from buckets made public by mistake.`,
 				Exercises: trio(
 					"Match each to a principle: (a) a building needs two keycards for the server room; (b) a firewall that blocks everything not listed; (c) an admin panel that checks your role only at login; (d) a cipher whose algorithm is published.",
 					"(c) breaks complete mediation: roles can change during a session.",
-					"Take a small program that reads a configuration file and runs with defaults if the file is missing. Change it so that a missing, unreadable or invalid security setting makes it refuse to start, with a clear error.",
-					"Fail closed: a missing setting must never fall back to 'allow everything'.",
+					"In C, write save_token(path, token) that creates the file so only its owner can read it, whatever the umask, and refuses to follow a symbolic link or overwrite an existing file. Check the result with stat and print the mode.",
+					"open(path, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW, 0600): O_EXCL refuses an existing file.",
 					"Audit the defaults of a service you run or could run (a database, a web server, a router): bind address, default accounts and passwords, logging, update policy. Write down what you would change before exposing it to a network, and why.",
 					"Many databases once listened on all network interfaces with no password by default.",
 				),
@@ -92,6 +130,29 @@ a shell string) for commands. Put size limits on everything.`,
 canonicalise ─▶ allowlist check ─▶ parse to types ─▶ your code
                                                         │
 where it goes next ◀─ encode: SQL params, HTML escape ◀─┘`,
+				UnderTheHood: `Seventeen file names sent to a server folder, /srv/files, that decodes
+%xx once and treats \ as / (as Windows does). Eleven of them really
+escape the folder. Two ways of checking them:
+
+                                  escapes let in   good names refused
+  blocklist: no "../", no "/"         6 of 11             1
+  decode, normalise, then check       0 of 11             0
+
+The blocklist let ..%2f, %2e%2e/, %2e%2e%2f, .%2e/, ..\ and %2f through,
+and still refused the harmless a/../b.txt. Checking the canonical form
+needs no list of bad spellings at all.
+
+Size limits matter as much. The regular expression ^(a+)+$ against n
+a's followed by a !, in Python:
+
+  n        16       20       24       26
+  time    3 ms    48 ms    0.94 s    3.2 s
+
+Every 2 more characters made it 4 times slower, because the engine
+tries every way of splitting the a's between the two +s; ^a+$ answered
+each in microseconds. Forty characters would take hours. Limit lengths,
+avoid nested repetition, or use an engine that guarantees linear time,
+such as Go's regexp or RE2.`,
 				MentalModel: "Check the canonical form, not the spelling the attacker chose.",
 				TryIt:       "Type in and run this stage's safe_join program, then add a test name of your own that you expect to be refused.",
 				Analogy: `A post room that X-rays every parcel. First it unwraps the parcel to see
@@ -101,16 +162,81 @@ relabelled for the right department (encode).`,
 				Example: `In 2021 a change to path handling in Apache HTTP Server 2.4.49
 (CVE-2021-41773) let requests with encoded ../ sequences escape the web
 folder and read other files on the server. The first fix, 2.4.50, was
-incomplete (CVE-2021-42013), and a full fix arrived in 2.4.51. This
-academy's own resource importer refuses control codes and bidirectional
-text markers, which could otherwise disguise what you are importing.`,
+incomplete (CVE-2021-42013), and a full fix arrived in 2.4.51. In 2019 a
+single regular expression with nested repetition, deployed in a firewall
+rule, took Cloudflare's network down for 27 minutes by using all of its
+CPU. This academy's own resource importer refuses control codes and
+bidirectional text markers, which could otherwise disguise what you are
+importing.`,
 				Exercises: trio(
 					`Why must a program normalise "files/a/../../etc/passwd" before checking that it starts with "files/"?`,
 					"The unnormalised string does start with files/, yet it points outside.",
-					"Write safe_join(base, name) in your language with tests for: a normal name, a nested name, ../ escapes, an absolute path, an empty name and a very long name. Then extend it to refuse symbolic links that point outside the folder.",
+					"Write safe_join(base, name) in C with tests for: a normal name, a nested name, ../ escapes, an absolute path, an empty name and a very long name. Then extend it to refuse symbolic links that point outside the folder.",
 					"Resolve the real path (realpath) after joining, then compare it with the real path of the base folder.",
 					"Choose one program you wrote that accepts input (a form, a CLI, a file importer). Draw its trust boundaries, list every input, and for each write the allowlist rule, the size limit and the output encoding. Fix at least one gap you find.",
 					"Include the inputs people forget: environment variables, file names inside archives, headers.",
+				),
+			},
+			{
+				Name:    "Safe Parsing: Lengths, Limits & Binary Formats",
+				Summary: "A length field is a claim made by the attacker: check it against what you actually received.",
+				Body: `Binary formats (network protocols, images, archives, fonts) describe
+themselves: a header says how long the next part is, how many items
+follow, how deep the nesting goes. Every one of those numbers comes from
+the sender, so a parser that believes them reads or writes wherever the
+sender chooses.
+
+The rules are few. Compare every length with the bytes that actually
+remain before using it, and do the arithmetic so it cannot overflow
+(check len > remaining, not offset + len > size, which can wrap round).
+Read multi-byte numbers from unsigned bytes. Put limits on everything
+the input controls: total size, number of records, nesting depth (a
+recursive parser crashes on deep enough input). Validate the whole input
+before acting on any of it, so a half-valid file never leaves half its
+effects. And keep parsers small, separate and fuzzed, or write them in a
+memory-safe language.`,
+				Diagram: `record:  [type 1 byte][length 2 bytes][value: length bytes]
+          ▲              ▲
+          │              └ a claim: refuse if length > bytes remaining
+          └ unknown type: skip it, using the same checked length`,
+				UnderTheHood: `A heartbeat in the style of TLS, in C: the request is a two-byte length
+and a payload, and the reply echoes the payload back. A request that
+claims 200 bytes but carries 4 ("ping"):
+
+  memcpy(reply, payload, claimed)       200 bytes back, 196 never sent,
+                                        a password stored nearby among them
+  if (claimed > received - 2) refuse    nothing sent back
+  the same bug under AddressSanitizer   heap-buffer-overflow: READ of
+                                        size 200, and the program stops
+
+That is Heartbleed (2014) in fifteen lines: OpenSSL returned up to 64 KB
+of its memory per request, private keys included, because of one missing
+comparison.
+
+Depth is a length too. A recursive C parser for nested brackets [[[…]]],
+with Linux's default 8 MB stack: depth 10,000 parsed; depth 100,000, just
+200 KB of input, crashed it with a segmentation fault. Python's json
+module refused depth 1,000 with a RecursionError instead of crashing:
+a limit, chosen in advance, is the difference.`,
+				MentalModel: "Every number in the input is the attacker's claim; check it against what you received before you use it.",
+				TryIt:       "Open any file in a hex viewer (xxd file.png | head) and find a length field in its header: for PNG, the 4 bytes before IHDR.",
+				Analogy: `A delivery note that says "40 boxes" on a van holding 4. A careful
+warehouse counts the boxes against the note before signing; a careless
+one walks into the neighbour's storeroom to look for the other 36.`,
+				Example: `Heartbleed (CVE-2014-0160) leaked memory from about a sixth of the
+web's secure servers through an unchecked length. In 2023 a heap
+overflow in libwebp's handling of lossless images (CVE-2023-4863), a
+table built from attacker-chosen code lengths, was exploited through
+images on the web and patched in every major browser. Both parsers were
+written in C, and both bugs came down to a number from the input that
+was trusted.`,
+				Exercises: trio(
+					"A record header says its value is 65,535 bytes long, and 10 bytes are left in the input. List three things a parser could do here, and say which one is right.",
+					"Refuse the whole input: reading past the end, or trusting the rest, are both wrong.",
+					"In C, write a parser for type-length-value records with a two-byte length, which refuses lengths past the end of the input and nesting deeper than 8, and validates everything before printing anything. Run it under AddressSanitizer on truncated and oversized inputs.",
+					"Keep an offset and the bytes remaining; check length <= remaining before advancing.",
+					"Fuzz a real file parser (for example a small PNG or WAV header reader you write, or an open-source one) with libFuzzer or go test -fuzz, starting from a few real files, and fix every crash it finds.",
+					"Seed it with valid files, so the fuzzer gets past the header at once.",
 				),
 			},
 			{
@@ -134,6 +260,35 @@ UndefinedBehaviorSanitizer, and fuzz anything that parses input.`,
           │ safe C habits: sized APIs, one owner, NULL after free
           │ sanitizers and fuzzing while testing
 weakest   │ hardening: canaries, FORTIFY, ASLR, RELRO`,
+				UnderTheHood: `One C program with two classic overflows: strcpy of a user's name into
+char name[16] inside struct { char name[16]; int is_admin; }, and into
+a local char buf[16]. Built four ways, with gcc:
+
+  built with                     into the struct      past the local
+                                 (17 bytes)           buffer (40 bytes)
+  no protection                  is_admin became 1    segfault
+  -fstack-protector-strong       is_admin became 1    "stack smashing
+                                                      detected", abort
+  -D_FORTIFY_SOURCE=2            "buffer overflow     "buffer overflow
+                                 detected", abort     detected", abort
+  -fsanitize=address             is_admin became 1    stack-buffer-overflow
+                                                      reported
+
+The silent one is the dangerous one: 17 bytes made an ordinary user an
+administrator, and neither the canary nor AddressSanitizer noticed,
+because the write never left the struct. Only FORTIFY, which knew at
+compile time that name holds 16 bytes, stopped it.
+
+What they cost, best of three runs:
+
+                               call-heavy loop   byte-pair encoding
+  no protection                    1.16 s             0.123 s
+  stack protector                  1.23 s             0.125 s
+  stack protector + FORTIFY        1.17 s             0.136 s
+  AddressSanitizer + UBSan         3.58 s             0.460 s
+
+Hardening costs a few percent, so ship it; the sanitizers cost 3 to 4
+times, so test with them, always.`,
 				MentalModel: "Hardening makes exploits harder; only removing the bug makes you safe.",
 				TryIt:       "Compile a small C program with gcc -Wall -Wextra -O2 -D_FORTIFY_SOURCE=2 -fstack-protector-strong, and check with checksec or readelf which protections the binary has.",
 				Analogy: `Seatbelts, airbags and crumple zones (hardening) save lives, but the
@@ -156,6 +311,130 @@ Roadmaps", urging vendors to plan the same move.`,
 				),
 			},
 			{
+				Name:    "Finding Secrets: Patterns, Entropy & Git History",
+				Summary: "How secret scanners work, why deleting a key is not enough, and what to do when one leaks.",
+				Body: `A secret scanner reads code, configuration and history looking for
+credentials. It uses three kinds of evidence. Known formats: providers
+make their keys recognisable on purpose (AWS access keys start with
+AKIA, GitHub tokens with ghp_, private keys with a BEGIN … PRIVATE KEY
+line). Context: a quoted value assigned to a name such as password,
+secret or token. And randomness: real keys look random, so their
+characters are spread evenly.
+
+Scan before the secret leaves your machine (a pre-commit hook, or push
+protection on the server), and scan the whole history, not just the
+latest files: git keeps every version. When a secret does leak, the
+order matters: revoke and rotate it first, because it must be assumed
+copied the moment it was pushed; then find out whether it was used;
+rewriting history comes last. And a scanner, like every log, must never
+print the secret it found.`,
+				Diagram: `commit 1   api_key = "sk_live_…"         ◀ the secret is here forever
+commit 2   api_key = os.environ["API_KEY"]
+           working tree: clean     history: still holds commit 1
+leak ─▶ revoke + rotate ─▶ check its use in logs ─▶ clean history`,
+				UnderTheHood: `A key committed and then removed, in a fresh git repository:
+
+  commit 1   config.py: api_key = "sk_test_4eC3…"
+  commit 2   config.py: api_key = os.environ["API_KEY"]
+  grep in the working tree      0 matches
+  git log -p                    2 matches (added, then removed)
+
+The key is still in every clone of the repository.
+
+Why scanners match formats rather than just randomness: the Shannon
+entropy of four 40-character strings, in bits per character (at most
+5.3 for 40 characters):
+
+  random base64 API key     4.68
+  English phrase            4.38
+  a file path               3.96
+  random hex token          3.76
+
+The hex token, a real secret, scores lower than an English sentence.
+And in this academy's own source, 22 of the 367 long string literals
+without spaces score 4.5 or more: alphabets and URLs, none of them
+secrets. Entropy alone both misses and cries wolf, which is why
+gitleaks and GitHub's push protection lead with the formats providers
+deliberately make recognisable.`,
+				MentalModel: "A pushed secret is a published secret: rotate first, clean up second.",
+				TryIt:       "Run git log -p | grep -i -E 'password|secret|token' in one of your own repositories and read what comes back.",
+				Analogy: `Shredding the letter after the photocopies were made. Once a key has
+been pushed, removing it from the latest version is shredding the
+original: the copies (every clone, every fork, every cache) still exist,
+so the only real fix is to change the lock.`,
+				Example: `GitHub's secret scanning works with over 200 token formats from
+providers who agreed to make their keys recognisable and to revoke any
+that are found in public. In 2022 Toyota revealed that an access key
+for a customer database had sat in a public GitHub repository for five
+years. Researchers have repeatedly shown that keys pushed to public
+repositories are found by automated scanners within minutes.`,
+				Exercises: trio(
+					"A developer deletes an API key from a file and commits again. The repository is public. List, in order, what they must do next.",
+					"Revoke and rotate the key, check its usage logs for abuse, then remove it from history.",
+					"In C, write a scanner that reads a file and reports the line and column of AWS-style access keys (AKIA and 16 capital letters or digits), with no false match inside longer words, without ever printing the key itself.",
+					"Check the character before and after the 20 characters, not just the 20.",
+					"Add secret scanning to one of your repositories: a pre-commit hook (gitleaks protect, or your own script) and a CI step that scans the full history. Plant a fake key on a branch to prove it is caught, then remove the branch.",
+					"Use an obviously fake key in the provider's format, such as an example from their documentation.",
+				),
+			},
+			{
+				Name:    "Integrity Checks: Hashes, Checksums & Signed Releases",
+				Summary: "Check that what you run is exactly what its authors published.",
+				Body: `A cryptographic hash such as SHA-256 turns any file into a 256-bit
+fingerprint: any change, even one bit, gives a completely different
+value, and nobody can construct two files with the same one. Publishing
+a release's SHA-256 lets anyone check that their download is exactly the
+published file.
+
+A checksum only proves that two things match. If an attacker controls
+the server, they replace both the file and its checksum. Signatures
+close the gap: the publisher signs with a private key kept off the
+server (GPG, minisign, Sigstore), and users check with the public key.
+Build provenance (SLSA attestations) adds which source and which build
+produced the file. For dependencies, lockfiles record each package's
+hash (go.sum, package-lock.json, pip's --require-hashes), so a package
+that changes after you chose it fails the build instead of running.`,
+				Diagram: `release file ──sha256──▶ fingerprint ──compare──▶ published checksum
+     │                       (file and checksum on one server can be
+     │                        replaced together)
+     └── signature, made with a private key kept off the server,
+         checked with the publisher's public key`,
+				UnderTheHood: `SHA-256 of a 1 MB file, then of the same file with one random bit
+flipped, 1,000 times: on average 128.2 of the 256 output bits changed,
+never fewer than 99. However small the change, the checksum is
+unrecognisable, which is what makes it a fingerprint. It is also cheap:
+256 MB hashed in 0.20 s here, 1.3 GB/s.
+
+What you are trusting grows with every dependency. In this machine's
+Python, the requests package brings 4 more packages with it
+(certifi, charset_normalizer, idna and urllib3), and scikit-learn
+brings 6, each of them code that runs with your permissions. The
+academy itself uses nothing outside Go's standard library; Go projects
+that do have dependencies record a hash of each in go.sum, and the go
+command refuses a download that does not match.`,
+				MentalModel: "A checksum proves the file matches; a signature proves who it matches.",
+				TryIt:       "Download a release of a tool you use, together with its checksum file, and check it with sha256sum -c (shasum -a 256 -c on macOS).",
+				Analogy: `A sealed envelope with the sender's wax seal. The seal's shape (the
+checksum) shows the letter was not opened; only the sender's signet ring
+(the private key) can make the seal, so a forger who rewrites the letter
+cannot reseal it.`,
+				Example: `In 2016 attackers broke into the Linux Mint website and replaced the
+download link with a backdoored ISO. A checksum shown on the same
+hacked website proves nothing in that situation; the release's GPG
+signature, made with a key the attackers did not have, would not have
+matched. This academy publishes SHA256 checksums and signed build
+provenance with every release, and its installers check the checksum
+before installing.`,
+				Exercises: trio(
+					"An attacker controls a download server that hosts both a file and its SHA-256 checksum. Does checking the checksum protect you? What does?",
+					"No: they can change both. A signature from a key the attacker does not have does.",
+					"In C, implement SHA-256 from the FIPS 180-4 standard and check it against sha256sum on files of 0, 55, 56, 64 and a million bytes.",
+					"The padding needs a second block when 55 < length mod 64: test exactly those lengths.",
+					"Verify a real release end to end: download a project's release, its checksum file and its signature (GPG, minisign or Sigstore), verify the signature on the checksum file and then the checksum of the release, and write down which key you trusted and why.",
+					"The trust starts with how you got the public key: from the project's website over HTTPS, or a keyserver.",
+				),
+			},
+			{
 				Name:    "Security Code Review",
 				Summary: "A second pair of eyes that knows where bugs hide.",
 				Body: `Code review catches bugs that tests and tools miss, especially logic and
@@ -173,6 +452,22 @@ there a test for the dangerous case, not just the happy one?
 Keep changes small (a few hundred lines at most) so they can be read
 properly, use a written checklist, and require a second reviewer for
 the most sensitive code.`,
+				UnderTheHood: `Where would a reviewer look first in this academy's own code? Searching
+its 39,862 lines of Go (tests left out) for the calls that cross a
+trust boundary:
+
+  filepath.Join          47    paths built from names
+  http.Client, Request   19    the network
+  os.Getenv              16    the environment
+  os.Remove, RemoveAll   16    deleting files
+  exec.Command            7    running other programs
+  reading, writing, renaming files and decoding JSON: 35 more
+
+140 calls on 136 lines, in 22 of the 77 files: 0.34% of the code. That
+is where a security review starts, where tests for hostile input
+belong, and where a change deserves a second reviewer. The other 99.7%
+still matters, but it cannot be reached by an attacker except through
+these lines.`,
 				MentalModel: "Review the lines that cross a trust boundary as if an attacker wrote the input.",
 				TryIt:       "Open any recent pull request in an open-source project you use and find the lines that handle input from outside. Would you have approved them?",
 				Analogy: `A second pilot reading the pre-flight checklist aloud. The captain is
@@ -187,7 +482,7 @@ reviewed and approved by another engineer before it is merged.`,
 				Exercises: trio(
 					"List five kinds of line in a pull request that deserve extra scrutiny from a security point of view.",
 					"Think: input, permissions, crypto, secrets, shell and file paths.",
-					"Write a one-page security review checklist for your own projects, then use it to review one of your older programs and record every finding with its severity.",
+					"Write a script (grep is enough) that lists the trust-boundary lines of one of your projects: file paths, environment variables, network calls, commands and parsers. Review each line it finds with a written checklist and record every finding with its severity.",
 					"Severity: could it leak data, change data, or take the service down, and how easily?",
 					"Review a real change: pick a small merged pull request in an open-source project that touches input handling, review it with your checklist, and write up what you would have asked. Compare your notes with the actual review comments.",
 					"Search the project's pull requests for words such as path, parse, upload or auth.",
@@ -213,6 +508,20 @@ positive, so the tools stay trusted instead of ignored.`,
              ─▶ dependency scan (reachable code only) ─▶ merge
 nightly ─▶ long fuzzing runs with sanitizers
         ─▶ every new crash becomes a regression test`,
+				UnderTheHood: `Go's built-in fuzzer (go test -fuzz), on two small parsers with one
+planted bug each:
+
+  a length byte that is trusted             found in under a second
+  an index bug behind the header "TLV2",    not found: 106 million
+    fuzzing from the seed "hello, world"    inputs in 5 minutes
+  the same bug, seeded with one valid file  found in under a second
+
+The fuzzer ran about 350,000 inputs a second and mutates the ones that
+reach new code, but matching four exact bytes by mutation is one chance
+in about 4 billion per try. One real example file got past the header
+at once. That is why fuzzing projects ship a seed corpus of valid
+files, and why a fuzzer started from nothing finds only the shallow
+bugs.`,
 				MentalModel: "Every bug a tool can find should never reach a human reviewer.",
 				TryIt:       "Run go vet ./... and govulncheck ./... on any Go project (or npm audit on a JavaScript one) and read what each reports.",
 				Analogy: `Smoke detectors and sprinklers in every room: they never get tired or
@@ -254,6 +563,13 @@ govulncheck on every change.`,
 			{"Why canonicalise input before validating it?", "Attackers use alternative spellings (../, encodings) that pass a check on the raw text but mean something else."},
 			{"Which is stronger against buffer overflows: stack canaries or a memory-safe language?", "A memory-safe language: it removes the bug; canaries only make exploiting it harder."},
 			{"Why keep pull requests small?", "Reviewers can only read a few hundred lines carefully; large changes hide bugs."},
+			{"A file is created with fopen(path, \"w\") under the usual umask of 022. Who can read it?", "Every user on the machine: the file gets mode 0644. Create secrets with open(..., 0600) or mkstemp."},
+			{"Why can ^(a+)+$ take seconds on a 26-character input?", "A backtracking engine tries every way of splitting the a's between the two repetitions: the time doubles with every character."},
+			{"What single check would have prevented Heartbleed?", "Comparing the claimed payload length with the bytes actually received, and refusing the request when it is larger."},
+			{"A 17-byte name overflows a 16-byte field into is_admin inside the same struct. Which of a stack canary, AddressSanitizer and FORTIFY_SOURCE catches it?", "Only FORTIFY_SOURCE, which knows the field's size at compile time; the write never leaves the struct, so the canary and ASan see nothing."},
+			{"A key was pushed to a public repository and deleted in the next commit. What comes first?", "Revoke and rotate the key: it is in the history and must be assumed copied already."},
+			{"Why does a fuzzer need a seed corpus?", "Random mutation almost never produces exact header bytes or magic numbers; valid examples get it past them to the deeper code."},
+			{"An attacker controls the server hosting both a file and its checksum. What still protects you?", "A signature made with a private key kept off that server, checked with the publisher's public key."},
 		},
 	},
 

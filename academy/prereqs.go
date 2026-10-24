@@ -196,11 +196,14 @@ var conceptPrereqs = map[string][]string{
 	"Profiling & Benchmarking Honestly":                {"The Roofline Model: Compute- vs Memory-Bound", "Profiling & Measuring Performance"},
 
 	// ---- Stage 17
-	"Secure Design Principles":   {"Thinking Like an Attacker: Threat Modelling", "Access Control: Who May Do What"},
-	"Handling Untrusted Input":   {"Web Vulnerabilities: Injection & XSS"},
-	"Writing Memory-Safe Code":   {"Memory-Safety Bugs: Overflows & Use-After-Free"},
-	"Security Code Review":       {"Handling Untrusted Input", "Writing Memory-Safe Code"},
-	"Automated Security Testing": {"Writing Memory-Safe Code"},
+	"Secure Design Principles":                              {"Thinking Like an Attacker: Threat Modelling", "Access Control: Who May Do What"},
+	"Handling Untrusted Input":                              {"Web Vulnerabilities: Injection & XSS"},
+	"Writing Memory-Safe Code":                              {"Memory-Safety Bugs: Overflows & Use-After-Free"},
+	"Security Code Review":                                  {"Handling Untrusted Input", "Writing Memory-Safe Code"},
+	"Automated Security Testing":                            {"Writing Memory-Safe Code"},
+	"Safe Parsing: Lengths, Limits & Binary Formats":        {"Handling Untrusted Input", "Memory-Safety Bugs: Overflows & Use-After-Free", "Bits & Bytes: Everything Is a Number"},
+	"Finding Secrets: Patterns, Entropy & Git History":      {"Secrets & the Software Supply Chain", "Probability for Programmers"},
+	"Integrity Checks: Hashes, Checksums & Signed Releases": {"Hashing & Password Storage", "Secrets & the Software Supply Chain"},
 
 	// ---- Stage 18
 	"Strong Authentication: MFA & Passkeys":                     {"TLS & Authentication on the Web", "Encryption: Symmetric & Public-Key"},
