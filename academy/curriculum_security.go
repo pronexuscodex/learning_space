@@ -1135,13 +1135,20 @@ network so one compromised machine cannot reach everything, collecting
 the logs and network records that reveal what happened, detecting
 attacks with signatures and anomaly detection, mapping detections to the
 MITRE ATT&CK catalogue of attacker behaviour, and running the day-to-day
-work of monitoring without drowning in alerts.`,
+work of monitoring without drowning in alerts. The measurements were made
+on this machine, inside private network namespaces and on simulated logs:
+10,000 firewall rules that cut connections tenfold where one set lookup
+cost nothing, a detector that is 99% accurate and still 99.9% wrong, and
+an alert queue that never empties.`,
 		Outcomes: []string{
 			"Design firewall rules and network zones that deny by default",
 			"Decide what to log, collect it centrally, and protect it",
 			"Explain signature and anomaly detection, and why false alarms are inevitable",
 			"Map an attack to MITRE ATT&CK techniques and write a detection for one",
 			"Triage alerts with a runbook and tune noisy rules",
+			"Keep an inventory of what is exposed, and notice when it changes",
+			"Choose between packet capture and flow records for what you need to answer",
+			"Make logs tamper-evident with a hash chain, and write signature matching and detection rules in C",
 		},
 		Glossary: []Term{
 			{"Segmentation", "Dividing a network into zones so traffic between them can be controlled."},
@@ -1152,6 +1159,15 @@ work of monitoring without drowning in alerts.`,
 			{"SIEM", "Security information and event management: collects logs in one place, correlates them and raises alerts."},
 			{"False positive", "An alert for something harmless. A false negative is an attack that raises no alert."},
 			{"MITRE ATT&CK", "A public catalogue of attacker tactics and techniques, used to plan and measure detection."},
+			{"Default deny", "A firewall policy that drops everything not explicitly allowed."},
+			{"nftables set", "A hashed collection of addresses or ports that one firewall rule can test in a single lookup."},
+			{"Base rate", "How common something is to begin with; when attacks are rare, even good detectors mostly raise false alarms."},
+			{"Aho-Corasick", "An algorithm that finds many patterns in one pass over the text, used by signature engines."},
+			{"Flow record", "A summary of one connection: addresses, ports, protocol, start and end times, packets and bytes (NetFlow, IPFIX)."},
+			{"Packet capture", "A copy of every packet seen on an interface (pcap), complete but large."},
+			{"Hash chain", "Log entries that each include a hash of the one before, so changing or removing any entry breaks every later hash."},
+			{"Asset inventory", "An up-to-date list of the machines, services and accounts you are responsible for."},
+			{"Attack surface", "Everything reachable from outside a system: open ports, public endpoints, exposed accounts."},
 		},
 		Concepts: []Concept{
 			{
@@ -1175,6 +1191,24 @@ everything, lets one infected machine reach every other.`,
                      ▼
 office ───▶ [fw] ─▶ internal: app servers ─▶ [fw] ─▶ databases
 admins ───▶ VPN / bastion with MFA ──────────────────▲`,
+				UnderTheHood: `Rules cost time, and how they are written decides how much. In a private
+network namespace on this machine (Linux, nftables), connections to a
+local server, measured each way:
+
+  firewall                                     connections a second
+  no rules                                          12,495
+  10,000 rules, each checked in turn                 1,205
+  one rule testing a set of 10,000 addresses        13,137
+
+Ten thousand rules checked one after another made every new connection
+ten times slower; the same addresses in an nftables set cost nothing,
+because a set is a hash lookup. Long blocklists belong in sets.
+
+Default deny, measured in the same namespace: with only port 9000
+allowed, a connection to 9000 succeeded in 1 ms, and one to 9001 waited
+2 seconds and gave up, because a dropped packet gets no answer at all.
+That silence is what an outsider scanning the machine sees, and also why
+a forgotten deny rule looks to your own users like a network fault.`,
 				MentalModel: "Draw who needs to talk to whom; everything else is blocked.",
 				TryIt:       "List the listening ports on your computer (ss -tulpn on Linux, netstat -an on Windows or macOS) and decide which of them need to be reachable from other machines.",
 				Analogy: `A ship divided into watertight compartments. One hole floods one
@@ -1193,6 +1227,112 @@ hospitals in the UK's National Health Service.`,
 					"Test the denials as carefully as the allows: from a second machine, try a port that should be closed.",
 					"Draw the network of your home or a small office: every device, what it needs to reach, and a proposed set of zones (for example: work devices, guests, smart-home devices) with the rules between them. Implement the guest zone if your router supports it.",
 					"Smart TVs and cameras rarely need to reach your laptop; put them in their own zone.",
+				),
+			},
+			{
+				Name:    "Network Flows & Packet Capture",
+				Summary: "Full packets answer every question but cost a fortune; flow records answer most of them for almost nothing.",
+				Body: `A packet capture (pcap, from tcpdump or Wireshark) records every byte:
+it can show exactly what was sent, but it is huge, holds the contents of
+every conversation (often personal data), and is mostly unreadable once
+traffic is encrypted. A flow record (NetFlow, IPFIX, or Zeek's conn.log)
+keeps one line per connection: the two addresses and ports, the
+protocol, when it started and ended, and how many packets and bytes went
+each way.
+
+Flows answer most monitoring questions: who talked to whom, when, how
+much, and which hosts suddenly send far more than usual. Packets answer
+what was said, and are kept briefly, for chosen hosts, or captured on
+demand during an investigation. Both need clocks in sync and a place to
+keep them that the monitored machines cannot change.`,
+				Diagram: `connection ──▶ packet capture: every packet, every byte   (~ the traffic)
+           └─▶ flow record: src, dst, ports, proto, start, end,
+               packets, bytes each way                  (~ 50 bytes)`,
+				UnderTheHood: `One 20 MB transfer over loopback, captured inside a private network
+namespace with a raw packet socket:
+
+  packets captured         556    (loopback allows 64 KB packets; on
+                                   Ethernet, more than 14,000)
+  bytes of capture         20.6 MB
+  one flow record          about 50 bytes
+
+The capture is as big as the traffic itself, about 400,000 times the
+flow record that says the same transfer happened, between which two
+endpoints, when, and how large it was. Monitoring a busy network with
+full capture means storing a copy of everything it carries; flow
+records for a whole network fit on one disk for a year.`,
+				MentalModel: "Keep flows for everything and packets for what you are investigating.",
+				TryIt:       "Open a pcap from the Wireshark sample captures page, and summarise it as flows with Statistics → Conversations: how much smaller is the summary?",
+				Analogy: `A phone bill against a recording of every call. The bill (flows) shows
+who called whom, when and for how long, which answers most questions;
+the recordings (packets) answer the rest, but nobody keeps them for
+every call.`,
+				Example: `Zeek, used by many universities and companies, turns traffic into
+connection, DNS, HTTP and TLS logs instead of storing packets. Cloud
+providers offer flow logs (AWS VPC Flow Logs, Google Cloud VPC Flow
+Logs) rather than packet capture for the same reason: cost and privacy.`,
+				Exercises: trio(
+					"A laptop sends 4 GB to an unknown address at 3 a.m. Which would show this, flow records or packet capture, and what would each tell you?",
+					"Flows show the size, time and destination; only packets (if not encrypted) show what was sent.",
+					"In C, read connection events (time, source, destination, bytes) from a file and aggregate them into flow records per source-destination pair, then print the ten pairs with the most bytes.",
+					"A hash table keyed by the pair, adding bytes and keeping the first and last times.",
+					"Capture a few minutes of your own machine's traffic with tcpdump, then summarise it as flows (with Zeek, or Wireshark's Conversations view) and find the three destinations your machine talks to most. Delete the capture afterwards.",
+					"Capture only your own machine, on a network you own.",
+				),
+			},
+			{
+				Name:    "Asset Inventory & Attack Surface",
+				Summary: "You cannot defend what you do not know you have.",
+				Body: `Every defence in this stage assumes a list: which machines exist, what
+runs on them, which ports they open, who can log in, what is reachable
+from the internet. Real organisations rarely have it right. Forgotten
+test servers, an old VPN appliance, a database opened "just for a day",
+a cloud account a former employee set up: these are where many breaches
+begin.
+
+An inventory combines sources: what the cloud provider's API lists, what
+the network sees (flow records, DHCP), what endpoint agents report, and
+what an external scan of your own address ranges finds. The useful part
+is the difference: a host the network sees but the list does not have,
+or a port that is open today and was closed yesterday. Check exposure
+from the outside regularly, and treat every new listening service as a
+change that needs an owner.`,
+				Diagram: `cloud API ──┐
+endpoint  ──┼──▶ inventory ──▶ compare with yesterday
+network   ──┤                     │
+own scan  ──┘                     ▼
+                     new host? new port? who owns it?`,
+				UnderTheHood: `What is this machine itself listening on? Read straight from the
+kernel's tables (/proc/net/tcp and tcp6), with no tool needed:
+
+  listening TCP sockets      3
+  on every interface         1   (reachable from any network it is on)
+  on loopback only           2   (reachable from this machine alone)
+
+The difference between 0.0.0.0 and 127.0.0.1 in a bind() call is the
+difference between a service the network can reach and one it cannot,
+and it is the most common accidental exposure there is. A daily job
+that records these lists and reports what changed costs almost nothing
+and is how a forgotten service is found by you rather than by someone
+else.`,
+				MentalModel: "Keep the list, compare it every day, and give every exposed service an owner.",
+				TryIt:       "On a machine you own, run ss -ltnp (Linux) or lsof -iTCP -sTCP:LISTEN (macOS) and find the program behind every listening port.",
+				Analogy: `A building manager's key register. If a door appears that nobody has a
+key for, or a key is missing from the board, that is worth looking into
+today, before anyone else finds the door.`,
+				Example: `In 2021 the ProxyLogon flaws in on-premises Microsoft Exchange were
+exploited on tens of thousands of internet-facing servers within days;
+organisations that knew exactly which of their servers were exposed
+could patch or disconnect them first. CISA's Binding Operational Directive 23-01
+(2022) requires US federal agencies to run automated asset discovery
+every 7 days.`,
+				Exercises: trio(
+					"A database server's configuration says bind-address = 0.0.0.0. What does that mean, and when is it a problem?",
+					"It listens on every interface; a problem whenever the firewall or network does not block it.",
+					"In C, read /proc/net/tcp, print each listening socket's address and port, and mark those bound to every interface; then compare with a saved list from yesterday and print what is new.",
+					"The state column 0A means LISTEN; the address is hex, little-endian for IPv4.",
+					"Build an inventory of your home or lab network: every device, what it runs and which ports it opens (scan only your own network, with nmap -sT on your own address range), and write down an owner and a reason for each open port.",
+					"Scan only networks you own or are explicitly allowed to test.",
 				),
 			},
 			{
@@ -1218,6 +1358,21 @@ firewall ─┤                (append-only, access-controlled)
 DNS ──────┘                     │
                                 ├─▶ search during investigations
                                 └─▶ detection rules ─▶ alerts`,
+				UnderTheHood: `What a log line costs, in C, for a 95-byte security event:
+
+  written through a stdio buffer          81 ns a line
+  one write() system call per line       428 ns a line
+  write() and fsync() per line           170 µs a line
+
+Waiting for the disk after every line is 2,000 times slower than
+buffering; most systems buffer and ship lines to a central store within
+seconds, accepting that the last moment before a crash may be lost.
+
+The volume adds up: at 1,000 events a second, 95-byte lines make 8.2 GB a
+day. 200,000 simulated lines of key=value logs compressed 6.4 times with
+gzip (19.3 MB to 3.0 MB), because logs repeat themselves. That is what
+makes keeping a year of security logs affordable: decide retention from
+how long incidents take to discover, and compress what you keep.`,
 				MentalModel: "Log so that a stranger could reconstruct the story months later.",
 				TryIt:       "On Linux, run journalctl -u ssh --since today (or read /var/log/auth.log); on Windows, open Event Viewer and find event ID 4625 (failed logon). What would an investigator want that is missing?",
 				Analogy: `A ship's logbook, written as things happen, in ink, with the time of
@@ -1235,6 +1390,57 @@ thousands of organisations months earlier.`,
 					"Write a test that logs in with a known password and asserts that string is absent from the log output.",
 					"Set up central logging for two machines or containers you own (for example with rsyslog or a small Loki or OpenSearch stack), then delete a local log file on one machine and show that the central copy still has it.",
 					"Forward over an encrypted connection, and restrict who can delete from the central store.",
+				),
+			},
+			{
+				Name:    "Tamper-Evident Logs & Trustworthy Time",
+				Summary: "Logs an intruder can silently edit prove nothing; chain them, ship them, and keep clocks right.",
+				Body: `An intruder who gets administrator rights on a machine can edit its
+logs. Two defences make that visible. Ship logs off the machine at once,
+to a store the machine can write to but not change or delete
+(append-only, write-once storage, or a separate account). And chain
+them: each entry carries a hash of the previous entry's hash and its own
+text, so changing, inserting or deleting any entry breaks every hash
+after it. Publishing the latest hash somewhere else (a second system,
+a daily email) pins the whole history.
+
+Time matters as much. An investigation lines up events from many
+machines; if their clocks disagree by minutes, the order of events is
+wrong and the story falls apart. Keep every machine on NTP, log in UTC
+with time zones written out, and record the time source in the log.`,
+				Diagram: `h0 = 000…0
+h1 = SHA-256(h0 + entry 1)
+h2 = SHA-256(h1 + entry 2)   change entry 1 ─▶ h1, h2, h3 … all change
+h3 = SHA-256(h2 + entry 3)   publish the newest hash elsewhere`,
+				UnderTheHood: `A hash chain over 1,000,000 log lines, in Python with hashlib:
+
+  sealing all lines (one SHA-256 each)      1.89 s
+  one word changed in line 600,001          verification stopped at
+                                            line 600,001 after 0.41 s
+
+A million lines cost under two seconds of one core to protect, and the
+check named the exact line that was edited. What the chain cannot do is
+stop someone who controls the machine from rewriting the whole chain
+from the edited line onwards; that is why the newest hash has to leave
+the machine, so that a rewritten chain no longer matches the copy held
+elsewhere.`,
+				MentalModel: "Ship logs out, chain them, publish the newest hash, and keep every clock in UTC and in sync.",
+				TryIt:       "Run timedatectl (or date -u on macOS) on two machines you use, and compare: how far apart are their clocks?",
+				Analogy: `A bound, numbered ledger written in ink. Tearing out a page or changing
+a figure leaves a mark, and a copy of each day's last line kept by the
+accountant's partner means even rewriting the whole book is noticed.`,
+				Example: `systemd's journal can seal logs with Forward Secure Sealing
+(journalctl --setup-keys), and AWS CloudTrail can deliver digest files
+that chain the hashes of its log files so tampering can be detected.
+Certificate Transparency logs use a Merkle tree, a hash chain's bigger
+relative, so anyone can check that no certificate was quietly removed.`,
+				Exercises: trio(
+					"In a hash-chained log, an attacker deletes entry 500 of 1,000. Which entries fail verification, and what stops them from simply recomputing the rest?",
+					"Every entry from 500 on; a copy of the newest hash kept on another system.",
+					"In C, write a sealer that turns log messages into hash-chained lines and a verifier that reports the first line whose hash does not match (reuse your sha256.c).",
+					"Hash the previous hash in hex, a newline and the message: exactly what the verifier will recompute.",
+					"Set up log shipping from one machine you own to a second one (rsyslog over TLS, or journald's remote upload), make the receiving side append-only for the sender, and show that deleting the sender's local log changes nothing on the receiver.",
+					"Give the sender permission to append only; no account on the sender should be able to delete on the receiver.",
 				),
 			},
 			{
@@ -1259,6 +1465,25 @@ especially precise.`,
   attack caught:        1
   false alarms:    ~10,000   (1% of 999,999 harmless events)
   → an alert is almost always harmless unless the rule is very precise`,
+				UnderTheHood: `Signature engines search traffic for thousands of patterns at once. In C,
+1,000 signatures of 6 to 13 letters against 64 MB of text:
+
+  each signature searched separately (strstr)    5.8 s
+  all at once with Aho-Corasick                  0.65 s
+
+Aho-Corasick builds one automaton from every pattern and reads each byte
+once, so its time hardly grows with the number of signatures; that is
+why Snort and Suricata use it and its relatives.
+
+The base rate, simulated: 1,000,000 events with 10 real attacks, and a
+detector that catches 99% of attacks and wrongly flags 1% of everything
+else:
+
+  real attacks flagged      9
+  false alarms         10,284     (99.9% of all alerts)
+
+Cutting false positives to 0.01% left 93 false alarms beside the 9 real
+ones: still mostly noise, but a list a person can read.`,
 				MentalModel: "Rare events and imperfect detectors mean most alerts are false; design for that.",
 				TryIt:       "Type in and run this stage's bruteforce.py. Then change the log so an attacker stays just under the limit, and notice that the detector never fires.",
 				Analogy: `Airport security uses both: a list of banned items on the X-ray screen
@@ -1299,6 +1524,21 @@ Mapping your detections onto ATT&CK shows where your coverage has gaps.`,
    ─▶ rule (Sigma) + why it matters + what to do
    ─▶ test: create a test account in a lab ─▶ did the alert fire?
    ─▶ coverage map: which techniques are covered, which are not`,
+				UnderTheHood: `Two rules over a simulated day of logins (2,000 users, 9,863 events,
+2,871 failures, most of them ordinary typing mistakes), with two
+techniques mixed in: many passwords tried on one account (ATT&CK
+T1110.001) and one password tried on many accounts (T1110.003):
+
+  rule                                         fired for
+  5 failures on one account in 10 minutes      the single-account attack only
+  failures for 10 accounts from one address    the many-account attack only
+    in 10 minutes
+
+Each rule caught exactly its own technique and stayed silent through
+thousands of ordinary failures, and neither would have caught the other.
+That is the argument for mapping detections to ATT&CK: coverage is
+counted technique by technique, and "we detect password attacks" hides
+which half is missing.`,
 				MentalModel: "A detection is untested code until you have seen it fire in a lab.",
 				TryIt:       "Open attack.mitre.org, pick the technique 'Valid Accounts', and read its detection section. Which of your own systems would log it?",
 				Analogy: `Burglars change their crowbars, but they all still have to get through
@@ -1338,6 +1578,19 @@ time on judgement.`,
 				Diagram: `alert ─▶ enrich (user, machine, recent events) ─▶ compare with normal
       ─▶ decide: benign │ suspicious: investigate │ incident: respond
       ─▶ afterwards: tune the rule if it was noise`,
+				UnderTheHood: `An alert queue, simulated over 30 days: analysts can close 300 alerts a
+day.
+
+  alerts arriving               backlog after 30 days
+  400 a day                         3,000
+  240 a day (duplicates grouped)        0
+
+A queue that receives a third more than it can clear never recovers: the
+backlog grows every day, and the newest real alert waits behind all of
+it. Grouping duplicates of the same alert on the same host, and tuning
+or deleting the rules that are always false, did more than working
+faster could. Measure each rule's share of the queue and how often it
+was real, and retire the ones that never are.`,
 				MentalModel: "An alert without a runbook and an owner is noise that will be ignored.",
 				TryIt:       "Write a five-step runbook for the alert 'login from a new country followed by a password change'. What would you check first, and what would make you escalate?",
 				Analogy: `A hospital's emergency department triages patients: a quick, standard
@@ -1380,6 +1633,12 @@ detection worked; the process after the alert did not.`,
 			{"What is the difference between signature and anomaly detection?", "Signatures match known attack patterns; anomaly detection flags departures from normal behaviour."},
 			{"Why do most alerts turn out to be false alarms?", "Real attacks are rare compared with normal events (the base rate), so even accurate detectors flag many harmless events."},
 			{"Why send logs to a central store as they happen?", "Attackers often delete local logs; a protected central copy survives."},
+			{"Why can 10,000 firewall rules slow a server down, and how do you avoid it?", "Rules are checked one after another for each new connection; put long address lists in a set, which is a single hash lookup."},
+			{"A detector catches 99% of attacks and flags 1% of normal events. With 10 attacks in a million events, what share of its alerts are real?", "About 0.1%: roughly 10 real alerts among about 10,000 false ones."},
+			{"Why does a signature engine use Aho-Corasick instead of searching for each pattern in turn?", "It reads each byte once for all patterns together, so the time hardly grows with the number of signatures."},
+			{"What does a flow record keep, and what does it leave out?", "Who talked to whom, when, and how many packets and bytes; not the contents."},
+			{"What makes a hash-chained log tamper-evident, and what else does it need?", "Each entry's hash covers the previous hash, so any edit breaks every later hash; the newest hash must be kept elsewhere."},
+			{"An alert queue receives 400 alerts a day and the team closes 300. What happens, and what helps most?", "The backlog grows forever; group duplicates and retire rules that are never real."},
 		},
 	},
 

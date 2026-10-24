@@ -32,7 +32,12 @@ versions follow [Semantic Versioning](https://semver.org/).
   - Three new checked C exercises: `totp`, `jwt_verify` and `policy_eval`, with reference solutions and mutation tests for the typical mistakes. The TOTP exercise now asks for C.
   - Ten glossary terms, three outcomes, six quiz questions, prerequisites and related-concept links for the new lessons.
   The academy now has 173 concepts and 519 exercises.
-- **More concept prerequisites:** 285 links across 168 concepts, up from 254 across 153, covering every new lesson.
+- **Stage 19 (Network Defence & Monitoring) at Stage 1's depth: 8 lessons, up from 5.** Every lesson has an "Under the hood" section built on measurements made on this machine, in private network namespaces and on simulated logs: 10,000 firewall rules cutting new connections from 12,495 to 1,205 a second where one nftables set cost nothing; buffered log lines at 81 ns against 170 µs with fsync each; Aho-Corasick matching 1,000 signatures nine times faster than searching for each; a detector that is 99% accurate and still 99.9% false alarms at a realistic base rate; two login rules that each catch exactly one technique; and an alert queue that never empties until duplicates are grouped.
+  - New lessons: **Network Flows & Packet Capture** (a 20 MB capture against a 50-byte flow record), **Asset Inventory & Attack Surface** (what a machine listens on, read from the kernel) and **Tamper-Evident Logs & Trustworthy Time** (a hash chain that found one changed word among a million lines).
+  - Three new checked C exercises: `log_chain`, `multi_match` and `auth_detect`, with reference solutions and mutation tests for the typical mistakes.
+  - Nine glossary terms, three outcomes, six quiz questions, prerequisites and related-concept links for the new lessons.
+  The academy now has 176 concepts and 528 exercises.
+- **More concept prerequisites:** 292 links across 171 concepts, up from 254 across 153, covering every new lesson.
 
 ### Fixed
 - **A second UX audit, screen by screen at 40, 80 and 120 columns:**

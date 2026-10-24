@@ -221,6 +221,9 @@ var conceptPrereqs = map[string][]string{
 	"Intrusion Detection: Signatures & Anomalies": {"Logging & Telemetry", "Probability for Programmers"},
 	"Detection Engineering with MITRE ATT&CK":     {"Intrusion Detection: Signatures & Anomalies"},
 	"Security Monitoring & Alert Triage":          {"Intrusion Detection: Signatures & Anomalies"},
+	"Network Flows & Packet Capture":              {"Firewalls & Network Segmentation", "TCP: Handshake, Flow & Congestion Control"},
+	"Asset Inventory & Attack Surface":            {"Firewalls & Network Segmentation", "Sockets & I/O Multiplexing"},
+	"Tamper-Evident Logs & Trustworthy Time":      {"Logging & Telemetry", "Hashing & Password Storage", "Time, Clocks & Ordering"},
 
 	// ---- Stage 20
 	"Incident Response Planning":          {"Detection & Incident Response"},

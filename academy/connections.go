@@ -399,6 +399,12 @@ var conceptLinks = map[string]links{
 		"MITRE ATT&CK: the Getting Started page and any technique's Detection section. The Sigma project's rule specification."},
 	"Security Monitoring & Alert Triage": {[]string{"Detection & Incident Response", "Evaluating Models Honestly", "Intrusion Detection: Signatures & Anomalies"},
 		"Security Onion documentation: the analyst workflow. Google's SRE book (Stage 9): the chapter on being on-call."},
+	"Network Flows & Packet Capture": {[]string{"The Layered Stack & Encapsulation", "TCP: Handshake, Flow & Congestion Control", "Logging & Telemetry"},
+		"The Zeek documentation on conn.log. RFC 7011 (IPFIX). The Wireshark User's Guide on capture filters."},
+	"Asset Inventory & Attack Surface": {[]string{"Sockets & I/O Multiplexing", "Firewalls & Network Segmentation", "Thinking Like an Attacker: Threat Modelling"},
+		"CIS Critical Security Controls 1 and 2 (inventory of enterprise and software assets). CISA Binding Operational Directive 23-01."},
+	"Tamper-Evident Logs & Trustworthy Time": {[]string{"Hashing & Password Storage", "Time, Clocks & Ordering", "Logging & Telemetry"},
+		"Schneier & Kelsey, Secure Audit Logs to Support Computer Forensics (1999). RFC 6962 (Certificate Transparency) on Merkle trees. The chrony documentation on keeping time."},
 
 	// ---- Stage 20
 	"Incident Response Planning": {[]string{"Detection & Incident Response", "Security Monitoring & Alert Triage", "Thinking Like an Attacker: Threat Modelling"},

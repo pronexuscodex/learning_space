@@ -200,7 +200,7 @@ Checked-exercise files live in `Documents/Academy Labs` (`$ACADEMY_LABS` chooses
 | | 19 | Network Defence & Monitoring |
 | | 20 | Incident Response, Forensics & Privacy |
 
-That is **173 concepts** and **519 exercises**, plus a glossary, a resource library, lab blueprints, a quiz and a mastery check for every stage. Start Here also lists electives for afterwards: graphics, quantum computing, embedded systems and bioinformatics.
+That is **176 concepts** and **528 exercises**, plus a glossary, a resource library, lab blueprints, a quiz and a mastery check for every stage. Start Here also lists electives for afterwards: graphics, quantum computing, embedded systems and bioinformatics.
 
 ## How computers work (Stage 0)
 
@@ -395,6 +395,9 @@ The later stages have checked exercises too, written with C and POSIX only, so t
 | `totp` | 18: MFA | RFC 6238 codes with your own SHA-1 and HMAC: the standard's test vectors, leading zeros, times after 2038 and steps beyond 2³², the top bit, the ±1 step window, an 80-byte secret, and 50,000 codes |
 | `jwt_verify` | 18: Tokens | an HS256 JWT verifier that decides the algorithm itself: alg none and HS512 refused, a changed payload, the wrong audience or issuer, expiry to the second, nbf, base64url's - and _, a 100-byte key, a key given twice |
 | `policy_eval` | 18: Policy as code | allow and deny rules with * wildcards: deny wins wherever it is, stars that match nothing or give characters back, line numbers with comments, and a pattern that takes a recursive matcher 20 seconds |
+| `log_chain` | 19: Tamper-evident logs | seal and verify a hash-chained log: a changed word, a deleted line, two lines swapped, the end cut off (caught only with the newest hash), one spelling of hex, a 100,000-byte message, 100,000 lines |
+| `multi_match` | 19: Signatures | Aho-Corasick over 16 MB: signatures inside other signatures, overlaps, binary data with zero bytes, blank signatures refused, and 5,000 signatures in one pass |
+| `auth_detect` | 19: Detection engineering | two login rules and a follow-up: ordinary mistakes stay quiet, the window's exact edge, failures spread over many accounts against many failures on one, a quiet period after each alert, a success after an alert, a simulated day with exactly three alerts |
 | `http_request` | 8: HTTP | parsing a request head: header names in any case, trimmed values, bare newlines, a 7,000-byte path, a missing Host, wrong versions, a head that never ends |
 
 **What's next** suggests a check as soon as you mark its concept as understood: you've read it, now make it work. It suggests the project once the whole stage is understood.
@@ -828,7 +831,7 @@ The tests check:
 - **The v1 → v2 migration and stage merging.**
 - **Retention:** the scheduler's intervals grow and reset on a lapse; deck unlocking and due cards; each step of the mastery ladder.
 - **Classic Mode:** every stage has a complete classic corner with HTTPS links; the struggle clock's thresholds and early unlock; notebook and type-in progress survive a save round trip.
-- **Checked exercises:** each check's reference solution passes every case, with gcc and with clang (85 checks, including a real loopback TCP server, forked processes and a write-ahead log the checker reads back). Mastery waits for a concept's check to pass. Typical mistakes fail with the right explanation:
+- **Checked exercises:** each check's reference solution passes every case, with gcc and with clang (88 checks, including a real loopback TCP server, forked processes and a write-ahead log the checker reads back). Mastery waits for a concept's check to pass. Typical mistakes fail with the right explanation:
   - the XOR swap;
   - `9 / 5` in integers;
   - an endless loop;
