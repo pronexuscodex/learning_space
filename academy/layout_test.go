@@ -181,3 +181,18 @@ func TestGlossaryNeverSplitsWords(t *testing.T) {
 		}
 	}
 }
+
+// Every diagram fits a concept card on an 80-column terminal whole: 80
+// columns leave 79 for the app and 73 beside the card's edge, and a
+// clipped diagram hides the part that explains it.
+func TestDiagramsFitEightyColumns(t *testing.T) {
+	for id, g := range curriculum {
+		for _, c := range g.Concepts {
+			for _, l := range dedent(c.Diagram) {
+				if n := visibleLen(l); n > 73 {
+					t.Errorf("Stage %d %q: a diagram line is %d wide (73 at most): %q", id, c.Name, n, l)
+				}
+			}
+		}
+	}
+}

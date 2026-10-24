@@ -167,16 +167,22 @@ var conceptPrereqs = map[string][]string{
 
 	// ---- Stage 14
 	"Descriptive Statistics & Distributions": {"Probability for Programmers"},
+	"Bayes' Theorem & Base Rates":            {"Probability for Programmers", "Descriptive Statistics & Distributions"},
 	"Statistical Inference & Experiments":    {"Descriptive Statistics & Distributions"},
+	"The Bootstrap & Resampling":             {"Statistical Inference & Experiments"},
+	"Bias, Variance & Regularisation":        {"Linear & Logistic Regression", "Linear Systems, Least Squares & Conditioning"},
 	"Linear & Logistic Regression":           {"Descriptive Statistics & Distributions", "Optimisation: From Gradient Descent to Adam", "Probability, Softmax & Cross-Entropy"},
 	"Trees, Ensembles & Clustering":          {"Linear & Logistic Regression"},
-	"Evaluating Models Honestly":             {"Linear & Logistic Regression"},
+	"Evaluating Models Honestly":             {"Linear & Logistic Regression", "Bayes' Theorem & Base Rates"},
 
 	// ---- Stage 15
 	"Computational Graphs & Reverse-Mode Autodiff": {"Gradients, Jacobians & the Matrix Chain Rule"},
 	"MLPs, Activations & Initialisation":           {"Computational Graphs & Reverse-Mode Autodiff", "Matrices as Linear Maps"},
 	"Residual Connections & Normalisation":         {"MLPs, Activations & Initialisation"},
-	"Attention & the Transformer":                  {"Residual Connections & Normalisation", "Probability, Softmax & Cross-Entropy"},
+	"Convolutions & Weight Sharing":                {"MLPs, Activations & Initialisation", "Matrices as Linear Maps"},
+	"Tokenisation & Embeddings":                    {"Vectors, Dot Products & Similarity", "Collections: Lists, Dictionaries & Strings"},
+	"Attention & the Transformer":                  {"Residual Connections & Normalisation", "Probability, Softmax & Cross-Entropy", "Tokenisation & Embeddings"},
+	"Sampling & Decoding":                          {"Attention & the Transformer", "Probability, Softmax & Cross-Entropy"},
 	"The Training Loop & Generalisation":           {"MLPs, Activations & Initialisation", "Evaluating Models Honestly", "Optimisation: From Gradient Descent to Adam"},
 
 	// ---- Stage 16

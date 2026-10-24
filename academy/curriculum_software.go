@@ -120,7 +120,7 @@ The classic disaster is rm -rf "$DIR/" with DIR unset: without -u it
 becomes rm -rf /. For anything longer than a page, or with real data
 structures, switch to a proper language; shell is glue.`,
 				Diagram: `#!/usr/bin/env bash
-set -euo pipefail          # stop on errors, unset variables, broken pipes
+set -euo pipefail          # stop on errors, unset names, broken pipes
 src=$1                     # the first argument
 for f in "$src"/*.log; do  # quoted: names with spaces stay whole
   gzip -- "$f" || echo "could not compress $f" >&2
@@ -705,7 +705,7 @@ for the job: bcrypt, scrypt or Argon2. The salt is a random value per
 user, so identical passwords get different hashes and precomputed
 "rainbow tables" are useless. Hashes also verify downloads, and they
 underpin Git and blockchains.`,
-				Diagram: `"hunter2" + salt "x9Qa" ──▶ [ Argon2, slow on purpose ] ──▶ $argon2id$…Kq7
+				Diagram: `"hunter2" + salt "x9Qa" ─▶ [ Argon2, slow on purpose ] ─▶ $argon2id$…Kq7
 login: hash the typed password with the same salt, then compare`,
 				MentalModel: "Make guessing expensive for attackers but cheap enough for honest logins.",
 				TryIt:       `Hash "hello" and "hello!" with SHA-256 and compare: one character changes everything.`,
@@ -738,12 +738,12 @@ over a public channel. Digital signatures prove who sent a message and
 that it was not altered. Real systems combine these: public-key methods
 to agree on a key, then fast symmetric encryption for the data. Never
 invent your own cryptography; use well-reviewed libraries.`,
-				Diagram: `Alice                                       Bob
-  │ encrypt with Bob's PUBLIC key              │
-  │ ────────────── ciphertext ───────────────▶ │ decrypt with Bob's PRIVATE key
-  │                                            │
-  │ ◀─────────── message + signature ──────────│ signed with Bob's PRIVATE key
-  │ verify with Bob's PUBLIC key               │`,
+				Diagram: `Alice                                Bob
+  │ encrypt with Bob's PUBLIC key       │
+  │ ─────────── ciphertext ───────────▶ │ decrypt with Bob's PRIVATE key
+  │                                     │
+  │ ◀──────── message + signature ──────│ signed with Bob's PRIVATE key
+  │ verify with Bob's PUBLIC key        │`,
 				MentalModel: "Public key locks, private key unlocks; private key signs, public key verifies.",
 				TryIt:       "Implement a Caesar cipher and break it by trying all 26 keys, and see why real ciphers need enormous key spaces.",
 				Analogy: `A padlock you hand out freely (the public key): anyone can snap it shut
@@ -1079,9 +1079,9 @@ believe the result. Find papers through Google Scholar, arXiv and a
 venue's proceedings; follow a paper backwards through its references and
 forwards through "cited by". Preprints are not peer-reviewed, and a
 single paper is a claim, not a settled fact.`,
-				Diagram: `pass 1 (5 min)   title · abstract · intro · headings · conclusion → read on?
+				Diagram: `pass 1 (5 min)   title, abstract, intro, headings, conclusion: read on?
 pass 2 (1 hr)    whole paper, skip proofs, study figures and tables
-pass 3 (hours)   re-derive and re-implement; find the unstated assumptions
+pass 3 (hours)   re-derive and re-implement; find hidden assumptions
                  most papers: stop after pass 1`,
 				MentalModel: "A paper is an argument to interrogate, read in passes, not a chapter to absorb front to back.",
 				TryIt:       "Give a famous short paper (Dijkstra's \"Go To Statement Considered Harmful\", or the original RSA paper) a five-minute first pass and write down its one claim.",
@@ -1196,7 +1196,7 @@ exists to prevent.`,
                                                    ▼
           report privately to the vendor ─▶ they fix it ─▶ CVE issued
                               │  (≈90 days)            │
-                              └─ no fix in time ───────┴─▶ publish responsibly`,
+                              └─ no fix in time ───────┴─▶ publish`,
 				MentalModel: "Find it, prove it minimally, report it privately, and let the fix ship before the world hears.",
 				TryIt:       "Read a published Project Zero write-up end to end and note the timeline from report to fix to disclosure.",
 				Analogy: `Finding a faulty lock on a neighbour's door. The responsible thing is to
@@ -1547,7 +1547,7 @@ problem) and complete (never raising a false alarm).`,
     else:
         return
 
-trouble(trouble)  →  if it halts, it loops; if it loops, it halts.  Contradiction.`,
+trouble(trouble): if it halts, it loops; if it loops, it halts. Absurd.`,
 				UnderTheHood: `Undecidability is not only about contrived programs. This loop:
 
   while (x != 1) x = x % 2 ? 3 * x + 1 : x / 2;
@@ -1665,8 +1665,8 @@ verification or puzzle problem into SAT is often the fastest way to
 solve it, even though the worst case is exponential.`,
 				Diagram: `Sudoku grid ──encode──▶ SAT formula ──solver──▶ true/false assignment
                  │                                          │
- variable x(r,c,d) = "cell (r,c) holds digit d"     decode ──▶ filled grid
- each cell holds one digit; each row, column and box holds each digit once`,
+ variable x(r,c,d) = "cell (r,c) holds digit d"   decode ─▶ filled grid
+ one digit per cell; each row, column and box holds each digit once`,
 				UnderTheHood: `A Sudoku becomes SAT with one variable per (row, column, digit): 729
 variables. The rules become clauses:
 
@@ -1855,10 +1855,11 @@ what you want, not how to get it (SQL, HTML, regex).
 
 Most modern languages mix paradigms. The skill is choosing the right
 style for each part of a program.`,
-				Diagram: `the same question: the sum of the squares of the even numbers to 1,000,000
+				Diagram: `one question: the sum of the squares of the even numbers to 1,000,000
 
 C        for (i = 1; i <= n; i++) if (i % 2 == 0) total += i * i;
-Java     LongStream.rangeClosed(1, n).filter(i -> i % 2 == 0).map(i -> i * i).sum()
+Java     LongStream.rangeClosed(1, n).filter(i -> i % 2 == 0)
+                   .map(i -> i * i).sum()
 Haskell  sum [x * x | x <- [1 .. n], even x]
 Erlang   lists:sum([X * X || X <- lists:seq(1, N), X rem 2 =:= 0])
 SQL      SELECT sum(i * i) FROM n WHERE i % 2 = 0`,
@@ -1920,7 +1921,7 @@ null, which Tony Hoare called his "billion-dollar mistake". Sum types
 				Diagram: `                   checked before running      checked while running
 no surprises       Rust, OCaml, Haskell        Python, Ruby
 (strong)           Java, Go                    Erlang
-converts quietly   C (int ↔ pointer, casts)    JavaScript ("5" + 3 = "53")
+converts quietly   C (int ↔ pointer, casts)    JavaScript: "5" + 3 = "53"
 (weak)`,
 				UnderTheHood: `"5" + 3, run in three dynamic languages:
 
@@ -1988,7 +1989,7 @@ to do after the recursive call.`,
 				Diagram: `sum 3 = 3 + sum 2                 sum_acc 0 3 = sum_acc 3 2
       = 3 + (2 + sum 1)                        = sum_acc 5 1
       = 3 + (2 + (1 + sum 0))                  = sum_acc 6 0
-      = 6   (every frame waits)                 = 6   (nothing waits: a loop)`,
+      = 6   (every frame waits)                 = 6   (a plain loop)`,
 				UnderTheHood: `The same recursive sum, sum n = n + sum (n − 1), pushed until it broke:
 
   Python      n = 900 fine; n = 1,000: RecursionError (its limit is 1,000)
@@ -2114,7 +2115,7 @@ rules are the same: never silently ignore an error, add context as it
 travels up, and handle it where you can actually do something about it.`,
 				Diagram: `C        fd = open(path, O_RDONLY);  if (fd < 0) perror(path);
 Java     try { read(path); } catch (IOException e) { … }
-Rust     let text = fs::read_to_string(path)?;     // ? returns the Err early
+Rust     let text = fs::read_to_string(path)?;   // ? returns the Err
 Go       data, err := os.ReadFile(path); if err != nil { return err }
 Erlang   let the process crash; its supervisor restarts it`,
 				UnderTheHood: `The same failure, opening a file that does not exist, in three styles:
@@ -2173,7 +2174,7 @@ with cycles. Rust's ownership system checks at compile time that every
 value has exactly one owner and that references never outlive it: memory
 safety without a garbage collector.`,
 				Diagram: `manual (C)        malloc ──────────────────── free   you decide when
-refcount (Python) count++ on each new reference, count-- on each drop; 0 → freed
+refcount (Python) +1 per new reference, −1 per dropped one; at 0, freed
 tracing GC (Go)   from the roots, mark what is reachable; sweep the rest
 ownership (Rust)  one owner; freed when the owner goes out of scope`,
 				UnderTheHood: `Reference counting, watched in CPython with sys.getrefcount:
@@ -2232,10 +2233,10 @@ hot paths to machine code, getting the best of both worlds (V8 for
 JavaScript, the JVM's HotSpot, PyPy). The runtime provides services such
 as garbage collection, threads and the standard library, and its start-up
 time is part of every run.`,
-				Diagram: `source ─▶ [compiler] ─▶ machine code ──────────────▶ CPU   (C, Go, Rust, OCaml)
-source ─▶ [compiler] ─▶ bytecode ─▶ [VM + JIT] ────▶ CPU   (Java, C#, JavaScript)
-source ─▶ [compiler] ─▶ bytecode ─▶ [VM, no JIT] ──▶ CPU   (CPython, Ruby, Erlang)
-source ─────────────────────────▶ [interpreter] ───▶ CPU   (shell scripts)`,
+				Diagram: `C, Go, Rust     source ─▶ [compiler] ─▶ machine code ───────────▶ CPU
+Java, C#, JS    source ─▶ [compiler] ─▶ bytecode ─▶ [VM + JIT] ─▶ CPU
+CPython, Ruby   source ─▶ [compiler] ─▶ bytecode ─▶ [VM] ───────▶ CPU
+shell scripts   source ─────────────────▶ [interpreter] ────────▶ CPU`,
 				UnderTheHood: `The same naive fib(35), about 30 million calls, everywhere, timed with
 start-up included:
 

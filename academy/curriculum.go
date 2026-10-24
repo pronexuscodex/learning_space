@@ -170,7 +170,7 @@ can stop it after any step and look at the result:
   gcc -c hello.c          an object file, hello.o
   gcc hello.o -o hello    linked into a program`,
 				Diagram: `source.c ─▶ [lexer] ─▶ tokens ─▶ [parser] ─▶ AST ─▶ [IR gen] ─▶ IR
-   ─▶ [optimizer] ─▶ [codegen] ─▶ .s ─▶ [assembler] ─▶ .o ─▶ [linker] ─▶ a.out`,
+   ─▶ [optimizer] ─▶ [codegen] ─▶ .s ─▶ [as] ─▶ .o ─▶ [linker] ─▶ a.out`,
 				UnderTheHood: `Following a six-line hello.c through gcc 13 on Linux:
 
   gcc -E hello.c | wc -l       819
@@ -949,10 +949,9 @@ act on it:
   sigaction(SIGTERM, &sa, NULL);
   while (!stop) { /* work */ }
   /* save, close, exit cleanly */`,
-				Diagram: `  kill -TERM pid
-       │
-       ▼                     main loop:  work ─ work ─ work ─ check stop ─▶ save, exit 0
-  kernel interrupts ─▶ on_term(): stop = 1 ─┘ (return to where it was)`,
+				Diagram: `  kill -TERM pid ─▶ kernel interrupts the program ─▶ on_term(): stop = 1
+                                                      then returns to it
+  main loop: work ─ work ─ work ─ check stop ─▶ stop is 1: save, exit 0`,
 				UnderTheHood: `A shell reports a process killed by signal n with exit status 128 + n.
 Measured in bash on Linux:
 
@@ -2006,9 +2005,9 @@ wait after each failure (up to a cap), and jitter randomises each wait,
 so that clients that failed together do not all retry together. Retry
 budgets and circuit breakers stop retrying altogether when a service is
 clearly down.`,
-				Diagram: `client ── charge £10, key=7f3a ──▶ server: charges, stores result for 7f3a
+				Diagram: `client ── charge £10, key=7f3a ──▶ server: charges, keeps result for 7f3a
 client ◀─────── reply lost ───────
-client ── charge £10, key=7f3a ──▶ server: 7f3a seen: returns stored result
+client ── charge £10, key=7f3a ──▶ server: 7f3a seen, sends that result
                                      (charged once, not twice)`,
 				UnderTheHood: `A Linux listening socket whose accept queue was full silently dropped
 new SYNs. A raw-socket capture recorded the client's attempts:
@@ -2504,7 +2503,12 @@ bounced further up the walls.`,
 	15: {
 		Overview: `Build the machinery of modern AI yourself: an automatic differentiation
 engine, then the layers that sit on it, up to a transformer. Once you
-have written backward() by hand, frameworks stop being magic.`,
+have written backward() by hand, frameworks stop being magic. Every
+lesson is measured: backprop agreeing with finite differences to ten
+digits at 1/600 of the cost, activations vanishing to 10⁻¹³ through 20
+badly initialised layers, attention that ignores all but one token
+without its √d, and a network that keeps improving on its training data
+while getting worse on new data.`,
 		Concepts: []Concept{
 			{
 				Name:    "Computational Graphs & Reverse-Mode Autodiff",
@@ -2525,6 +2529,27 @@ b ────────────┘
 backward:  ∂L/∂y = 2(y − t)
            ∂L/∂a = ∂L/∂y     ∂L/∂b = ∂L/∂y
            ∂L/∂w = ∂L/∂a·x   ∂L/∂x = ∂L/∂a·w`,
+				UnderTheHood: `A micrograd-style scalar engine, written in 40 lines of Python, on a
+tanh neuron with three weights, against central finite differences:
+
+  weight   autograd          finite difference
+  w0       −0.3424558353     −0.3424558353
+  w1        0.3434553121      0.3434553121
+  w2        0.5275324176      0.5275324175
+
+The one bug every engine has at first: storing a gradient with = instead
+of adding it with +=. For y = x·x at x = 3 that engine said 3; the right
+answer is 6, because x reaches the product along two edges.
+
+Cost, for a loss over 1,000 weights (NumPy, 100 examples):
+
+  one forward pass                          14.2 µs
+  forward + backward: all 1,000 gradients   55.7 µs   3.9 × forward
+  1,000 gradients by finite differences     35.3 ms   2,489 × forward
+
+The backward pass agreed with the finite differences to 2.8 × 10⁻¹⁰. With
+a billion weights, finite differences would need two billion forward
+passes per step; reverse mode still needs about one.`,
 				MentalModel: "Every op knows its own local derivative; the graph multiplies them together.",
 				TryIt:       "Build a scalar Value type with + × tanh and backward(), and check it against the Stage 13 gradient checker.",
 			},
@@ -2539,6 +2564,24 @@ at every layer, gradients vanish or explode. Xavier/Glorot
 initialisation (for tanh) and Kaiming/He initialisation (for ReLU) choose
 the weight variance so that activation variance stays roughly constant
 through depth.`,
+				UnderTheHood: `Five linear 4 × 4 layers in a row and their single product matrix gave
+the same output to 5 × 10⁻¹⁵: without an activation, depth adds nothing.
+
+1,000 random inputs through 20 layers of width 512, with different
+starting weights; the standard deviation of the activations:
+
+  activation, weights        layer 1   layer 5    layer 10   layer 20
+  tanh, N(0, 1)               0.982     0.982      0.982      0.982
+  tanh, N(0, 0.01²)           0.216     0.00057    3.4 × 10⁻⁷  1.2 × 10⁻¹³
+  tanh, Xavier (1/√512)       0.627     0.322      0.231      0.161
+  ReLU, Xavier                0.583     0.15       0.029      0.001
+  ReLU, Kaiming (√(2/512))    0.825     0.91       0.939      1.09
+
+N(0, 1) looks healthy, but 90.5% of its tanh units were saturated (|a| >
+0.99) after three layers, where the gradient 1 − a² is almost zero.
+Tiny weights shrink the signal to nothing. Xavier keeps tanh alive but
+starves ReLU, which zeroes half its inputs; Kaiming's factor of 2 makes
+up for that half, and the signal holds steady through all 20 layers.`,
 				MentalModel: "Without nonlinearity, depth is an illusion; with bad initialisation, it cannot be trained.",
 				TryIt:       "Train a 10-layer MLP with N(0,1) initialisation and then with Kaiming, and plot each layer's activation standard deviation.",
 			},
@@ -2553,8 +2596,131 @@ Normalisation keeps activations well-scaled. BatchNorm normalises over
 the batch; LayerNorm (and RMSNorm) normalise over each token's features,
 which suits sequences and variable batch sizes. Transformers usually put
 the norm before each sub-layer (pre-norm) for stable training.`,
+				UnderTheHood: `Gradients through depth, measured: tanh layers of width 256 with Xavier
+weights, the size of the gradient at the network's input divided by its
+size at the output.
+
+  depth   plain        residual x + f(x)   pre-norm residual x + f(LN(x))
+    10    0.26          3.7                  2.6
+    50    0.12         38                    5.9
+   100    0.078       207                    8.6
+
+Plain layers shrink the gradient at every step back. Residual connections
+fix that, but on their own they let it grow: every block adds to the
+signal (its spread reached 9.2 after 100 blocks), and the gradient with
+it. Normalising the input of each block (pre-norm, as in GPT and most
+modern transformers) keeps the growth to about the square root of the
+depth, which is why the two tricks come together.`,
 				MentalModel: "Residuals make identity the default; normalisation keeps the signal in range.",
 				TryIt:       "Train a 20-layer MLP with and without residual connections and compare the loss curves.",
+			},
+			{
+				Name:    "Convolutions & Weight Sharing",
+				Summary: "One small filter, slid across the whole image: far fewer weights, and a pattern found anywhere.",
+				Body: `A convolutional layer slides a small filter (say 3 × 3) across the image
+and computes the same weighted sum at every position. The same weights
+are used everywhere, which has two effects. The layer has very few
+parameters, and it is translation-equivariant: shift the input, and the
+output shifts by the same amount, so a filter that detects an edge or an
+eye finds it wherever it is.
+
+Stacking convolutions with pooling or strides grows each unit's
+receptive field: early layers see edges, later ones textures, parts and
+objects. Convolutions brought deep learning its first big wins (AlexNet
+on ImageNet in 2012) and still run in phones, cars and medical imaging,
+next to vision transformers that cut images into patches instead.`,
+				Diagram: `input (5 × 5)        3 × 3 filter           output (3 × 3)
+ ┌─────────────┐      ┌───────┐            ┌───────┐
+ │ ▓▓▓ . .     │  ⊛   │ w w w │    ─▶      │ ● . . │   the same 9 weights
+ │ ▓▓▓ . .     │      │ w w w │            │ . . . │   at every position
+ │ ▓▓▓ . .     │      │ w w w │            │ . . . │
+ └─────────────┘      └───────┘            └───────┘`,
+				UnderTheHood: `Parameters for a 224 × 224 colour image (3 channels) going to 64
+outputs per position or unit:
+
+  fully connected, 150,528 inputs → 64 units    9,633,856 weights
+  3 × 3 convolution, 3 → 64 channels                1,792 weights
+
+5,000 times fewer, and the convolution produces 64 values at every one
+of the 50,000 positions while the dense layer produces 64 in total.
+
+Equivariance, checked in NumPy: convolving a 32 × 32 image shifted 5
+pixels to the right gave exactly (difference 0.0) the convolution of the
+original shifted 5 pixels, away from the edge, where the shifted-in
+pixels differ. A dense layer has no such property: it must learn the
+same pattern separately at every position.`,
+				MentalModel: "Share the weights across positions, and the network learns a pattern once and finds it everywhere.",
+				TryIt:       "Convolve a small greyscale image with the 3 × 3 kernels [[1,0,−1],[2,0,−2],[1,0,−1]] (Sobel) and its transpose, and look at the edges they find.",
+				Analogy: `Searching a page for a word with a small cut-out window: you slide the
+same window over every spot, rather than learning a separate rule for
+each position on the page.`,
+				Example: `AlexNet (2012) cut the ImageNet error rate from 26% to 15% with
+convolutions trained on GPUs and started the deep-learning boom. Your
+phone's camera uses convolutional networks for portrait blur and night
+mode, and radiology tools use them to flag findings in scans.`,
+				Exercises: trio(
+					"A 3 × 3 convolution maps 64 channels to 128. How many weights does it have, with a bias per output channel?",
+					"3 × 3 × 64 × 128 = 73,728, plus 128 biases: 73,856.",
+					"In C, convolve a greyscale PGM image with the Sobel kernels and write the edge image back as PGM; then shift the input by a few pixels and check that the output shifts with it.",
+					"A PGM file is a short text header (P5, width, height, 255) followed by one byte per pixel.",
+					"Train a small CNN and an MLP with a similar number of parameters on a public image dataset (CIFAR-10 or Fashion-MNIST), and compare their test accuracy and training time.",
+					"Count parameters with sum(p.numel() for p in model.parameters()) in PyTorch.",
+				),
+			},
+			{
+				Name:    "Tokenisation & Embeddings",
+				Summary: "Text becomes a list of integer tokens, and each token becomes a learned vector.",
+				Body: `A language model never sees letters. A tokeniser cuts text into pieces
+from a fixed vocabulary, and each piece becomes an integer. Whole words
+make the vocabulary huge and cannot spell new words; single bytes make
+sequences very long. Byte-pair encoding (BPE) sits between: start from
+bytes, and repeatedly merge the most frequent adjacent pair into a new
+token, until the vocabulary has the size you want (GPT-2 used 50,257).
+
+Each token id then indexes a row of an embedding matrix: a learned vector
+(of 768 numbers in GPT-2) that the network can compute with. Training
+moves similar tokens close together, in the sense of Stage 13's cosine
+similarity. Tokenisation explains many surprises: models that cannot
+count the letters in a word they see as one or two tokens, and languages
+that cost more tokens, and so more money, for the same text.`,
+				Diagram: `"the cat"  ─▶  bytes  116 104 101 32 99 97 116
+           ─▶  BPE    "the" " cat"   ─▶  ids  [1169, 3797]
+           ─▶  embedding rows:  E[1169] = (0.12, −0.80, …)  768 numbers`,
+				UnderTheHood: `BPE trained on this academy's README (84,938 bytes), merging any
+adjacent bytes, spaces included:
+
+  merges    tokens    bytes per token
+     100    53,212        1.60
+     500    36,908        2.30
+   1,000    30,405        2.79
+   2,000    24,356        3.49
+
+The first ten merges were "e ", "s ", ", ", "in", "er", "th", "d ", "an",
+"t " and "re": the commonest letter pairs of English, plus word endings
+glued to the following space. The longest tokens after 2,000 merges were
+whole repeated strings such as ".com/pronexuscodex/learning_space": BPE
+learns exactly what its training text repeats. That is why GPT-style
+tokenisers first split text into words, numbers and punctuation, then
+run BPE inside each piece.`,
+				MentalModel: "A model reads token ids, not letters; how the text is cut decides what it can see.",
+				TryIt:       "Paste a sentence, a long number and a word in another language into an online tokeniser viewer (such as OpenAI's tokenizer page) and count the tokens.",
+				Analogy: `Shorthand: a stenographer starts writing letter by letter, then invents
+a symbol for every combination that keeps coming up ("tion", "the"),
+until common phrases take one stroke and rare words are still spelt out.`,
+				Example: `GPT-2's tokeniser has 50,257 tokens, GPT-4o's about 200,000. API prices
+are per token, so the same text costs more in languages the tokeniser
+splits finely. Famous "glitch tokens" such as " SolidGoldMagikarp" were
+whole Reddit usernames that BPE had merged into single tokens which then
+almost never appeared in the training text, so their embeddings were
+never trained.`,
+				Exercises: trio(
+					"Apply one BPE merge by hand to aaabdaaabac: which pair is merged first, and what does the text become?",
+					"aa occurs most often; with Z for aa the text becomes ZabdZabac.",
+					"In C, implement byte-pair encoding: learn N merges from a text file, then encode a new sentence with them and decode it back to check you get the same bytes.",
+					"Encoding applies the learned merges in the order they were learned.",
+					"Compare how many tokens the same paragraph takes in English and in another language you know with a real tokeniser (tiktoken in Python), and estimate what that means for the cost of an API call.",
+					"tiktoken.get_encoding(\"cl100k_base\").encode(text)",
+				),
 			},
 			{
 				Name:    "Attention & the Transformer",
@@ -2574,8 +2740,80 @@ attacks.`,
                    │ x + Attn(Norm(x))            │
                    │ x + MLP(Norm(x))             │
                    └──────────────────────────────┘ ─▶ Norm ─▶ logits`,
+				UnderTheHood: `128 random queries and keys: the spread of the scores, and the average
+weight of the most-attended token (uniform would be 1/128 = 0.008):
+
+  d     unscaled scores           scaled by 1/√d
+   16   spread 3.9, top 0.51      spread 1.0, top 0.067
+   64   spread 7.8, top 0.76      spread 1.0, top 0.067
+  256   spread 16.1, top 0.89     spread 1.0, top 0.073
+
+Without the scaling, a dot product of d random terms has a spread of
+√d, and at d = 256 each query put 89% of its attention on one token: the
+softmax saturates, and the gradients to every other token nearly vanish.
+With it, the spread stays 1 at every width.
+
+The O(n²) cost, NumPy on one machine, d = 64:
+
+  tokens   time       score matrix (float32)
+     512     9.3 ms      1.0 MB
+   1,024    58.3 ms      4.2 MB
+   2,048   151.5 ms     16.8 MB
+   4,096   760.4 ms     67.1 MB
+
+Doubling the context roughly quadruples the memory; at 100,000 tokens one
+head's score matrix would be 40 GB.`,
 				MentalModel: "Attention is a learned, differentiable lookup table.",
 				TryIt:       "Compute single-head causal attention for 4 tokens by hand with d = 2.",
+			},
+			{
+				Name:    "Sampling & Decoding",
+				Summary: "A language model gives probabilities; how you pick from them changes everything it says.",
+				Body: `At every step a language model outputs a probability for each token in
+its vocabulary. Decoding is how you turn that into text. Greedy decoding
+always takes the most likely token: deterministic, and prone to dull,
+repetitive loops. Sampling draws a token at random according to the
+probabilities, which gives variety, and occasionally nonsense from the
+long tail of unlikely tokens.
+
+Three knobs shape the draw. Temperature T divides the logits before the
+softmax: below 1 it sharpens the distribution towards the top token,
+above 1 it flattens it. Top-k keeps only the k most likely tokens; top-p
+(nucleus) keeps the smallest set whose probabilities add up to p, so it
+adapts to how sure the model is. Beam search, which keeps the few best
+partial sentences, suits translation more than open-ended writing.`,
+				Diagram: `logits ─▶ ÷ T ─▶ softmax ─▶ keep top-k or top-p ─▶ renormalise ─▶ draw
+T < 1: sharper, safer        T > 1: flatter, more surprising`,
+				UnderTheHood: `Ten logits from 4.0 down to −3.0, at four temperatures:
+
+  temperature   top token   top 3    entropy
+     0.2          0.92       1.00    0.44 bits
+     0.7          0.55       0.95    1.63 bits
+     1.0          0.45       0.89    2.01 bits
+     1.5          0.35       0.78    2.45 bits
+
+At 0.2 the model almost always says its first choice; at 1.5 the top
+three cover only 78%, and the rest goes to tokens the model itself
+considered unlikely. Top-p at 0.9 kept 4 of the 10 tokens here; on a
+step where the model is sure, the same p keeps only one, and when it is
+unsure, many.`,
+				MentalModel: "The model proposes a distribution; the decoder decides how adventurous to be with it.",
+				TryIt:       "With logits [2, 1, 0.5, 0], compute the softmax at temperatures 0.5, 1 and 2 by hand or in a spreadsheet.",
+				Analogy: `Ordering at a restaurant you know: at low temperature you always take
+your favourite dish, at high temperature you might try anything on the
+menu, and top-p is "only the dishes I would actually enjoy".`,
+				Example: `Chat assistants expose temperature and top-p in their APIs: code
+completion usually runs near 0 so the same prompt gives the same answer,
+creative writing higher. "Repetition loops", where a model repeats a
+phrase forever, are a classic symptom of greedy decoding.`,
+				Exercises: trio(
+					"Why does temperature 0 mean greedy decoding, and why can a temperature above 1 produce gibberish?",
+					"As T falls to 0 the softmax puts all the probability on the largest logit; above 1 it shifts probability towards unlikely tokens.",
+					"In C, write a sampler: read logits, apply a temperature, keep the top-p nucleus and draw a token with a seeded random-number generator; check by drawing 100,000 times that the frequencies match the probabilities.",
+					"Sort the probabilities, take the shortest prefix that reaches p, renormalise, then draw one uniform number and walk the cumulative sums.",
+					"Run a small open model (GPT-2 with Hugging Face) on one prompt with greedy decoding, with T = 0.7 and top-p = 0.9, and with T = 1.5, and compare five continuations of each for quality and variety.",
+					"model.generate(..., do_sample=True, temperature=0.7, top_p=0.9)",
+				),
 			},
 			{
 				Name:    "The Training Loop & Generalisation",
@@ -2589,6 +2827,42 @@ a smaller model.
 Use learning-rate warm-up and then cosine decay. Before scaling
 anything, overfit one tiny batch to zero loss. If you cannot, there is a
 bug.`,
+				UnderTheHood: `A small ReLU network (2 → 256 → 256 → 1), written in NumPy with a
+hand-written backward pass, on the two-spirals problem: 200 points to
+train on, 2,000 to validate.
+
+First, the sanity check: on just 16 examples the training loss fell to
+0.0044 and accuracy to 100%. The code can learn.
+
+Learning rates (4,000 steps, width 128):
+
+  rate    train loss  train acc   validation loss  validation acc
+  3.0       0.300       0.84          0.417            0.79
+  1.0       0.021       0.98          0.275            0.94
+  0.1       0.044       0.98          0.182            0.94
+  0.01      0.430       0.80          0.511            0.72
+
+Training longer, without weight decay:
+
+  step     train loss   validation loss   validation acc
+    500      0.109          0.202             0.92
+  2,000      0.031          0.208             0.94
+  5,000      0.016          0.320             0.93
+ 20,000      0.001          0.638             0.92
+
+The same run with weight decay 0.001:
+
+  step     train loss   validation loss   validation acc
+  2,000      0.058          0.167             0.94
+  5,000      0.062          0.170             0.94
+ 20,000      0.060          0.170             0.94
+
+Without weight decay the training loss kept falling to 0.001 while the
+validation loss tripled after step 2,000: the network was memorising its
+200 points, and the best model was the checkpoint at the lowest
+validation loss, which is why training loops save checkpoints and stop
+early. With weight decay the training loss settled at 0.060 and the
+validation loss stayed at 0.17 however long it ran.`,
 				MentalModel: "First make it overfit, then make it generalise.",
 				TryIt:       "Deliberately overfit 32 MNIST images to 100% accuracy, then add weight decay and watch validation accuracy.",
 			},
@@ -2617,6 +2891,12 @@ bug.`,
 			{"Why divide by √d in scaled dot-product attention?", "Dot products of d-dimensional vectors have variance about d. Scaling keeps it near 1 so the softmax does not saturate and gradients do not vanish."},
 			{"Why is reverse mode preferred over forward mode for training?", "There is one scalar output and millions of inputs. Reverse mode gets every gradient in one backward pass; forward mode needs one pass per input."},
 			{"What does it mean if you cannot overfit a single small batch?", "There is almost certainly a bug: in the gradients, the data pipeline, the loss or the learning rate."},
+			{"Why does Kaiming initialisation use a factor of 2 that Xavier does not?", "ReLU zeroes about half of its inputs, halving the signal's variance at every layer; doubling the weight variance makes up for it."},
+			{"Residual connections fix vanishing gradients. Why do transformers still need normalisation?", "Each block adds to the signal, so without normalisation activations and gradients grow with depth; normalising each block's input keeps them in range."},
+			{"Why does a convolutional layer have so few parameters compared with a dense layer on the same image?", "It reuses one small filter at every position (weight sharing), so its size depends on the filter and channels, not on the image size."},
+			{"Why does byte-pair encoding produce tokens like \"e \" and whole repeated URLs?", "It merges whatever adjacent pairs are most frequent in its training text; real tokenisers split text into words first to avoid merging across them."},
+			{"What do temperature and top-p change when sampling from a language model?", "Temperature sharpens (below 1) or flattens (above 1) the distribution; top-p keeps only the most likely tokens whose probabilities add up to p."},
+			{"Your training loss keeps falling, but the validation loss started rising. Which model should you keep?", "The checkpoint with the lowest validation loss: after that point the network is memorising its training data."},
 		},
 	},
 
