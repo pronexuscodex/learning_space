@@ -2906,7 +2906,11 @@ validation loss stayed at 0.17 however long it ran.`,
 virtual memory (Stage 6) and the math and autograd (Stages 13 and 15)
 collide on a GPU. Learn why AI performance is mostly about moving bytes,
 and how kernels, attention and inference servers are designed around
-that.`,
+that. The measurements here were made on an ordinary 4-core CPU, where
+the same physics shows at smaller numbers, next to the published figures
+of real GPUs: reading 1 value in 16 that still costs 57% of the time,
+fusion that is worth 2.3× only when the work is memory-bound, and a KV
+cache that wastes three quarters of its memory without paging.`,
 		Concepts: []Concept{
 			{
 				Name:    "The GPU Execution Model",
@@ -2920,6 +2924,26 @@ different branches, the paths run one after the other (divergence).
 GPUs hide memory latency not with big caches but by switching to another
 ready warp. High occupancy means enough warps in flight to keep the
 arithmetic units fed.`,
+				UnderTheHood: `Scale first: an NVIDIA H100 (SXM) has 132 SMs, each holding up to 2,048
+resident threads, so about 270,000 threads can be in flight at once;
+the 4-core CPU these lessons were measured on runs 4 (8 with
+hyper-threading). The GPU wins by having so much ready work that some
+warp can always run while others wait hundreds of cycles for memory.
+
+Divergence, counted: a branch over 1,048,576 elements, grouped into
+warps of 32 in order. A warp whose threads disagree runs both paths.
+
+  condition true for   order     warps that run both paths
+        50%            random            100.0%
+        50%            sorted              0.003%
+         1%            random             27.6%
+         1%            sorted              0.003%
+
+Even a rare condition (1%) makes over a quarter of the warps pay for both
+branches when the data is shuffled; sorting or grouping the data so that
+neighbouring threads agree removes nearly all of it. The same idea runs
+on the CPU: AVX-512 executes 16 lanes in lockstep and handles an if by
+computing both sides under a mask.`,
 				MentalModel: "A GPU is a throughput machine; latency is hidden by always having other work ready.",
 				TryIt:       "Write a vector-add kernel, try block sizes of 32, 128, 256 and 1024, and measure the bandwidth achieved.",
 			},
@@ -2939,6 +2963,24 @@ turns a memory-bound kernel into a compute-bound one.`,
   ~1 cy        ~30 cy                  ~200 cy     ~500 cy · TB/s
   coalesced:  t0 t1 t2 … t31 → [ one 128-byte transaction ]
   strided:    t0 . . t1 . . t2 …  → up to 32 separate transactions`,
+				UnderTheHood: `Memory always moves whole lines (64 bytes on this CPU, 32- to 128-byte
+sectors on a GPU), so what matters is how much of each line you use.
+Reading a 1 GB array of 4-byte integers in C, one value every S:
+
+  stride   values read   time     per value   useful bandwidth
+     1       268 M       129 ms    0.48 ns       8.3 GB/s
+     2       134 M       106 ms    0.79 ns       5.1 GB/s
+     4        67 M        89 ms    1.33 ns       3.0 GB/s
+     8        34 M        79 ms    2.37 ns       1.7 GB/s
+    16        17 M        73 ms    4.32 ns       0.9 GB/s
+    32         8 M        73 ms    8.68 ns       0.5 GB/s
+
+At stride 16, one value per 64-byte line, the program read 1/16 of the
+data and still took 57% of the time: every line was fetched in full,
+and 60 of its 64 bytes were thrown away. That is exactly what an
+uncoalesced warp does to HBM. Laying data out so that neighbouring
+threads (or iterations) touch neighbouring bytes is the cheapest speed-up
+there is.`,
 				MentalModel: "Neighbouring threads should touch neighbouring bytes.",
 				TryIt:       "Write a matrix transpose kernel naively, then with a shared-memory tile, and compare GB/s.",
 			},
@@ -2963,6 +3005,27 @@ however many FLOPs the GPU has.`,
      │       /
      └──────┴──────────────────────▶ arithmetic intensity (FLOP/byte)
           ridge`,
+				UnderTheHood: `The roofline of the 4-core CPU used here, measured:
+
+  memory bandwidth (triad c = a + 1.5·b, 4 threads)    49.2 GB/s
+  compute, fp32 matrix multiply (OpenBLAS)             494 GFLOP/s
+  ridge point                                          about 10 FLOP/byte
+
+The triad does 2 FLOPs per 12 bytes (AI 0.167), so at 49.2 GB/s it ran
+at 8.2 GFLOP/s: under 2% of what the same cores reach in a matrix
+multiply. Adding cores helped only because one core could not saturate
+the memory bus (13.0 GB/s alone); past that, a kernel below the ridge
+runs exactly as fast as memory lets it.
+
+GPUs, from their datasheets:
+
+  GPU           HBM bandwidth   dense BF16      ridge
+  A100 (SXM)     2.04 TB/s      312 TFLOP/s     153 FLOP/byte
+  H100 (SXM)     3.35 TB/s      989 TFLOP/s     295 FLOP/byte
+
+An H100 needs almost 300 operations per byte fetched to use its compute.
+Only large matrix multiplies get there; everything elementwise, and
+decoding at batch size 1, runs at the bandwidth roof.`,
 				MentalModel: "Count the bytes before you count the FLOPs.",
 				TryIt:       "Predict the tokens per second of a 13B int8 model on your GPU from its bandwidth, then measure it with llama.cpp.",
 			},
@@ -2979,8 +3042,84 @@ online softmax (a running max and a running sum, rescaled as each new
 block arrives). The full matrix is never stored. The result is exact,
 not an approximation; it is just far less memory traffic. The idea is
 IO-awareness.`,
+				UnderTheHood: `relu(a·b + c) over 128 million floats, 4 threads, in C:
+
+  three kernels (multiply, add, relu)   109 ms   8 array passes
+  one fused kernel                       47 ms   4 array passes
+
+Fusion was 2.3× faster, and it was all bytes: the fused kernel reads a,
+b and c once and writes the result once, where the three kernels write
+two temporaries and read them back. Each array written is also read into
+the cache first (write-allocate), so the real traffic is 11 passes
+against 5: a ratio of 2.2. The counter-example matters as much: the same
+experiment with GELU (a tanh per element) on one core took 918 ms
+unfused and 875 ms fused. GELU's arithmetic made it compute-bound, so
+saving bytes saved almost nothing. Fuse what is memory-bound.
+
+The online softmax, checked in NumPy on a million scores in blocks of
+128: one pass with a running maximum and a rescaled running sum agreed
+with the two-pass softmax to 4.4 × 10⁻¹⁶. That exactness is what lets
+FlashAttention skip the n × n matrix, which at 8,192 tokens is 128 MB
+per head per sequence in fp16, written and read back by naive attention.
+The FlashAttention paper reported GPT-2 training 3 times faster at 1K
+tokens, with identical results.`,
 				MentalModel: "Reorganise the algorithm around the memory hierarchy, not the other way round.",
 				TryIt:       "Implement the online softmax in plain code and verify that it matches the two-pass version to within 1e-6.",
+			},
+			{
+				Name:    "Quantisation & Number Formats",
+				Summary: "Fewer bits per number: less memory, more speed, and a little error you must measure.",
+				Body: `Training uses 32- or 16-bit floats; inference often far fewer bits.
+fp16 has 5 exponent bits (its largest value is 65,504) and 10 mantissa
+bits; bf16 keeps fp32's 8 exponent bits, so it never overflows where
+fp32 would not, but has only 7 mantissa bits. That range is why
+training moved to bf16.
+
+Integer quantisation stores each weight as a small integer and a shared
+scale: w ≈ scale × q, with q in −127 … 127 for int8 or −7 … 7 for int4.
+The choice of what shares a scale is everything. One scale for a whole
+matrix lets a few large outlier weights squash all the others into a
+handful of levels; one scale per row, or per group of 128 weights, keeps
+the error small. Since decoding is memory-bound (the roofline lesson),
+halving the bytes per weight nearly doubles the tokens per second.`,
+				Diagram: `fp32   1 │ 8 exponent │ 23 mantissa      range ±3.4 × 10³⁸
+bf16   1 │ 8 exponent │  7 mantissa      same range, fewer digits
+fp16   1 │ 5 exponent │ 10 mantissa      largest 65,504
+int8   w ≈ scale × q,  q ∈ −127 … 127,  one scale per row or group`,
+				UnderTheHood: `A 4096 × 4096 weight matrix (normal, with 20 outliers of 0.6 among
+weights of about 0.02, as real LLMs have), multiplied by one vector;
+the relative error of the result against fp32:
+
+  format                            bits   error        size
+  fp16                               16    0.00021     33.6 MB
+  bf16                               16    0.0017      33.6 MB
+  int8, one scale for the matrix      8    0.069       16.8 MB
+  int8, one scale per row             8    0.010       16.8 MB
+  int4, one scale per row             4    0.171        8.4 MB
+  int4, one scale per 128 weights     4    0.118        8.4 MB
+
+The same 8 bits gave 7 times less error with a scale per row: the
+outliers no longer set everyone's scale. int4 needs small groups, and
+real 4-bit methods (GPTQ, AWQ) go further by choosing which weights to
+protect. Range, checked: 70,000 in fp16 is inf, and 10⁻⁸ is 0; bf16
+keeps 10³⁸ (as 9.97 × 10³⁷).`,
+				MentalModel: "Bits are bandwidth: quantise until the measured error starts to matter, and give outliers their own scale.",
+				TryIt:       "In NumPy, quantise a random matrix to int8 with one scale per row, dequantise it, and measure the error of a matrix-vector product.",
+				Analogy: `Recording prices to the nearest cent, the nearest pound or the nearest
+hundred pounds. Choose the unit for each shelf, not for the whole shop:
+one unit fitted to a single sofa makes every sweet cost nothing.`,
+				Example: `llama.cpp runs 7B-parameter models on laptops by storing them in about
+4 bits per weight (formats such as Q4_K), around 4 GB instead of 14.
+NVIDIA's H100 added fp8 to its tensor cores, and DeepSeek-V3 was trained
+largely in fp8 to cut memory and communication.`,
+				Exercises: trio(
+					"A 70B-parameter model: how much memory do its weights take in fp16, int8 and int4, and roughly how many tokens per second could each reach at batch size 1 on a 3.35 TB/s GPU?",
+					"140, 70 and 35 GB; about 24, 48 and 96 tokens per second at the bandwidth roof.",
+					"In C, quantise a matrix to int8 with one scale per row (round to nearest), dequantise it, and report the largest and the average error; then try one scale for the whole matrix and explain the difference.",
+					"scale = max |w| in the row / 127; q = round(w / scale), clamped to −127 … 127.",
+					"Run the same small model (with llama.cpp or Ollama) at two quantisation levels, such as Q8_0 and Q4_K_M, and compare file size, tokens per second and the quality of a few answers.",
+					"llama.cpp prints tokens per second after each answer.",
+				),
 			},
 			{
 				Name:    "KV Cache, Batching & PagedAttention",
@@ -2997,8 +3136,150 @@ fixed-size blocks mapped through a block table: virtual memory from
 Stage 6, applied to attention. This removes fragmentation and lets
 requests share prompt prefixes. Quantisation (int8, int4) cuts bytes
 everywhere.`,
+				UnderTheHood: `Batching, on this CPU: a decode step is mostly a matrix-vector product
+with the weights. With an 8192 × 8192 fp32 matrix (256 MB) and B requests
+at once:
+
+  batch   time per step   tokens/s   GFLOP/s   weights read at
+     1        4.4 ms          225        30        60.5 GB/s
+     8       11.7 ms          683        92        22.9 GB/s
+    64       22.3 ms        2,873       386        12.0 GB/s
+   256       69.5 ms        3,683       494         3.9 GB/s
+
+At batch 1 the step ran at full memory bandwidth and the arithmetic sat
+idle; 64 requests at once cost 5 times the time and served 64 times the
+tokens, until the compute roof (494 GFLOP/s) took over.
+
+The KV cache of a Llama-3-8B-style model (32 layers, 8 KV heads, head
+dimension 128, fp16) is 2 × 32 × 8 × 128 × 2 = 131,072 bytes, 128 KB per
+token: 1 GB for one 8,192-token conversation. Simulating 1,000 requests
+of 50 to 4,000 tokens:
+
+  reserve 8,192 slots per request    24.7% of KV memory holds tokens
+  16-token pages (PagedAttention)    99.6%
+
+That 75% waste matches what the vLLM paper measured in the servers before
+it, and is why paging the cache let the same GPU serve several times
+more requests at once.`,
 				MentalModel: "An LLM server is an operating system whose scarce resource is KV memory.",
 				TryIt:       "Compute the KV-cache size for a Llama-style 8B model (32 layers, 8 KV heads, head_dim 128, fp16) at 8k context.",
+			},
+			{
+				Name:    "Parallelism Across GPUs: Data, Tensor & Pipeline",
+				Summary: "When one GPU is not enough: split the data, the matrices or the layers.",
+				Body: `Training a large model needs far more memory than its weights. With
+mixed-precision Adam, each parameter costs about 16 bytes: the bf16
+weight and gradient (2 + 2), an fp32 master copy (4) and Adam's two
+moments (4 + 4), before any activations. There are three ways to split
+the work across GPUs, and large runs combine all three.
+
+Data parallelism gives every GPU a full copy and a different slice of
+each batch, then averages the gradients with an all-reduce after every
+step; ZeRO and FSDP also shard the optimiser state and weights so no GPU
+holds a full copy. Tensor parallelism splits each big matrix multiply
+across GPUs inside a layer, which needs fast links (NVLink) because they
+exchange activations every layer. Pipeline parallelism gives each GPU a
+group of layers and streams micro-batches through them, at the cost of
+idle "bubbles" while the pipeline fills and drains.`,
+				Diagram: `data:      GPU0 [whole model] batch 0-31
+           GPU1 [whole model] batch 32-63   ─▶ all-reduce the gradients
+tensor:    one matmul split by columns: GPU0 W[:, :n/2]  GPU1 W[:, n/2:]
+pipeline:  GPU0 layers 1-8 ─▶ GPU1 layers 9-16 ─▶ GPU2 layers 17-24`,
+				UnderTheHood: `Memory for training with mixed-precision Adam, 16 bytes per parameter:
+
+  model     weights alone (bf16)    training state
+   7B           14 GB                  112 GB
+  70B          140 GB                1,120 GB
+
+A 7B model does not fit on one 80 GB GPU for training, although it runs
+inference on one easily.
+
+Ring all-reduce, the standard way to average gradients: each of N GPUs
+sends 2 × (N − 1) / N times the gradient size, whatever N is.
+
+  GPUs                      2      4      8      64
+  sent per GB of gradients  1.00   1.50   1.75   1.97 GB
+
+Sending everything to one GPU and back would make that one link carry
+N times as much. Pipeline bubbles: with p stages and m micro-batches,
+the idle fraction is (p − 1) / (m + p − 1): 43% for 4 stages and 4
+micro-batches, 8.6% with 32.`,
+				MentalModel: "Split the batch first; split the matrices only over fast links; split the layers when nothing else fits.",
+				TryIt:       "Work out how many 80 GB GPUs a 13B model needs for training with Adam, and how many for inference in bf16.",
+				Analogy: `A kitchen preparing a banquet. Data parallelism is several cooks each
+making whole dishes for different tables. Tensor parallelism is cooks
+working on the same dish side by side, passing things constantly.
+Pipeline parallelism is an assembly line: one preps, one cooks, one
+plates, and at the start and the end of service someone is waiting.`,
+				Example: `Meta trained Llama 3 405B on 16,384 H100 GPUs combining all of these
+(tensor, pipeline, context and data parallelism). PyTorch's FSDP and
+Microsoft's DeepSpeed ZeRO are the common open implementations of
+sharded data parallelism.`,
+				Exercises: trio(
+					"Each of 8 GPUs holds a 2 GB gradient. How much does each send in a ring all-reduce, and how much would one GPU receive if all sent to it?",
+					"2 × 7/8 × 2 GB = 3.5 GB each; a central GPU would receive 7 × 2 = 14 GB.",
+					"In C, simulate a ring all-reduce among N workers: split each vector into N chunks, run the N − 1 reduce-scatter steps and the N − 1 all-gather steps, and check that every worker ends with the sum.",
+					"In step s of reduce-scatter, worker i sends chunk (i − s) mod N to worker i + 1, which adds it to its own.",
+					"Read the Llama 3 paper's section on parallelism (or the PyTorch FSDP tutorial) and draw how a 405B model's training state was split across 16,384 GPUs.",
+					"Look for the tensor, pipeline, context and data parallel sizes; their product is the number of GPUs.",
+				),
+			},
+			{
+				Name:    "Profiling & Benchmarking Honestly",
+				Summary: "Measure the right thing, many times, after warming up.",
+				Body: `Performance numbers lie easily. The first run of anything pays one-off
+costs: page faults on memory touched for the first time, cold caches,
+code being compiled or loaded, a GPU waking up. Timers measure the wrong
+thing when work is asynchronous: a GPU kernel launch returns at once,
+so you must synchronise before reading the clock. And one measurement is
+noise: the machine also runs other things.
+
+So warm up, repeat, and report a distribution (the median, and a high
+percentile for latency) rather than a single number. Compare against
+the roofline to know how far from the limit you are. Then profile before
+optimising: a profiler (perf, Nsight Systems, the PyTorch profiler)
+shows where the time actually goes, which is rarely where you guessed.`,
+				Diagram: `run 1  ████████████████  page faults, cold caches, JIT
+run 2  ███
+run 3  ███        ◀ measure these: report the median and the p99
+run 4  ████`,
+				UnderTheHood: `Two traps, measured on this machine.
+
+Writing a 256 MB NumPy array:
+
+  first time    482.5 ms   (the operating system maps every page)
+  second time    34.8 ms
+
+The first run was 14 times slower, for a reason that has nothing to do
+with the code being timed.
+
+A 512 × 512 fp32 matrix multiply, timed 200 times:
+
+  first run   1.11 ms     minimum   0.483 ms
+  median      0.517 ms    p99       0.816 ms    maximum   2.393 ms
+
+The slowest run took five times the fastest, on identical work. Report
+the median (0.52 ms) with the spread, never the first run or a single
+lucky one. On a GPU, also call torch.cuda.synchronize() (or record CUDA
+events) before stopping the clock, or you time only the launch.`,
+				MentalModel: "Warm up, repeat, synchronise, and report a distribution against a known limit.",
+				TryIt:       "Time a function 100 times in Python with time.perf_counter, and plot the times: where are the first run, the median and the outliers?",
+				Analogy: `Timing a runner: you do not time their first lap, run while they are
+still tying their shoes, or a single lap on a windy day, and you check
+the stopwatch was stopped when they crossed the line, not when the
+starting gun fired.`,
+				Example: `MLPerf, the industry benchmark for AI hardware, fixes warm-up, the
+number of runs and the accuracy each result must reach, because vendors
+otherwise report flattering numbers. PyTorch's benchmark utilities
+(torch.utils.benchmark) warm up and synchronise for you.`,
+				Exercises: trio(
+					"A GPU benchmark reports 0.01 ms for a large matrix multiply that should take 5 ms. What most likely went wrong?",
+					"The timer stopped after the kernel was launched, not after it finished: the code never synchronised.",
+					"In C, time a loop over a freshly allocated 1 GB array and then over the same array again, 20 times each, with clock_gettime, and print the minimum, median and maximum. Explain the first run.",
+					"Page faults: the operating system maps the memory only when it is first touched.",
+					"Profile a real program of yours (with perf record and perf report, py-spy or the PyTorch profiler), find the function that takes most of the time, speed it up, and report the before and after as medians of several runs.",
+					"perf record -g ./program, then perf report.",
+				),
 			},
 		},
 		Resources: []Resource{
@@ -3027,6 +3308,11 @@ everywhere.`,
 			{"Why does batching raise decode throughput?", "Each weight read from HBM serves every sequence in the batch, which multiplies arithmetic intensity."},
 			{"What does FlashAttention avoid writing to HBM?", "The n×n attention score and probability matrices. It uses tiling plus an online softmax."},
 			{"Which Stage 6 idea does PagedAttention borrow?", "Paging: a per-sequence block table maps logical KV positions to fixed-size physical blocks."},
+			{"Why can reading every 16th value of an array take more than half as long as reading all of them?", "Memory moves whole cache lines (or GPU sectors): each value read still fetches its whole 64-byte line, so most of the bytes moved are thrown away."},
+			{"Fusing three elementwise kernels into one made them 2.3× faster, but fusing a GELU chain helped almost nothing. Why?", "The simple ops were memory-bound, so moving fewer bytes saved time; GELU's tanh made it compute-bound, so the bytes were not the bottleneck."},
+			{"Why does int8 with one scale per row beat one scale for the whole matrix?", "A few large outliers set a single scale so large that most weights round to a handful of levels; per-row scales confine each outlier to its own row."},
+			{"How much memory does training a 7B model with mixed-precision Adam need, before activations?", "About 16 bytes per parameter (weights, gradients, fp32 master copy and two Adam moments): 112 GB."},
+			{"Why does a benchmark's first run so often look much slower, and what should you report instead?", "It pays one-off costs such as page faults, cold caches and compilation; warm up, repeat, and report the median with a high percentile."},
 		},
 	},
 }

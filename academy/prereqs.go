@@ -186,11 +186,14 @@ var conceptPrereqs = map[string][]string{
 	"The Training Loop & Generalisation":           {"MLPs, Activations & Initialisation", "Evaluating Models Honestly", "Optimisation: From Gradient Descent to Adam"},
 
 	// ---- Stage 16
-	"The GPU Execution Model":                      {"Pipelining, Branch Prediction & Parallelism", "Scheduling & Context Switches"},
-	"GPU Memory Hierarchy & Coalescing":            {"The GPU Execution Model", "The Memory Hierarchy & Locality"},
-	"The Roofline Model: Compute- vs Memory-Bound": {"GPU Memory Hierarchy & Coalescing"},
-	"Kernel Fusion & FlashAttention":               {"The Roofline Model: Compute- vs Memory-Bound", "Attention & the Transformer"},
-	"KV Cache, Batching & PagedAttention":          {"Attention & the Transformer", "Virtual Memory & Paging"},
+	"The GPU Execution Model":                          {"Pipelining, Branch Prediction & Parallelism", "Scheduling & Context Switches"},
+	"GPU Memory Hierarchy & Coalescing":                {"The GPU Execution Model", "The Memory Hierarchy & Locality"},
+	"The Roofline Model: Compute- vs Memory-Bound":     {"GPU Memory Hierarchy & Coalescing"},
+	"Kernel Fusion & FlashAttention":                   {"The Roofline Model: Compute- vs Memory-Bound", "Attention & the Transformer"},
+	"KV Cache, Batching & PagedAttention":              {"Attention & the Transformer", "Virtual Memory & Paging"},
+	"Quantisation & Number Formats":                    {"The Roofline Model: Compute- vs Memory-Bound", "Floating Point for Numerical Computing"},
+	"Parallelism Across GPUs: Data, Tensor & Pipeline": {"The Training Loop & Generalisation", "The GPU Execution Model"},
+	"Profiling & Benchmarking Honestly":                {"The Roofline Model: Compute- vs Memory-Bound", "Profiling & Measuring Performance"},
 
 	// ---- Stage 17
 	"Secure Design Principles":   {"Thinking Like an Attacker: Threat Modelling", "Access Control: Who May Do What"},
