@@ -37,7 +37,12 @@ versions follow [Semantic Versioning](https://semver.org/).
   - Three new checked C exercises: `log_chain`, `multi_match` and `auth_detect`, with reference solutions and mutation tests for the typical mistakes.
   - Nine glossary terms, three outcomes, six quiz questions, prerequisites and related-concept links for the new lessons.
   The academy now has 176 concepts and 528 exercises.
-- **More concept prerequisites:** 292 links across 171 concepts, up from 254 across 153, covering every new lesson.
+- **Stage 20 (Incident Response & Privacy) at Stage 1's depth: 8 lessons, up from 5.** Every lesson has an "Under the hood" section built on measurements made on this machine with data created for the purpose: a prepared script recording volatile evidence in a third of a second; 41,639 system files checked against the package manager's hashes, with every difference needing an explanation; a plain copy that changed a file's date while its hash stayed the same; a real post-mortem from building this academy; and three ordinary fields that single out 96% of a simulated population.
+  - New lessons: **Backups & Recovery Testing** (5,000 files backed up, restored and checked against a manifest, timed against the RTO), **Building an Incident Timeline** (clocks 90 seconds apart putting a third of close events in the wrong order) and **Anonymisation, Pseudonymisation & Differential Privacy** (every 7-digit phone number hashed in 5 seconds, and the error each epsilon costs).
+  - Three new checked C exercises: `backup_verify`, `timeline` and `k_anon`, with reference solutions and mutation tests for the typical mistakes.
+  - Nine glossary terms, three outcomes, six quiz questions, prerequisites and related-concept links for the new lessons.
+  The academy now has 179 concepts and 537 exercises.
+- **More concept prerequisites:** 298 links across 174 concepts, up from 254 across 153, covering every new lesson.
 
 ### Fixed
 - **A second UX audit, screen by screen at 40, 80 and 120 columns:**

@@ -200,7 +200,7 @@ Checked-exercise files live in `Documents/Academy Labs` (`$ACADEMY_LABS` chooses
 | | 19 | Network Defence & Monitoring |
 | | 20 | Incident Response, Forensics & Privacy |
 
-That is **176 concepts** and **528 exercises**, plus a glossary, a resource library, lab blueprints, a quiz and a mastery check for every stage. Start Here also lists electives for afterwards: graphics, quantum computing, embedded systems and bioinformatics.
+That is **179 concepts** and **537 exercises**, plus a glossary, a resource library, lab blueprints, a quiz and a mastery check for every stage. Start Here also lists electives for afterwards: graphics, quantum computing, embedded systems and bioinformatics.
 
 ## How computers work (Stage 0)
 
@@ -398,6 +398,9 @@ The later stages have checked exercises too, written with C and POSIX only, so t
 | `log_chain` | 19: Tamper-evident logs | seal and verify a hash-chained log: a changed word, a deleted line, two lines swapped, the end cut off (caught only with the newest hash), one spelling of hex, a 100,000-byte message, 100,000 lines |
 | `multi_match` | 19: Signatures | Aho-Corasick over 16 MB: signatures inside other signatures, overlaps, binary data with zero bytes, blank signatures refused, and 5,000 signatures in one pass |
 | `auth_detect` | 19: Detection engineering | two login rules and a follow-up: ordinary mistakes stay quiet, the window's exact edge, failures spread over many accounts against many failures on one, a quiet period after each alert, a success after an alert, a simulated day with exactly three alerts |
+| `backup_verify` | 20: Backups | a restored folder against a sha256sum manifest: changed, missing and extra files in subfolders, a file emptied but still named, binary data, and manifest paths with .. or / refused before anything is read |
+| `timeline` | 20: Timelines | events from several hosts in one UTC timeline: offsets both ways, leap years and 2100, fractions (.5 is half a second), known clock errors applied, ties kept in order, 100,000 events |
+| `k_anon` | 20: Anonymisation | k-anonymity with prefixes and number bands: the smallest group and the rows at risk, band edges, keys that would run together without a separator, short rows refused, 100,000 rows |
 | `http_request` | 8: HTTP | parsing a request head: header names in any case, trimmed values, bare newlines, a 7,000-byte path, a missing Host, wrong versions, a head that never ends |
 
 **What's next** suggests a check as soon as you mark its concept as understood: you've read it, now make it work. It suggests the project once the whole stage is understood.
@@ -831,7 +834,7 @@ The tests check:
 - **The v1 → v2 migration and stage merging.**
 - **Retention:** the scheduler's intervals grow and reset on a lapse; deck unlocking and due cards; each step of the mastery ladder.
 - **Classic Mode:** every stage has a complete classic corner with HTTPS links; the struggle clock's thresholds and early unlock; notebook and type-in progress survive a save round trip.
-- **Checked exercises:** each check's reference solution passes every case, with gcc and with clang (88 checks, including a real loopback TCP server, forked processes and a write-ahead log the checker reads back). Mastery waits for a concept's check to pass. Typical mistakes fail with the right explanation:
+- **Checked exercises:** each check's reference solution passes every case, with gcc and with clang (91 checks, including a real loopback TCP server, forked processes and a write-ahead log the checker reads back). Mastery waits for a concept's check to pass. Typical mistakes fail with the right explanation:
   - the XOR swap;
   - `9 / 5` in integers;
   - an endless loop;

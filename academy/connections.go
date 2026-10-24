@@ -417,6 +417,12 @@ var conceptLinks = map[string]links{
 		"Google's SRE book: the chapter on postmortem culture. GitLab's 2017 database outage post-mortem."},
 	"Privacy & Data Protection": {[]string{"Hashing & Password Storage", "Encryption: Symmetric & Public-Key", "Probability for Programmers"},
 		"The GDPR's articles on principles (Article 5) and breach notification (Articles 33 and 34)."},
+	"Backups & Recovery Testing": {[]string{"Containment, Eradication & Recovery", "Hashing & Password Storage", "Integrity Checks: Hashes, Checksums & Signed Releases"},
+		"GitLab's public post-mortem of its 2017 database outage. The CISA #StopRansomware guide on offline, encrypted backups."},
+	"Building an Incident Timeline": {[]string{"Time, Clocks & Ordering", "Tamper-Evident Logs & Trustworthy Time", "Digital Forensics Basics"},
+		"NIST SP 800-61 (Computer Security Incident Handling Guide). The Plaso (log2timeline) documentation."},
+	"Anonymisation, Pseudonymisation & Differential Privacy": {[]string{"Privacy & Data Protection", "Probability for Programmers", "Descriptive Statistics & Distributions"},
+		"Sweeney, Simple Demographics Often Identify People Uniquely (2000). Dwork & Roth, The Algorithmic Foundations of Differential Privacy (2014), chapters 1 to 3."},
 }
 
 // stageOfConcept finds which stage a concept belongs to (0 if unknown).

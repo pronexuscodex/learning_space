@@ -1650,13 +1650,21 @@ backups that actually restore, evidence handled carefully enough to
 learn what happened, and a culture that fixes causes instead of blaming
 people. This stage also covers privacy and data protection: collecting
 less personal data, protecting what you keep, and the legal duties that
-apply when it leaks.`,
+apply when it leaks. The measurements were made on this machine with
+data created for the purpose: a backup of 5,000 files restored and
+checked in under ten seconds, a copied file whose dates changed while its
+hash did not, clocks 90 seconds apart that put a third of an incident's
+events in the wrong order, and three ordinary fields that single out
+96% of a simulated population.`,
 		Outcomes: []string{
 			"Write an incident response plan with clear roles, severities and contacts",
 			"Contain an incident, rebuild from known-good sources and restore from tested backups",
 			"Collect and preserve digital evidence without destroying it",
 			"Run a blameless post-mortem that leads to real fixes",
 			"Apply data-protection principles and know when a breach must be reported",
+			"Set recovery objectives and prove backups restore by testing them",
+			"Build an incident timeline from several sources in one corrected time",
+			"Measure re-identification risk, and choose between pseudonymisation, generalisation and differential privacy",
 		},
 		Glossary: []Term{
 			{"Incident commander", "The one person who coordinates an incident response and makes the calls."},
@@ -1667,6 +1675,15 @@ apply when it leaks.`,
 			{"Post-mortem", "A written review after an incident: what happened, why, and what will change."},
 			{"Personal data", "Any information about an identifiable person: a name, an email, a location, an IP address."},
 			{"Data minimisation", "Collecting and keeping only the personal data you actually need."},
+			{"RPO", "Recovery point objective: how much recent data you can afford to lose, set by how often you back up."},
+			{"RTO", "Recovery time objective: how long you can afford to be down while restoring."},
+			{"Immutable backup", "A backup that cannot be changed or deleted for a set period, even by an administrator."},
+			{"Timeline", "Every relevant event from every source, in one time zone and one corrected clock, in order."},
+			{"Clock skew", "How far a machine's clock is from the true time; it must be known to order events across machines."},
+			{"Quasi-identifier", "A field that is not a name but helps identify someone in combination: postcode, birth date, sex."},
+			{"k-anonymity", "Every combination of quasi-identifiers in a dataset is shared by at least k people."},
+			{"Pseudonymisation", "Replacing identifiers with codes; still personal data, because it can often be reversed."},
+			{"Differential privacy", "Adding calibrated noise to results so that no single person's data changes them noticeably."},
 		},
 		Concepts: []Concept{
 			{
@@ -1693,6 +1710,21 @@ response inside NIST's wider Cybersecurity Framework.`,
  ├─ communications ── staff, customers, regulators
  └─ scribe ────────── timeline: every action, with the time
 severity 1: all hands now │ severity 2: working hours │ 3: ticket`,
+				UnderTheHood: `A plan is mostly preparation done in advance, and some of it can be code.
+A prepared Python script that records the volatile state of this
+machine (every process, its command line and open files, a SHA-256 of
+each running program, and the socket tables):
+
+  processes recorded            12
+  executables hashed             9
+  sockets listed                30
+  time taken                     0.33 s
+  record                         2 KB, timestamped in UTC
+
+A third of a second, run the same way every time, before anything is
+switched off, against an analyst typing commands from memory at 3 a.m.
+That is what a playbook is for: deciding while calm what will be
+collected, by whom, with which tool, and where it is stored.`,
 				MentalModel: "The worst moment to write a plan is during the incident.",
 				TryIt:       "For your own devices, write the first five things you would do if your email account were taken over, and the phone numbers or recovery codes you would need, printed on paper.",
 				Analogy: `A fire drill. Nobody learns where the exits are while the building is
@@ -1734,6 +1766,24 @@ closely afterwards; attackers often try to return.`,
 eradicate: close the way in, remove backdoors, rotate secrets
 recover:   rebuild from clean images, restore pre-attack backups
 watch:     extra monitoring for the attacker returning`,
+				UnderTheHood: `Why "rebuild from known-good" beats "clean it up": checking this
+machine's system files against the package manager's own hashes
+(dpkg --verify, 837 packages, 41,639 files with checksums) took 70
+seconds and reported:
+
+  files whose contents differ          7
+    configuration files edited         2   (/etc/sudoers, bash.bashrc)
+    replaced on purpose                5   (certificate bundles and
+                                            Python packaging files, by
+                                            this environment's setup)
+  files missing                    7,102   (manuals, docs, translations
+                                            left out of the image)
+
+Every one of those has an innocent explanation, and on a compromised
+machine every one would have to be proven innocent, one by one, while
+anything not covered by a package (scripts, cron jobs, keys added to an
+account) is not checked at all. Reinstalling from known-good images and
+restoring data from backups avoids having to prove a negative.`,
 				MentalModel: "You cannot trust a machine an attacker controlled; rebuild it.",
 				TryIt:       "Pick one important folder of yours, restore it from your backup to a different place, and check that the files open. If you cannot, you do not have a backup yet.",
 				Analogy: `A kitchen with food poisoning: close it (contain), find and throw out
@@ -1753,6 +1803,61 @@ published a detailed report on what went wrong so others could learn.`,
 					"The restore time is your real recovery time; write it down.",
 					"Write a ransomware playbook for a small business: the first hour minute by minute, how to decide what to rebuild, the order of recovery by business importance, and how to check backups are clean before restoring.",
 					"Restore identity systems (accounts, passwords) first: everything else depends on them.",
+				),
+			},
+			{
+				Name:    "Backups & Recovery Testing",
+				Summary: "A backup is only real once you have restored from it.",
+				Body: `Recovery starts with two numbers agreed in advance. The recovery point
+objective (RPO) is how much recent data you can lose: backing up every
+hour means up to an hour of work gone. The recovery time objective (RTO)
+is how long you can be down: it includes finding the backup, copying it
+back, checking it and starting services.
+
+Ransomware changed what a backup must survive: attackers look for
+backups and delete or encrypt them first. Keep the 3-2-1 rule (three
+copies, two kinds of storage, one off-site) and make one copy immutable
+or offline, so that no account on the production systems can change it.
+Keep a manifest of checksums with each backup, and test: restore to a
+separate machine on a schedule, compare against the manifest, time it,
+and compare the time with the RTO.`,
+				Diagram: `backup every hour ──▶ RPO: up to 1 hour of data lost
+restore + check + start ──▶ RTO: measured, not guessed
+copies: production ── backup store ── off-site, immutable
+manifest: SHA-256 of every file, checked after each restore`,
+				UnderTheHood: `5,000 files, 1.09 GB, a third of them random (incompressible) and the
+rest text, on this machine:
+
+  tar and gzip the backup        32.0 s   → 360 MB
+  tar without compression         7.0 s
+  restore from the gzip archive   8.7 s
+  check all 5,000 against a       1.0 s   every file matched
+    SHA-256 manifest
+
+The check took a second and is the only step that proves the restore
+worked: a backup job that reports success while copying an empty or
+half-written folder is the classic way to discover, mid-incident, that
+there was never a backup. Scale the measured times to your data: at
+this rate a 1 TB restore would take over two hours before checking,
+which is the number to put next to the RTO.`,
+				MentalModel: "Untested backups are hopes; schedule the restore and time it.",
+				TryIt:       "Restore one file from your own backup today (cloud, Time Machine, anything) and check it opens. When did you last do that?",
+				Analogy: `A fire drill rather than a fire extinguisher bought years ago and never
+checked: you learn that the door sticks and the route takes ten minutes
+while nothing is burning.`,
+				Example: `In 2017 GitLab lost six hours of production database data after an
+accidental deletion; of its five backup and replication methods, none
+was working as expected when it was needed, which it documented in a
+public post-mortem. Maersk recovered from NotPetya the same year only
+because one domain controller in Ghana happened to be offline during the
+attack.`,
+				Exercises: trio(
+					"A shop backs up its database every night at 2 a.m. and a restore takes 3 hours. Ransomware hits at 6 p.m. What are its RPO and RTO in practice, and what would you change first?",
+					"Up to 16 hours of orders lost and at least 3 hours down; more frequent backups, or a replica plus point-in-time recovery.",
+					"In C, write a backup verifier: given a manifest of SHA-256 sums and a folder, report every file that is missing, changed or not in the manifest (reuse your sha256.c, and readdir to walk the folder).",
+					"Refuse manifest paths that start with / or contain .. : a manifest must not make the checker read outside the folder.",
+					"Test a real restore of something you care about: restore a backup to a different place, verify it against checksums taken before, and time each step. Write down the measured RTO and what you would change.",
+					"Make the manifest when you take the backup, not when you restore it.",
 				),
 			},
 			{
@@ -1776,6 +1881,20 @@ court, involve professionals early.`,
                │ running processes, logged-in users
                │ disk contents (image it, hash it)
 least volatile │ remote logs, backups, archives`,
+				UnderTheHood: `What handling does to a file's metadata, measured with stat on a file
+created for the purpose and dated 1 October:
+
+  operation          modified time (mtime)       change time (ctime)
+  original           2026-10-01 09:00:00         when it was created
+  cp                 now                         now
+  cp -p              2026-10-01 09:00:00         now
+  touch -d 2020-…    2020-01-01 00:00:00         now
+
+A plain copy destroyed the date an investigator would want; cp -p kept
+it, and back-dating with touch rewrote mtime but not ctime, which only
+the kernel sets. Through all of it the SHA-256 of the contents stayed
+the same. Hash evidence when you collect it, work on copies, and treat
+timestamps as clues to be corroborated, not proof.`,
 				MentalModel: "Every action you take changes the evidence; copy first, analyse the copy.",
 				TryIt:       "Type in and run this stage's integrity.py, then change one byte of a file's content and predict its new fingerprint's first characters before running again.",
 				Analogy: `Detectives at a crime scene photograph everything before touching
@@ -1797,6 +1916,57 @@ evidence in the right order.`,
 				),
 			},
 			{
+				Name:    "Building an Incident Timeline",
+				Summary: "Put every event from every source on one clock, in one time zone, in order.",
+				Body: `Most of an investigation is ordering: which login came before which
+download, which alert before which change. Events come from firewalls,
+servers, identity providers and applications, each with its own clock
+and its own way of writing time: local time with an offset, UTC with a
+Z, seconds since 1970, sometimes no time zone at all.
+
+Normalise everything to UTC, write the original next to it, and correct
+for each source's measured clock error (compare a known event, such as
+an NTP sync or a login seen on two systems). Keep the timeline as a
+shared document with the source of every line, mark what is known and
+what is inferred, and sort ties stably so that events from one source
+keep their own order.`,
+				Diagram: `firewall   09:41:07+02:00 ─┐
+web server 07:40:59Z      ─┼──▶ to UTC ──▶ minus each clock's error
+laptop     1792834867     ─┘                         │
+                                                     ▼
+                         sort: one timeline, each line with its source`,
+				UnderTheHood: `How much does clock error matter? 3,000 simulated events over an hour
+on three machines, judged on the 196,977 pairs of events from different
+machines less than two minutes apart:
+
+  clocks off by          pairs put in the wrong order
+  0, +90 and -40 s           67,806   (34%)
+  a few tens of ms               17   (0.01%)
+
+With clocks a minute or two apart, a third of the close calls in the
+timeline are backwards, and close calls are exactly the questions an
+investigation asks (did the login come before the download?). NTP keeps
+ordinary machines within milliseconds; the real work is knowing each
+source's error, and correcting for it before sorting.`,
+				MentalModel: "Normalise to UTC, correct each clock, keep the source of every line, then sort.",
+				TryIt:       "Find one event in two places (a login in your email's security page and on your phone) and compare the times they show: what time zone is each in?",
+				Analogy: `Reconstructing a train journey from tickets stamped in different
+countries' local times, with one station clock known to be two minutes
+fast: convert, correct, then lay them out in order.`,
+				Example: `Timeline tools such as Plaso (log2timeline) and Timesketch merge dozens
+of log and file-system sources into one sorted timeline for this reason.
+NIST SP 800-61 tells responders to keep systems' clocks synchronised so
+that events can be correlated across them.`,
+				Exercises: trio(
+					"A firewall logs 09:41:07+02:00 and a server logs 07:41:05Z, but the server's clock is known to be 5 seconds slow. Which event happened first?",
+					"The firewall's is 07:41:07Z; the server's, corrected, is 07:41:10Z.",
+					"In C, merge events from several hosts written as ISO 8601 times with Z or a ±HH:MM offset, subtract each host's known clock error, and print one timeline in UTC, keeping the input order for events at the same moment.",
+					"Convert each time to seconds since 1970 with a days-from-civil function rather than the local time zone's mktime.",
+					"Build a timeline of one real afternoon on your own computer from three sources (shell history, browser history, system log), all in UTC, and mark which entries are certain and which inferred.",
+					"journalctl --utc and date -u show times in UTC.",
+				),
+			},
+			{
 				Name:    "Blameless Post-Mortems",
 				Summary: "Learn from every incident by fixing systems, not blaming people.",
 				Body: `After an incident, write down what happened while memories are fresh:
@@ -1815,6 +1985,24 @@ post-mortems, and reading them is one of the fastest ways to learn.`,
 				Diagram: `timeline ─▶ impact ─▶ contributing factors (not "who")
          ─▶ what went well ─▶ what went badly
          ─▶ action items: owner + date ─▶ follow-up review`,
+				UnderTheHood: `A real, small post-mortem from building this academy. A test that checks
+a slow solution is rejected failed only with clang:
+
+  what happened     a deliberately slow C program, which the checker
+                    must stop, finished inside its 10-second limit
+  measured          9.75 s with clang and no sanitizers; 29.4 s with
+                    gcc and sanitizers; the good solution 0.9 to 1.4 s
+  why it was easy   the limit was set for learners' slow machines,
+                    and the test borrowed it; CI only ran gcc
+  fix               the test uses its own 4-second limit, between the
+                    two; learners keep their 10 seconds
+  follow-up         run the checks' tests with both compilers before
+                    each merge, not only the one CI uses
+
+Nobody was careless: two reasonable choices, made months apart, met on
+a faster compiler. The written version is what lets the next person see
+the pattern (a test relying on a limit chosen for something else) before
+it bites again.`,
 				MentalModel: "Ask 'what made this mistake easy to make?', never 'who made it?'.",
 				TryIt:       "Read one public post-mortem (Cloudflare's blog publishes many) and list its contributing factors and action items.",
 				Analogy: `Air accident investigation. Investigators look for every factor behind
@@ -1857,6 +2045,21 @@ reported to the regulator within 72 hours of becoming aware of it.`,
    ─▶ keep only as long as needed ─▶ delete (backups too)
 breach? ─▶ assess risk ─▶ tell the regulator within 72 h
        ─▶ tell the people affected if the risk to them is high`,
+				UnderTheHood: `Minimisation, measured on 100,000 simulated people: how many does a
+combination of ordinary fields single out?
+
+  fields kept                                     unique people
+  postcode, full date of birth, sex                  95.7%
+  postcode, year of birth, sex                        0.0%
+  region, 5-year age band, sex                        0.0%  (smallest
+                                                     group: 715 people)
+
+Three fields that look harmless identify almost everyone, as Latanya
+Sweeney found in 2000 for real US data (87% from 5-digit ZIP code, date
+of birth and sex). Keeping the year instead of the date made nobody
+unique. Most services need an age range, not a birthday: the field you
+do not collect needs no protection, no retention policy and no breach
+notice.`,
 				MentalModel: "Data you do not have cannot leak.",
 				TryIt:       "Ask one service you use for a copy of all the data it holds about you (most have a download-your-data page) and look through it. What surprises you?",
 				Analogy: `A doctor's surgery keeps only the records it needs to treat you, locks
@@ -1876,6 +2079,64 @@ nothing anywhere.`,
 					"Remember logs, backups and analytics: personal data hides in all of them.",
 					"Write a breach-response checklist for a small online shop under GDPR (or your country's law): how to assess the risk, what to tell the regulator within 72 hours, when and how to tell customers, and a template notification email.",
 					"Your national data protection authority publishes breach-reporting guidance and forms.",
+				),
+			},
+			{
+				Name:    "Anonymisation, Pseudonymisation & Differential Privacy",
+				Summary: "Removing names is not anonymising; measure the risk and pick the right tool.",
+				Body: `Replacing a name or a phone number with a hash or a code is
+pseudonymisation: under data-protection law it is still personal data,
+because it can often be reversed by whoever holds the key, or by anyone
+who can try every possible value. Real anonymisation makes
+re-identification impractical, and there are three main tools.
+
+Generalisation coarsens quasi-identifiers (a postcode to a region, a
+birth date to an age band) until every combination is shared by at
+least k people: k-anonymity. Suppression removes the rows or values
+that are still rare. Differential privacy answers questions with noise
+added, calibrated by a parameter epsilon: a smaller epsilon means more
+noise and stronger privacy. Choose by use: generalisation for datasets
+that are shared, differential privacy for published statistics.`,
+				Diagram: `raw data ──▶ pseudonymised: codes instead of names    (still personal)
+         ──▶ generalised: region, age band; groups of k  (k-anonymous)
+         ──▶ statistics + calibrated noise               (differentially
+                                                          private)`,
+				UnderTheHood: `Hashing is not anonymisation. SHA-256 of a 7-digit phone number, in
+Python on one core: about 2 million a second, so every 7-digit number
+can be hashed in 5 seconds, and a "pseudonymised" list of hashed numbers
+read back by looking each one up. The same goes for any identifier with
+few possible values.
+
+Differential privacy's cost, measured: a true count of 1,234 published
+with Laplace noise, 20,000 times for each epsilon:
+
+  epsilon     median error    95th percentile
+  0.1             6.9              29.9
+  1.0             0.7               3.0
+  10              0.1               0.3
+
+For a count of 1,234, epsilon 1 costs about one person of accuracy in
+the typical answer; epsilon 0.1 hides any single person far better but
+blurs the count by tens. That trade is the decision to make, in numbers,
+before publishing.`,
+				MentalModel: "Count how many people each record could be; if the answer is one, it is not anonymous.",
+				TryIt:       "Find a dataset you are allowed to use (or make one) and count how many rows are unique on postcode, birth date and sex.",
+				Analogy: `Blurring a face in a photo while leaving the distinctive coat, the
+street sign and the dog: the person is still recognisable to anyone who
+knows them. Anonymisation has to remove what identifies in combination,
+not just the obvious part.`,
+				Example: `In 2006 Netflix published "anonymised" film ratings; researchers
+re-identified some users by matching them with public IMDb reviews.
+The US Census Bureau used differential privacy to publish the 2020
+census, after its own experiments showed that earlier protections let
+much of the 2010 data be reconstructed.`,
+				Exercises: trio(
+					"A dataset replaces each customer's email address with its SHA-256 hash. Is it anonymous? Who could reverse it, and how?",
+					"No: anyone with a list of candidate emails can hash them and compare.",
+					"In C, compute k-anonymity: read rows of comma-separated values, group them on chosen columns (optionally generalised: first N characters, or numbers in bands of W), and report the smallest group and the rows in groups smaller than k.",
+					"Build each row's key from its generalised fields, sort the keys, and count runs of equal keys.",
+					"Take a dataset you are allowed to use (an open-data release, or one you generate), measure its k-anonymity on likely quasi-identifiers, then generalise until k is at least 5 and write down what the data lost for its users.",
+					"Generalise the field with the most distinct values first.",
 				),
 			},
 		},
@@ -1901,6 +2162,12 @@ nothing anywhere.`,
 			{"What is the 3-2-1 backup rule?", "Three copies of the data, on two kinds of storage, with one copy off-site (and ideally one offline or immutable)."},
 			{"Why collect memory before imaging the disk?", "Memory is the most volatile evidence: it is lost when the machine is switched off."},
 			{"Within how long must a personal-data breach usually be reported to the regulator under GDPR?", "Within 72 hours of becoming aware of it."},
+			{"What do RPO and RTO measure?", "RPO: how much recent data you can lose (set by backup frequency). RTO: how long a restore may take before you are running again."},
+			{"Why keep a checksum manifest with every backup?", "It is the only quick proof that what was restored is complete and unchanged."},
+			{"A file is copied with plain cp. Which of its timestamps can no longer be trusted, and what still identifies its contents?", "Its modification time becomes the time of the copy; the SHA-256 of the contents is unchanged."},
+			{"Two machines' clocks differ by 90 seconds. Why does that matter for a timeline?", "Events less than a couple of minutes apart can appear in the wrong order: correct each clock before sorting."},
+			{"Is a list of SHA-256 hashes of phone numbers anonymous?", "No: every possible number can be hashed in seconds and matched back."},
+			{"Postcode, birth date and sex singled out 96% of a simulated population. What fixes it?", "Generalising: a region and an age band, so that every combination is shared by many people (k-anonymity)."},
 		},
 	},
 }
