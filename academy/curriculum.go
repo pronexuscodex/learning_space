@@ -1526,7 +1526,7 @@ tool for finding out which.`,
 			{"Site", "SQLite architecture", "https://www.sqlite.org/arch.html", "A small, real, well-documented engine."},
 			{"Article", "LevelDB implementation notes", "https://github.com/google/leveldb/blob/main/doc/impl.md", "SSTable format and compaction in a few pages."},
 			{"Site", "Use The Index, Luke", "https://use-the-index-luke.com/", "How indexes behave from the SQL side."},
-			{"Book", "Readings in Database Systems (the Red Book, free)", "https://www.redbook.io/", "Hellerstein, Stonebraker and Bailis choose the papers that matter and explain why, chapter by chapter."},
+			{"Book", "Readings in Database Systems (the Red Book, free)", "https://web.archive.org/web/2/http://www.redbook.io/", "Hellerstein, Stonebraker and Bailis choose the papers that matter and explain why, chapter by chapter. The official site, redbook.io, answers only over plain http, so this is the Internet Archive's copy."},
 			{"Course", "Berkeley CS 186: Database Systems", "https://cs186berkeley.net/", "Storage, indexes, joins, query optimisation, transactions and recovery, with a database to build."},
 		},
 		Blueprints: []Blueprint{

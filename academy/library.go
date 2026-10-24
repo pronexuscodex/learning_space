@@ -48,7 +48,7 @@ var freeBooks = []LibraryDoc{
 	{1, "Book", "Beej's Guide to C Programming", "https://beej.us/guide/bgc/", "https://beej.us/guide/bgc/pdf/bgc_usl_c_1.pdf", ""},
 	{2, "Book", "Algorithms by Jeff Erickson", "https://jeffe.cs.illinois.edu/teaching/algorithms/", "https://jeffe.cs.illinois.edu/teaching/algorithms/book/Algorithms-JeffE.pdf", ""},
 	{3, "Book", "Mathematics for Computer Science", "https://courses.csail.mit.edu/6.042/spring18/", "https://courses.csail.mit.edu/6.042/spring18/mcs.pdf", ""},
-	{7, "Book", "Readings in Database Systems (5th edition)", "https://www.redbook.io/", "https://www.redbook.io/pdf/redbook-5th-edition.pdf", ""},
+	{7, "Book", "Readings in Database Systems (5th edition)", "https://web.archive.org/web/2/http://www.redbook.io/", "https://web.archive.org/web/2id_/http://www.redbook.io/pdf/redbook-5th-edition.pdf", ""},
 	{8, "Book", "Beej's Guide to Network Programming", "https://beej.us/guide/bgnet/", "https://beej.us/guide/bgnet/pdf/bgnet_usl_c_1.pdf", ""},
 	{13, "Book", "Mathematics for Machine Learning", "https://mml-book.github.io/", "https://mml-book.github.io/book/mml-book.pdf", ""},
 	{13, "Book", "Linear Algebra Done Right (4th edition)", "https://linear.axler.net/", "https://linear.axler.net/LADR4e.pdf", ""},
