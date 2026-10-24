@@ -1239,6 +1239,9 @@ int main(int argc, char **argv) {
 			"Look for the page first (a hit); on a miss, look for a free frame before choosing a victim.",
 			"u P does nothing unless P is in the pool with a pin count above 0, and it does not count as an access.",
 		},
+		// A million accesses with a scan of 64 frames each, under the
+		// sanitizers, took over 2 s on a busy macOS CI runner.
+		Timeout: 10 * time.Second,
 	},
 	{
 		ID: "bloom", Stage: 7, Concept: "LSM-Trees",
