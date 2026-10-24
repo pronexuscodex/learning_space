@@ -345,6 +345,12 @@ var conceptLinks = map[string]links{
 		"The FlashAttention paper. Horace He's post on operator fusion."},
 	"KV Cache, Batching & PagedAttention": {[]string{"Virtual Memory & Paging", "Attention & the Transformer"},
 		"The PagedAttention (vLLM) paper. llama.cpp's source for a real KV cache."},
+	"Quantisation & Number Formats": {[]string{"Integers & Floating Point in Bits", "Floating Point for Numerical Computing", "KV Cache, Batching & PagedAttention"},
+		"Dettmers et al., LLM.int8() (2022), on outlier features. Frantar et al., GPTQ (2023). llama.cpp's quantisation formats in its ggml source."},
+	"Parallelism Across GPUs: Data, Tensor & Pipeline": {[]string{"Consensus & Replication (Raft)", "Optimisation: From Gradient Descent to Adam", "The Roofline Model: Compute- vs Memory-Bound"},
+		"Rajbhandari et al., ZeRO (2020). Shoeybi et al., Megatron-LM (2019). Hugging Face's Ultra-Scale Playbook on training across many GPUs."},
+	"Profiling & Benchmarking Honestly": {[]string{"Profiling & Measuring Performance", "Virtual Memory & Paging", "Statistical Inference & Experiments"},
+		"Brendan Gregg's Systems Performance, the chapter on methodology. The PyTorch tutorial on torch.utils.benchmark."},
 
 	// ---- Stage 17
 	"Secure Design Principles": {[]string{"Thinking Like an Attacker: Threat Modelling", "Software Design & Abstraction", "Access Control: Who May Do What"},
