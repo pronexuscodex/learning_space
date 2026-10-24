@@ -399,6 +399,12 @@ var conceptLinks = map[string]links{
 		"MITRE ATT&CK: the Getting Started page and any technique's Detection section. The Sigma project's rule specification."},
 	"Security Monitoring & Alert Triage": {[]string{"Detection & Incident Response", "Evaluating Models Honestly", "Intrusion Detection: Signatures & Anomalies"},
 		"Security Onion documentation: the analyst workflow. Google's SRE book (Stage 9): the chapter on being on-call."},
+	"Network Flows & Packet Capture": {[]string{"The Layered Stack & Encapsulation", "TCP: Handshake, Flow & Congestion Control", "Logging & Telemetry"},
+		"The Zeek documentation on conn.log. RFC 7011 (IPFIX). The Wireshark User's Guide on capture filters."},
+	"Asset Inventory & Attack Surface": {[]string{"Sockets & I/O Multiplexing", "Firewalls & Network Segmentation", "Thinking Like an Attacker: Threat Modelling"},
+		"CIS Critical Security Controls 1 and 2 (inventory of enterprise and software assets). CISA Binding Operational Directive 23-01."},
+	"Tamper-Evident Logs & Trustworthy Time": {[]string{"Hashing & Password Storage", "Time, Clocks & Ordering", "Logging & Telemetry"},
+		"Schneier & Kelsey, Secure Audit Logs to Support Computer Forensics (1999). RFC 6962 (Certificate Transparency) on Merkle trees. The chrony documentation on keeping time."},
 
 	// ---- Stage 20
 	"Incident Response Planning": {[]string{"Detection & Incident Response", "Security Monitoring & Alert Triage", "Thinking Like an Attacker: Threat Modelling"},
@@ -411,6 +417,12 @@ var conceptLinks = map[string]links{
 		"Google's SRE book: the chapter on postmortem culture. GitLab's 2017 database outage post-mortem."},
 	"Privacy & Data Protection": {[]string{"Hashing & Password Storage", "Encryption: Symmetric & Public-Key", "Probability for Programmers"},
 		"The GDPR's articles on principles (Article 5) and breach notification (Articles 33 and 34)."},
+	"Backups & Recovery Testing": {[]string{"Containment, Eradication & Recovery", "Hashing & Password Storage", "Integrity Checks: Hashes, Checksums & Signed Releases"},
+		"GitLab's public post-mortem of its 2017 database outage. The CISA #StopRansomware guide on offline, encrypted backups."},
+	"Building an Incident Timeline": {[]string{"Time, Clocks & Ordering", "Tamper-Evident Logs & Trustworthy Time", "Digital Forensics Basics"},
+		"NIST SP 800-61 (Computer Security Incident Handling Guide). The Plaso (log2timeline) documentation."},
+	"Anonymisation, Pseudonymisation & Differential Privacy": {[]string{"Privacy & Data Protection", "Probability for Programmers", "Descriptive Statistics & Distributions"},
+		"Sweeney, Simple Demographics Often Identify People Uniquely (2000). Dwork & Roth, The Algorithmic Foundations of Differential Privacy (2014), chapters 1 to 3."},
 }
 
 // stageOfConcept finds which stage a concept belongs to (0 if unknown).

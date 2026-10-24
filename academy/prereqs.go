@@ -221,13 +221,19 @@ var conceptPrereqs = map[string][]string{
 	"Intrusion Detection: Signatures & Anomalies": {"Logging & Telemetry", "Probability for Programmers"},
 	"Detection Engineering with MITRE ATT&CK":     {"Intrusion Detection: Signatures & Anomalies"},
 	"Security Monitoring & Alert Triage":          {"Intrusion Detection: Signatures & Anomalies"},
+	"Network Flows & Packet Capture":              {"Firewalls & Network Segmentation", "TCP: Handshake, Flow & Congestion Control"},
+	"Asset Inventory & Attack Surface":            {"Firewalls & Network Segmentation", "Sockets & I/O Multiplexing"},
+	"Tamper-Evident Logs & Trustworthy Time":      {"Logging & Telemetry", "Hashing & Password Storage", "Time, Clocks & Ordering"},
 
 	// ---- Stage 20
-	"Incident Response Planning":          {"Detection & Incident Response"},
-	"Containment, Eradication & Recovery": {"Incident Response Planning"},
-	"Digital Forensics Basics":            {"Incident Response Planning", "Logging & Telemetry"},
-	"Blameless Post-Mortems":              {"Incident Response Planning"},
-	"Privacy & Data Protection":           {"Thinking Like an Attacker: Threat Modelling"},
+	"Incident Response Planning":                             {"Detection & Incident Response"},
+	"Containment, Eradication & Recovery":                    {"Incident Response Planning"},
+	"Digital Forensics Basics":                               {"Incident Response Planning", "Logging & Telemetry"},
+	"Blameless Post-Mortems":                                 {"Incident Response Planning"},
+	"Privacy & Data Protection":                              {"Thinking Like an Attacker: Threat Modelling"},
+	"Backups & Recovery Testing":                             {"Containment, Eradication & Recovery", "Hashing & Password Storage"},
+	"Building an Incident Timeline":                          {"Digital Forensics Basics", "Tamper-Evident Logs & Trustworthy Time"},
+	"Anonymisation, Pseudonymisation & Differential Privacy": {"Privacy & Data Protection", "Probability for Programmers"},
 }
 
 // conceptAt locates a concept by name: its stage and its index there.
