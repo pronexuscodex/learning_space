@@ -28,6 +28,8 @@ type console struct {
 
 	raw     bool   // read key by key (interactive terminal with raw-mode support)
 	screen  bool   // output is a terminal, so clearing the screen is meaningful
+	keyBar  bool   // a person types at a terminal: show the key bar (keybar.go)
+	hideBar bool   // the learner switched the key bar off in Settings
 	onClear func() // redraws the current screen after Ctrl+L (may be nil)
 
 	// Live editor state, guarded by mu, so a terminal resize can redraw
@@ -36,7 +38,19 @@ type console struct {
 	editing   bool
 	curPrompt string
 	curBuf    []rune
+	cur       int // cursor position in curBuf
+	curRow    int // terminal row of the cursor, from the input's first row
 	shown     int
+	inputRows int // rows the last answered line took (for erasing the key bar)
+
+	// Readline's memory: earlier answers for ↑ and ↓ (this session only),
+	// where ↑ has got to, the line you were typing, and the last cut.
+	history   []string
+	histPos   int
+	histDraft []rune
+	killed    []rune
+	searches  []string   // the pager's / history, kept apart as less does
+	inline    bool       // editing the pager's status line: one row only
 	cols      func() int // current layout width (nil: 80)
 
 	// pending is an answer typed ahead at a pager prompt; the next
@@ -54,6 +68,10 @@ type console struct {
 	// enterRaw switches to single keys (tests replace it); nil means the
 	// real terminal.
 	enterRaw func() (func(), error)
+
+	// size reports the terminal's columns and rows (tests replace it);
+	// nil means the real terminal.
+	size func() (cols, rows int, ok bool)
 
 	// closed is set once input has ended (Ctrl+D or end of a pipe). It is
 	// sticky, so every later prompt also sees the end of input and the
@@ -183,7 +201,14 @@ func isCancel(s string) bool {
 
 // readLine prints prompt and returns one sanitized line. It returns io.EOF
 // when input is exhausted (Ctrl-D / closed pipe). Ctrl+L clears the screen.
+// The key bar above the prompt shows the editing keys.
 func (c *console) readLine(prompt string) (string, error) {
+	return c.readLineKeys(prompt, editBar)
+}
+
+// readLineKeys is readLine with the key bar's entries chosen by the
+// caller (nil for none).
+func (c *console) readLineKeys(prompt string, keys []barKey) (string, error) {
 	if c.pending != nil {
 		s := *c.pending
 		c.pending = nil
@@ -193,8 +218,16 @@ func (c *console) readLine(prompt string) (string, error) {
 	if c.closed {
 		return "", io.EOF
 	}
+	bar := ""
+	if prompt != "" {
+		bar = c.barLine(keys)
+	}
+	if bar != "" {
+		prompt = bar + "\n" + prompt
+	}
 	var s string
 	var err error
+	c.inputRows = 0
 	if c.raw {
 		s, err = c.readLineRaw(prompt)
 	} else {
@@ -202,6 +235,9 @@ func (c *console) readLine(prompt string) (string, error) {
 	}
 	if errors.Is(err, io.EOF) {
 		c.closed = true
+	}
+	if bar != "" && err == nil && c.inputRows > 0 {
+		c.eraseBar(strings.Count(prompt, "\n") + c.inputRows)
 	}
 	return s, err
 }
@@ -225,6 +261,12 @@ func (c *console) readLineCooked(prompt string) (string, error) {
 		if strings.ContainsRune(line, keyCtrlL) {
 			c.clearScreen()
 			continue
+		}
+		c.inputRows = 1 // the terminal echoed the line: count its rows
+		if cols := c.termCols(); cols > 0 {
+			if n := visibleLen(lastLine(prompt) + strings.TrimRight(line, "\r\n")); n > 0 {
+				c.inputRows = (n-1)/cols + 1
+			}
 		}
 		return sanitize(line), nil
 	}

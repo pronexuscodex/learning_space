@@ -34,6 +34,10 @@ The [full guide](academy/README.md#source-layout) lists every file.
 - Links: HTTPS only, official sources, free to read.
 - Security content is **defensive**: how to recognise, prevent and fix problems, practised only on legal training sites (OverTheWire, PortSwigger Academy, picoCTF and similar) and on your own machines.
 
+## Keyboard first
+
+The academy teaches people to drive a computer from the keyboard, as on the terminals of the 1980s. Every action must work without a mouse and without arrow keys alone, using the classic bindings the same way everywhere: the keys of `less` and `man` for reading (Space, b, j, k, g, G, /, n, q), the shell's Emacs keys for typing (Ctrl-U, Ctrl-W, Ctrl-L), `q` to go back and `?` for help. Show each screen's keys, and say where the same keys work outside the academy. [CLAUDE.md](CLAUDE.md) lists the design rules in full.
+
 ## Making a change
 
 You need [Go](https://go.dev/dl/) 1.22 or newer, and nothing else.

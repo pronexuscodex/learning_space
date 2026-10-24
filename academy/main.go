@@ -1090,6 +1090,7 @@ func main() {
 			out:    os.Stdout,
 			raw:    interactive() && rawInputSupported(int(os.Stdin.Fd())),
 			screen: stdoutIsTerminal(),
+			keyBar: interactive() && stdoutIsTerminal(),
 		},
 		width: termWidth(),
 		pager: interactive(),

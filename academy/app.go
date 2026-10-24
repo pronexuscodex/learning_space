@@ -1108,14 +1108,34 @@ func (a *App) showShortcuts() {
 			a.printf("    %s %s\n", sty.Bold(sty.Cyan(padRight(k, 14))), l)
 		}
 	}
+	para := func(text string) {
+		for _, l := range wrap(text, a.cols()-6, "  ") {
+			a.println(sty.Gray(l))
+		}
+	}
 	a.printf("  %s\n", sty.Bold("While typing (any prompt)"))
-	row("Ctrl+L", "clear the screen and redraw, keeping what you have typed")
-	row("Backspace", "delete the previous character")
-	row("Ctrl+U", "erase the whole line")
-	row("Ctrl+W", "erase the previous word")
-	row("Ctrl+D", "end input: saves and exits (on an empty line)")
-	row("Ctrl+C", "save and exit (closing the window saves too)")
+	para("The keys of bash, zsh, Python, psql and every program built on GNU readline. ^L means Ctrl+L: hold Ctrl, press L.")
+	row("Enter", "answer")
+	row("← →  ^B ^F", "one character left or right")
+	row("^← ^→ Alt+B/F", "one word left or right")
+	row("Home End ^A ^E", "the start or the end of the line")
+	row("Backspace", "delete the character before the cursor")
+	row("Delete  ^D", "delete the character under the cursor; ^D on an empty line saves and exits")
+	row("^U  ^K", "cut to the start, or to the end, of the line")
+	row("^W", "cut the word before the cursor")
+	row("^Y", "paste what you cut last (yank)")
+	row("↑ ↓  ^P ^N", "earlier and later answers from this session")
+	row("^L", "clear the screen and redraw, keeping what you have typed")
+	row("^C", "save and exit (closing the window saves too)")
 	row("q  or  :q", "cancel the current prompt (q for numbers, :q for text)")
+	para("The bar above each prompt names the keys that work there; Settings (o) can hide it.")
+	a.println("")
+	a.printf("  %s\n", sty.Bold("Where else these keys work"))
+	row("bash  zsh", "the same keys at the shell prompt, plus ^R to search earlier commands")
+	row("python3  psql", "and sqlite3, gdb, mysql, irb: the same keys at their prompts")
+	row("less  man", "and git log: the keys of long screens, below")
+	row("Emacs", "where ^A ^E ^B ^F ^K ^Y come from")
+	row("macOS", "^A ^E ^K ^Y in every text box")
 	a.println("")
 	a.printf("  %s\n", sty.Bold("Also understood at the menu"))
 	row("r", "Daily Review (same as 9)")
@@ -1136,9 +1156,7 @@ func (a *App) showShortcuts() {
 	a.println("")
 	a.printf("  %s\n", sty.Gray(truncate(versionLine(), a.cols()-4)))
 	if !a.con.raw {
-		for _, l := range wrap("Your terminal is in line mode (for example on Windows, or when input is piped), so Ctrl+L takes effect after you press Enter.", a.cols()-6, "  ") {
-			a.println(sty.Gray(l))
-		}
+		para("Your terminal is in line mode (for example on Windows, or when input is piped): it edits the line itself, with its own keys, and Ctrl+L takes effect after you press Enter.")
 	}
 }
 
@@ -1148,7 +1166,7 @@ func (a *App) run() {
 	for {
 		a.printMenu()
 		a.con.setOnClear(a.printMenu) // Ctrl+L and resizes redraw the menu on a clean screen
-		choice, err := a.con.readLine(sty.Bold(sty.Cyan("  academy")) + sty.Cyan(" › "))
+		choice, err := a.con.readLineKeys(sty.Bold(sty.Cyan("  academy"))+sty.Cyan(" › "), menuBar)
 		a.con.setOnClear(nil)
 
 		// Tidy screen: each chosen action starts on a clean screen, and its

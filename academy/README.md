@@ -731,8 +731,13 @@ Press **`c`** on the main menu. Classic Mode brings back the habits that made st
 | Key | Where | Does |
 |-----|-------|------|
 | **Ctrl+L** | any prompt | clears the screen and redraws it (the main menu is redrawn too), keeping what you have typed |
-| Backspace | any prompt | deletes the previous character |
-| Ctrl+U / Ctrl+W | any prompt | erases the whole line / the previous word |
+| ← / →, Ctrl+B / Ctrl+F | any prompt | one character left / right |
+| Ctrl+← / Ctrl+→, Alt+B / Alt+F | any prompt | one word left / right |
+| Home / End, Ctrl+A / Ctrl+E | any prompt | the start / the end of the line |
+| Backspace / Delete, Ctrl+D | any prompt | deletes the character before / under the cursor |
+| Ctrl+U / Ctrl+K | any prompt | cuts to the start / the end of the line |
+| Ctrl+W, Ctrl+Y | any prompt | cuts the word before the cursor; pastes what was cut last |
+| ↑ / ↓, Ctrl+P / Ctrl+N | any prompt | earlier / later answers from this session (at `/` in a long screen: earlier searches) |
 | Ctrl+D | empty prompt | ends input: saves and exits |
 | Ctrl+C | anywhere | saves and exits |
 | Space / b | long screens | next page / previous page |
@@ -742,7 +747,11 @@ Press **`c`** on the main menu. Classic Mode brings back the habits that made st
 | h / q | long screens | every pager key / leave |
 | a number or key | long screens | leaves and answers the next prompt straight away: on a long list, type the item's number without paging to the end |
 
-On Linux, macOS and the BSDs, the academy reads keys one at a time (a small built-in line editor using termios from Go's standard library), so Ctrl+L works instantly and arrow keys are ignored instead of printing `^[[A`. The terminal is always restored on exit, including after Ctrl+C. Elsewhere (for example Windows), input stays line-based: press **Ctrl+L then Enter**, or type `clear`.
+These are the line-editing keys of GNU readline and of zsh's Emacs mode, so they are the same at the prompts of bash, zsh, Python, psql, sqlite3, gdb and many more, and in macOS text boxes; what you practise here works there, and the other way round. The pager's keys are those of `less` and `man`.
+
+**The key bar.** At the bottom of the screen, on the line above each prompt, a bar names the keys that work there, as in nano: `Enter answer  ←→ move  ↑↓ earlier answers  ^A ^E start, end  …` (`^L` means Ctrl+L). At the main menu it shows the menu's keys instead. It disappears once you answer, so no trail of bars is left behind, and it keeps only what fits on narrow screens. Settings (`o`) can switch it off.
+
+On Linux, macOS and the BSDs, the academy reads keys one at a time (a small built-in line editor using termios from Go's standard library), so every key above acts instantly and other keys are ignored instead of printing `^[[5~`. The terminal is always restored on exit, including after Ctrl+C. Elsewhere (for example Windows), input stays line-based and the terminal edits the line with its own keys: press **Ctrl+L then Enter**, or type `clear`.
 
 ## Resizing the terminal
 
@@ -759,7 +768,7 @@ The layout follows your terminal's **live size**. It reads the size with an ioct
   - Pages use the real terminal height.
 - **Content stays readable:** it stops widening at 110 columns.
 - **Code and diagrams:** code listings wrap long lines with a `↪` marker, so no code is ever hidden. ASCII diagrams are clipped with `…` and a note to widen the window.
-- **Input that wraps across rows** is still erased and redrawn correctly by Backspace, Ctrl+U and Ctrl+W.
+- **Input that wraps across rows** is redrawn correctly by every editing key, with the cursor in the right row and column.
 - **Checking it:** `tools/layout_check.py` drives every major screen through a real pseudo-terminal at any widths you give it and reports lines wider than the terminal. It currently finds none from 40 to 200 columns.
 
 ## Colours and settings
