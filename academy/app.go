@@ -1100,12 +1100,12 @@ func (a *App) showShortcuts() {
 	}
 	a.println("")
 	row := func(key, what string) {
-		for i, l := range wrap(what, a.cols()-20, "") {
+		for i, l := range wrap(what, a.cols()-21, "") {
 			k := ""
 			if i == 0 {
 				k = key
 			}
-			a.printf("    %s %s\n", sty.Bold(sty.Cyan(padRight(k, 14))), l)
+			a.printf("    %s %s\n", sty.Bold(sty.Cyan(padRight(k, 15))), l)
 		}
 	}
 	para := func(text string) {
