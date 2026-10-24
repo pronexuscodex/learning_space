@@ -363,6 +363,12 @@ var conceptLinks = map[string]links{
 		"Building Secure and Reliable Systems: the chapters on writing code and testing code. OWASP ASVS, used as a review checklist."},
 	"Automated Security Testing": {[]string{"Testing & Reliability", "Secrets & the Software Supply Chain", "From Code to Production"},
 		"OSS-Fuzz documentation: the getting-started guide. The Go fuzzing tutorial."},
+	"Safe Parsing: Lengths, Limits & Binary Formats": {[]string{"Handling Untrusted Input", "Memory-Safety Bugs: Overflows & Use-After-Free", "Parsing: Recursive Descent & Pratt"},
+		"The Heartbleed write-up at heartbleed.com. LangSec's papers on parsers as the attack surface (langsec.org). The SEI CERT C rules on integers (INT)."},
+	"Finding Secrets: Patterns, Entropy & Git History": {[]string{"Secrets & the Software Supply Chain", "Version Control with Git", "Probability for Programmers"},
+		"GitHub's documentation on secret scanning and push protection. The gitleaks README, on its rules and on scanning history."},
+	"Integrity Checks: Hashes, Checksums & Signed Releases": {[]string{"Hashing & Password Storage", "Secrets & the Software Supply Chain", "Encryption: Symmetric & Public-Key"},
+		"FIPS 180-4, the Secure Hash Standard (the definition of SHA-256). The SLSA specification at slsa.dev. Sigstore's documentation on signing and verifying."},
 
 	// ---- Stage 18
 	"Strong Authentication: MFA & Passkeys": {[]string{"TLS & Authentication on the Web", "Encryption: Symmetric & Public-Key", "Hashing & Password Storage"},
@@ -375,6 +381,12 @@ var conceptLinks = map[string]links{
 		"AWS IAM security best practices. Building Secure and Reliable Systems (Stage 17): the chapter on design for least privilege."},
 	"Zero Trust: Never Trust the Network Alone": {[]string{"Network Attacks & Defences", "TLS & Authentication on the Web", "Secure Design Principles"},
 		"NIST SP 800-207: the sections on tenets and logical components. The BeyondCorp paper (this stage's classic)."},
+	"Rate Limiting & Credential Stuffing Defences": {[]string{"Strong Authentication: MFA & Passkeys", "Hashing & Password Storage", "Probability for Programmers"},
+		"The OWASP Credential Stuffing Prevention Cheat Sheet. Troy Hunt's post on the Pwned Passwords k-anonymity range API."},
+	"Policy as Code: Writing & Testing Authorization Rules": {[]string{"Authorization Design: Roles, Attributes & Least Privilege", "Access Control: Who May Do What", "Finite Automata & Regular Expressions"},
+		"The AWS IAM documentation on policy evaluation logic. The Open Policy Agent policy-testing guide. Russ Cox's Glob Matching Can Be Simple And Fast Too."},
+	"Secrets Management & Short-Lived Credentials": {[]string{"Secrets & the Software Supply Chain", "Cloud Security & Shared Responsibility", "Encryption: Symmetric & Public-Key"},
+		"GitHub's documentation on security hardening with OpenID Connect. HashiCorp Vault's documentation on dynamic secrets."},
 
 	// ---- Stage 19
 	"Firewalls & Network Segmentation": {[]string{"Network Attacks & Defences", "The Layered Stack & Encapsulation", "Zero Trust: Never Trust the Network Alone"},

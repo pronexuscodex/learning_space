@@ -39,8 +39,8 @@ Then open **Systems & AI Academy**, or type `academy`. You can also use [Homebre
 | | |
 |---|---|
 | 🧭 **A real curriculum** | 21 stages in five tracks (Foundations, Systems, Software & Theory, AI & Hardware, Defensive Security), in the order a CS degree teaches them. |
-| 💡 **167 concepts** | Each one comes with an analogy, a real-world example, a diagram, and a look *under the hood* at the real bytes and commands. |
-| 🛠️ **501 exercises** | Hands-on, three per concept, plus 79 checked C exercises the academy compiles and tests, quizzes, mastery checks, lab blueprints and type-in programs. |
+| 💡 **173 concepts** | Each one comes with an analogy, a real-world example, a diagram, and a look *under the hood* at the real bytes and commands. |
+| 🛠️ **519 exercises** | Hands-on, three per concept, plus 85 checked C exercises the academy compiles and tests, quizzes, mastery checks, lab blueprints and type-in programs. |
 | 🧠 **Spaced repetition** | Daily review brings back each idea just before you'd forget it. |
 | 📖 **281-word dictionary** | Every programming word explained in plain language, with related words. |
 | 📚 **Library** | 33 free, legal books and papers that download as PDFs into `Documents/Academy Library`, arranged by stage. |

@@ -693,6 +693,8 @@ func init() {
 	checks = append(checks, dataChecks...)
 	checks = append(checks, neuralChecks...)
 	checks = append(checks, infraChecks...)
+	checks = append(checks, secureChecks...)
+	checks = append(checks, identityChecks...)
 	sort.SliceStable(checks, func(i, j int) bool { return checks[i].Stage < checks[j].Stage })
 }
 
