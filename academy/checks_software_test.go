@@ -789,6 +789,16 @@ int main(void) {
     return 0;
 }
 `
+	// The learner's limit is 10 s, for slow machines and the sanitizers;
+	// here the reference takes 0.9 to 1.4 s and reparsing 10 to 30 s, so a
+	// 4 s limit tells them apart with either compiler.
+	for i := range checks {
+		if checks[i].ID == "stack_vm" {
+			old := checks[i].Timeout
+			checks[i].Timeout = 4 * time.Second
+			defer func() { checks[i].Timeout = old }()
+		}
+	}
 	failsWith(t, "stack_vm", reparse, "ninety million instructions", "did not finish")
 	// SUB with its operands the wrong way round.
 	failsWith(t, "stack_vm", mutate("stack_vm", "push(a - b);", "push(b - a);"), "arithmetic", "")
