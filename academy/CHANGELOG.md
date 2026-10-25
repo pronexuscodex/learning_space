@@ -4,7 +4,7 @@ All notable changes to the Systems & AI Academy are listed here. The
 format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 versions follow [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [1.9.1] - 2026-10-25
 
 ### Added
 - **Every pick of [Teach Yourself Computer Science](https://teachyourselfcs.com/) is now in the academy**, under the stage it belongs to: Structure and Interpretation of Computer Programs and Berkeley CS 61A (Stage 12), Berkeley CS 61C (Stage 4), The Algorithm Design Manual and Steven Skiena's lectures (Stage 2), Alex Aiken's Compilers course (Stage 5), Berkeley CS 162 (Stage 6), Readings in Database Systems (the Red Book) and Berkeley CS 186 (Stage 7), and Kurose & Ross's Computer Networking with Stanford CS 144 (Stage 8). The guide itself is listed in Stage 0. The Red Book's free PDF is in the Library, ready to download.
