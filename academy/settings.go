@@ -85,7 +85,7 @@ func (a *App) settingsScreen() error {
 	for {
 		a.mu.Lock()
 		st := a.reg.Settings
-		classic, tidy := a.reg.ClassicMode, a.reg.TidyScreen
+		classic := a.reg.ClassicMode
 		a.mu.Unlock()
 		onOff := func(b bool) string {
 			if b {
@@ -99,9 +99,9 @@ func (a *App) settingsScreen() error {
 				themeName = t.Name
 			}
 		}
-		homeName := "simple"
-		if st.DetailedHome {
-			homeName = "detailed"
+		homeName := "everything"
+		if st.SimpleHome {
+			homeName = "simple"
 		}
 		symbols := "emoji 💡"
 		if st.PlainSymbols {
@@ -113,12 +113,11 @@ func (a *App) settingsScreen() error {
 			"Symbols: " + sty.Bold(symbols) + sty.Gray(" · plain if emoji look broken"),
 			"Ask how sure I am before review answers: " + onOff(!st.NoConfidence),
 			"Classic Mode: " + onOff(classic) + sty.Gray(" · struggle clock, notebook, type-ins"),
-			"Tidy screen: " + onOff(tidy) + sty.Gray(" · each action on a clean screen"),
-			"Home screen: " + sty.Bold(homeName) + sty.Gray(" · simple shows the daily essentials, detailed every menu item"),
+			"Home screen: " + sty.Bold(homeName) + sty.Gray(" · or simple: the daily essentials only"),
 			"Key bar: " + onOff(!st.HideKeyBar) + sty.Gray(" · the keys to use, above each prompt"),
 			"Back",
 		})
-		if err != nil || choice == 7 {
+		if err != nil || choice == 6 {
 			if err == errCancel {
 				return nil
 			}
@@ -141,12 +140,9 @@ func (a *App) settingsScreen() error {
 				return err
 			}
 		case 4:
-			a.mutate(func(r *Registry) { r.TidyScreen = !r.TidyScreen })
-			a.con.ok("Saved.")
-		case 5:
-			a.mutate(func(r *Registry) { r.Settings.DetailedHome = !r.Settings.DetailedHome })
+			a.mutate(func(r *Registry) { r.Settings.SimpleHome = !r.Settings.SimpleHome })
 			a.con.ok("Home screen changed. Every key works either way; ? lists them all.")
-		case 6:
+		case 5:
 			a.mutate(func(r *Registry) { r.Settings.HideKeyBar = !r.Settings.HideKeyBar })
 			a.applySettings()
 			a.con.ok("Saved. Every key still works, and ? lists them all.")

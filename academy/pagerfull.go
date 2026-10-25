@@ -115,7 +115,7 @@ type fullPager struct {
 // homeKeys are the main menu's one-key choices. On a page opened from the
 // main menu they leave the page and go there at once, as the page says;
 // paging there uses Space, the arrows, PgUp/PgDn, Home/End, b and q.
-const homeKeys = "0123456789jnmdfgpakwlxoctesr+?"
+const homeKeys = "0123456789jnmdfgpakwlxocesr+?"
 
 // pageFullScreen shows lines in the full-screen pager. It returns false,
 // having shown nothing, when the terminal cannot switch to single keys.

@@ -277,15 +277,11 @@ func (a *App) reviewLabel(short bool) string {
 // "All screens & keys" page of the simple home.
 func (a *App) allScreens() []menuGroup {
 	a.mu.Lock()
-	classic, tidy := a.reg.ClassicMode, a.reg.TidyScreen
+	classic := a.reg.ClassicMode
 	a.mu.Unlock()
 	mode := sty.Gray("off")
 	if classic {
 		mode = sty.Bold(sty.Yellow("ON"))
-	}
-	tidyMode := sty.Gray("off")
-	if tidy {
-		tidyMode = sty.Bold(sty.Green("on"))
 	}
 	item, hint := menuItem, menuHint
 	return []menuGroup{
@@ -323,7 +319,6 @@ func (a *App) allScreens() []menuGroup {
 			{item("o", "Settings"), hint("theme, symbols, home screen"), "Settings"},
 			{item("?", "All screens & keys"), "", "All keys"},
 			{item("c", "Classic Mode "+mode), "", "Classic " + stripANSI(mode)},
-			{item("t", "Tidy screen "+tidyMode), "", "Tidy " + stripANSI(tidyMode)},
 			{item("q", "Exit"), hint("progress saves itself; 5 works too"), "Exit"},
 			{item("8", sty.Gray("Undo this session")), "", "Undo session"},
 		}},
@@ -361,19 +356,20 @@ func (a *App) simpleMenu() []menuGroup {
 	}
 }
 
-// printMenu draws the home screen: simple by default, detailed when the
-// learner chose it in Settings.
+// printMenu draws the home screen: everything by default (the full
+// dashboard and every screen), or the short home if the learner chose it
+// in Settings.
 func (a *App) printMenu() {
 	a.mu.Lock()
-	detailed := a.reg.Settings.DetailedHome
+	simple := a.reg.Settings.SimpleHome
 	a.mu.Unlock()
-	if detailed {
-		a.printDashboard()
-		a.renderMenu("MAIN MENU", a.allScreens())
+	if simple {
+		a.printHome()
+		a.renderMenu("MENU", a.simpleMenu())
 		return
 	}
-	a.printHome()
-	a.renderMenu("MENU", a.simpleMenu())
+	a.printDashboard()
+	a.renderMenu("MAIN MENU", a.allScreens())
 }
 
 // printHome is the simple dashboard: three numbers, where you are, and
@@ -1168,15 +1164,6 @@ func (a *App) run() {
 		a.con.setOnClear(a.printMenu) // Ctrl+L and resizes redraw the menu on a clean screen
 		choice, err := a.con.readLineKeys(sty.Bold(sty.Cyan("  academy"))+sty.Cyan(" › "), menuBar)
 		a.con.setOnClear(nil)
-
-		// Tidy screen: each chosen action starts on a clean screen, and its
-		// output (including its final message) stays visible above the menu.
-		a.mu.Lock()
-		tidy := a.reg.TidyScreen
-		a.mu.Unlock()
-		if tidy && a.con.screen && choice != "" {
-			fmt.Fprint(a.con.out, clearSeq)
-		}
 		if err != nil {
 			a.con.note("Input closed — saving.")
 			a.commitAndExit()
@@ -1193,16 +1180,6 @@ func (a *App) run() {
 		case "clear", "cls":
 			if a.con.screen {
 				fmt.Fprint(a.con.out, clearSeq)
-			}
-		case "t":
-			a.mutate(func(r *Registry) { r.TidyScreen = !r.TidyScreen })
-			a.mu.Lock()
-			on := a.reg.TidyScreen
-			a.mu.Unlock()
-			if on {
-				a.con.ok("Tidy screen on: every action now starts on a clean screen. Press t again to turn it off.")
-			} else {
-				a.con.ok("Tidy screen off: earlier output stays visible above the menu.")
 			}
 		case "?", "h", "help":
 			a.pagedHome(a.showShortcuts)

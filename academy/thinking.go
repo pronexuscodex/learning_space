@@ -388,7 +388,7 @@ type Settings struct {
 	Theme        string `json:"theme,omitempty"`
 	PlainSymbols bool   `json:"plain_symbols,omitempty"` // replace emoji with plain characters
 	NoConfidence bool   `json:"no_confidence,omitempty"` // skip "how sure are you?" in reviews
-	DetailedHome bool   `json:"detailed_home,omitempty"` // the full dashboard and menu instead of the simple home
+	SimpleHome   bool   `json:"simple_home,omitempty"`   // the short home screen instead of the full dashboard and menu
 	HideKeyBar   bool   `json:"hide_key_bar,omitempty"`  // no key bar above prompts
 }
 

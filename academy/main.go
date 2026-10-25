@@ -252,7 +252,6 @@ type Registry struct {
 	Tracks        []Track               `json:"tracks"`
 	Reviews       map[string]ReviewCard `json:"reviews"`        // card ID → spaced-repetition state
 	ReviewHistory map[string]int        `json:"review_history"` // local date → cards reviewed that day
-	TidyScreen    bool                  `json:"tidy_screen"`    // start each action on a clean screen
 	StudySessions []StudySession        `json:"study_sessions"` // focus-timer sessions
 	Goals         Goals                 `json:"goals"`          // weekly targets (zero: none)
 	Achievements  map[string]time.Time  `json:"achievements"`   // achievement ID → when earned
@@ -524,7 +523,6 @@ func seedRegistry() *Registry {
 
 	return &Registry{
 		SchemaVersion:  schemaVersion,
-		TidyScreen:     true, // each action starts on a clean screen, so the scrollback stays readable
 		NextLabID:      1,
 		Reviews:        map[string]ReviewCard{},
 		ReviewHistory:  map[string]int{},
