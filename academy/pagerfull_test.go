@@ -202,3 +202,23 @@ func TestFullScreenStatusIsSteady(t *testing.T) {
 		}
 	}
 }
+
+// Every key that leaves a menu page must open something at the menu: a
+// key with no screen behind it closes the page and only gets a warning.
+func TestHomeKeysAreMenuKeys(t *testing.T) {
+	a := &App{reg: seedRegistry(), con: &console{out: &bytes.Buffer{}}, width: 80}
+	menu := map[rune]bool{'r': true, 's': true, '5': true, '7': true} // aliases: r = 9, s = /, 5 = q; 7 saves
+	for _, g := range a.allScreens() {
+		for _, e := range g.entries {
+			text := stripANSI(e.text)
+			if i, j := strings.Index(text, "["), strings.Index(text, "]"); i >= 0 && j == i+2 {
+				menu[rune(text[i+1])] = true
+			}
+		}
+	}
+	for _, r := range homeKeys {
+		if !menu[r] {
+			t.Errorf("homeKeys has %q, but no menu item opens with it", r)
+		}
+	}
+}
