@@ -4,7 +4,7 @@ All notable changes to the Systems & AI Academy are listed here. The
 format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 versions follow [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [1.10.0] - 2026-10-25
 
 ### Changed
 - **The next step is the last line of the home screen**, right above the prompt: today's workout, then your best next step. With the full dashboard, a 24-row terminal used to show only the menu.
