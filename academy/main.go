@@ -1053,7 +1053,7 @@ func main() {
 		sty.theme = reg.Settings.Theme
 		reg.checkStatus = checkStatusesAt(path) // mastery counts passed checks
 		for _, l := range reg.shareCard(time.Now(), termWidth()) {
-			if reg.Settings.PlainSymbols {
+			if reg.Settings.plainSymbolsOn() {
 				l = plainText(l)
 			}
 			fmt.Println(l)

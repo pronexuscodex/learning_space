@@ -64,3 +64,42 @@ func TestHomeScreens(t *testing.T) {
 		}
 	}
 }
+
+// The next step is the last line of the full home, right above the
+// prompt, so a 24-row terminal shows it even when the dashboard has
+// scrolled away.
+func TestNextStepIsBesideThePrompt(t *testing.T) {
+	for _, cols := range []int{minWidth, 80, maxWidth} {
+		for _, r := range []*Registry{seedRegistry(), demoRegistry(time.Now())} {
+			lines := strings.Split(strings.TrimRight(renderHome(t, r, cols), "\n"), "\n")
+			last := lines[len(lines)-1]
+			if !strings.Contains(last, "Today's workout") && !strings.Contains(last, "Next") {
+				t.Errorf("cols %d: the last line of the home is %q, not the next step", cols, last)
+			}
+			if !strings.Contains(lines[len(lines)-2], "└") {
+				t.Errorf("cols %d: the next step should come straight after the menu, got %q above it", cols, lines[len(lines)-2])
+			}
+		}
+	}
+}
+
+// The dashboard says what each number counts, in the words the other
+// screens use: graduated stages and labs (not a bare ★, which the Study
+// Hall uses for a passed check), "Reading" as in the Ledger, and hours
+// for the 14-day line (the streak also counts reviews).
+func TestDashboardWords(t *testing.T) {
+	home := renderHome(t, demoRegistry(time.Now()), 110)
+	for _, want := range []string{"Stages graduated", "graduated)", "Reading", "Hours, 14 days", "Mastered"} {
+		if !strings.Contains(home, want) {
+			t.Errorf("dashboard lacks %q:\n%s", want, home)
+		}
+	}
+	for _, old := range []string{"★)", "Texts", "Last 14d"} {
+		if strings.Contains(home, old) {
+			t.Errorf("dashboard still says %q", old)
+		}
+	}
+	if stageStateNames[StageMastered] == "mastered" {
+		t.Error("a stage's star is a passed check; \"mastered\" is reserved for concept mastery")
+	}
+}

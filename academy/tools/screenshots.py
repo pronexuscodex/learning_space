@@ -37,7 +37,7 @@ def find_chrome():
 # name: (columns, keys to type, first line regex, last line regex or None,
 #        max lines[, which key's output to start from: -1 = the last])
 SHOTS = {
-    "menu": (80, [], r"Study [0-9.]+ h", r"└─", 45),
+    "menu": (80, [], r"Study [0-9.]+ h", r"Today's workout ○|Next ▸", 46),
     "stages": (80, ["6"], r"STUDY HALL", r"\[20\]", 40),
     "concept-card": (80, ["6", "1", "1", "5"], r"┏━", r"◆ Mental model", 70),
     "under-the-hood": (80, ["6", "1", "1", "6"], r"🔧 Under the hood", r"◆ Mental model", 30),

@@ -72,7 +72,9 @@ func (c *console) barLine(keys []barKey) string {
 			break
 		}
 		used += n
-		parts = append(parts, sty.Bold(sty.Cyan(k.key))+" "+sty.Gray(k.what))
+		// The words stay in the terminal's own text colour: grey (SGR 90)
+		// is unreadable in some palettes, and this is how to get around.
+		parts = append(parts, sty.Bold(sty.Cyan(k.key))+" "+k.what)
 	}
 	if len(parts) == 0 {
 		return ""
