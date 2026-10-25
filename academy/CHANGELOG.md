@@ -4,6 +4,14 @@ All notable changes to the Systems & AI Academy are listed here. The
 format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 versions follow [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Changed
+- **The home screen shows everything when you open the academy:** the full dashboard and every screen, grouped. The short home is still there for anyone who prefers it: Settings → *Home screen: simple*.
+
+### Removed
+- **Tidy screen** (the `t` key and its setting). Actions no longer clear the screen first, so what you did stays visible above the menu, and Ctrl+L or `clear` clears it whenever you like. Old progress files that still have the setting load as before.
+
 ## [1.9.1] - 2026-10-25
 
 ### Added

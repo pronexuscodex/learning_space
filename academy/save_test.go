@@ -32,13 +32,13 @@ func TestAutosaveBackupOncePerSessionAndUndo(t *testing.T) {
 		t.Fatalf("an unchanged session must not make a backup, got %d", len(backups))
 	}
 	for i := 0; i < 5; i++ {
-		a.mutate(func(r *Registry) { r.TidyScreen = !r.TidyScreen })
+		a.mutate(func(r *Registry) { r.Settings.NoConfidence = !r.Settings.NoConfidence })
 		a.autosave()
 		saved, _, err := loadRegistry(path)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if saved.TidyScreen != a.reg.TidyScreen {
+		if saved.Settings.NoConfidence != a.reg.Settings.NoConfidence {
 			t.Fatalf("save %d: the change is not on disk", i)
 		}
 	}
