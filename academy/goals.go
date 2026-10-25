@@ -72,7 +72,10 @@ const (
 	StageMastered          // mastery check passed or stage graduated
 )
 
-var stageStateNames = []string{"locked", "ready", "in progress", "understood", "mastered"}
+// "passed", not "mastered": a stage gets its star from one mastery check
+// (or graduation), while a concept is mastered only on evidence over
+// weeks (conceptMastery), and the two must not share a word.
+var stageStateNames = []string{"locked", "ready", "in progress", "understood", "passed"}
 var stageStateGlyphs = []string{"·", "○", "◐", "◉", "★"}
 
 // stageState places a stage on the roadmap.

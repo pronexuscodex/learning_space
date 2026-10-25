@@ -378,7 +378,7 @@ const (
 
 var themes = []struct{ ID, Name, About string }{
 	{ThemeDefault, "Default", "the standard colours"},
-	{ThemeContrast, "High contrast", "brighter text, no faint grey"},
+	{ThemeContrast, "High contrast", "brighter text, no grey: choose this if grey hints are hard to read"},
 	{ThemeColorblind, "Colour-blind friendly", "blue and orange instead of green and red"},
 	{ThemeMono, "Monochrome", "no colour, only bold and layout"},
 }

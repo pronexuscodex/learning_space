@@ -198,9 +198,9 @@ func (a *App) printDashboard() {
 	a.println("")
 	for _, l := range flow([]string{
 		stat("Study", fmt.Sprintf("%.1f h", cs.hours)),
-		stat("Labs", fmt.Sprintf("%d", cs.labs)) + sty.Gray(fmt.Sprintf(" (%d★)", cs.labsGrad)),
-		stat("Stages", fmt.Sprintf("%d/%d", cs.stagesGrad, cs.stages)),
-		stat("Texts", fmt.Sprintf("%d/%d", cs.textsRead, cs.texts)),
+		stat("Labs", fmt.Sprintf("%d", cs.labs)) + sty.Gray(fmt.Sprintf(" (%d graduated)", cs.labsGrad)),
+		stat("Stages graduated", fmt.Sprintf("%d/%d", cs.stagesGrad, cs.stages)),
+		stat("Reading", fmt.Sprintf("%d/%d", cs.textsRead, cs.texts)), // the Ledger's word for the same books
 		stat("Concepts", fmt.Sprintf("%d/%d", cs.conceptsStudied, cs.concepts)),
 		stat("Exercises", fmt.Sprintf("%d/%d", cs.exercisesDone, cs.exercises)),
 		stat("Mastered", fmt.Sprintf("%d/%d", cs.mastered, cs.concepts)),
@@ -220,7 +220,7 @@ func (a *App) printDashboard() {
 	barWidth := max(10, min(24, w-20))
 	for _, l := range flow([]string{
 		sty.Gray("Campus") + " " + bar(done, total, barWidth, sty.Cyan) + " " + sty.Bold(pct(done, total)),
-		sty.Gray("Last 14d") + " " + sparkline(cs.activity[len(cs.activity)-14:]),
+		sty.Gray("Hours, 14 days") + " " + sparkline(cs.activity[len(cs.activity)-14:]), // logged hours only; the streak counts reviews too
 		streak,
 	}, "   ", w, "  ") {
 		a.println(l)
@@ -234,14 +234,21 @@ func (a *App) printDashboard() {
 		a.println(l)
 	}
 	a.println(a.wordOfTheDayLine("d"))
+}
+
+// nextStepLine is the one thing to do next: today's workout until it is
+// done, then the best next step ("" when there is none).
+func (a *App) nextStepLine() string {
 	a.mu.Lock()
 	day := a.reg.todayWorkout(time.Now())
 	a.mu.Unlock()
 	if day == nil || !day.complete() {
-		a.println(a.workoutLine())
-	} else if h := a.nextHint(); h != "" {
-		a.println("  " + h)
+		return a.workoutLine()
 	}
+	if h := a.nextHint(); h != "" {
+		return "  " + h
+	}
+	return ""
 }
 
 // menuEntry is one menu item: extra is shown only when it fits, short is
@@ -370,6 +377,11 @@ func (a *App) printMenu() {
 	}
 	a.printDashboard()
 	a.renderMenu("MAIN MENU", a.allScreens())
+	// The next step goes last, beside the prompt, so it is on screen even
+	// when the dashboard has scrolled away on a 24-row terminal.
+	if l := a.nextStepLine(); l != "" {
+		a.println(l)
+	}
 }
 
 // printHome is the simple dashboard: three numbers, where you are, and
@@ -546,7 +558,7 @@ func (a *App) viewLedger() {
 	a.println("\n" + sty.Gray(strings.Repeat("─", w)))
 	for _, l := range flow([]string{
 		sty.Gray("Campus total") + " " + sty.Bold(hoursText(roundHours(grand))) + " across " + count(a.reg.labCount(), "lab"),
-		sty.Gray("Last 14d") + " " + sparkline(cs.activity[len(cs.activity)-14:]),
+		sty.Gray("Hours, 14 days") + " " + sparkline(cs.activity[len(cs.activity)-14:]), // logged hours only; the streak counts reviews too
 		sty.Gray("last saved") + " " + formatTime(a.reg.LastCommit),
 	}, "   ", w, "  ") {
 		a.println(l)

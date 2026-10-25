@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"strings"
 	"testing"
@@ -211,5 +212,27 @@ func TestThemesRemapColours(t *testing.T) {
 	}
 	if s := (Style{on: true, theme: ThemeMono}); !strings.Contains(s.Bold("b"), "\x1b[1m") {
 		t.Error("monochrome keeps bold")
+	}
+}
+
+// On the Linux console, which has no emoji glyphs, emoji become plain
+// characters automatically; the saved choice is not changed, so other
+// terminals still get emoji.
+func TestPlainSymbolsOnTheLinuxConsole(t *testing.T) {
+	for _, tc := range []struct {
+		term  string
+		plain bool
+	}{{"linux", true}, {"xterm-256color", false}} {
+		t.Setenv("TERM", tc.term)
+		var out bytes.Buffer
+		a := &App{reg: seedRegistry(), con: &console{out: &out}, width: 80}
+		a.applySettings()
+		a.println("💡 tip")
+		if got := !strings.Contains(out.String(), "💡"); got != tc.plain {
+			t.Errorf("TERM=%s: plain symbols = %v, want %v (%q)", tc.term, got, tc.plain, out.String())
+		}
+		if a.reg.Settings.PlainSymbols {
+			t.Errorf("TERM=%s: the saved setting must not change", tc.term)
+		}
 	}
 }

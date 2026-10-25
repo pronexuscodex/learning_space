@@ -7,6 +7,10 @@ versions follow [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Changed
+- **The next step is the last line of the home screen**, right above the prompt: today's workout, then your best next step. With the full dashboard, a 24-row terminal used to show only the menu.
+- **Clearer dashboard words:** "Stages graduated", "Labs 2 (0 graduated)" instead of a bare ★, "Reading" as in the Ledger, and "Hours, 14 days" for the activity line, which counts logged hours only (the streak counts reviews too). On the roadmap and stage lists, ★ now reads "passed" (the stage's mastery check passed, or it graduated): "mastered" stays for concepts, which are mastered only on evidence over weeks.
+- **How to get around is never grey:** the key bar's words and the hints in brackets (such as "q cancel") use the terminal's own text colour, since grey is unreadable in some palettes. The High contrast theme now says it is the one to choose when grey is hard to read.
+- **Emoji become plain characters automatically on the Linux text console** (`TERM=linux`), which has no emoji; your saved choice is untouched for other terminals.
 - **The home screen shows everything when you open the academy:** the full dashboard and every screen, grouped. The short home is still there for anyone who prefers it: Settings → *Home screen: simple*.
 
 ### Removed

@@ -5,6 +5,7 @@ package main
 
 import (
 	"io"
+	"os"
 	"strings"
 	"unicode/utf8"
 )
@@ -18,6 +19,16 @@ var plainSymbols = map[rune]string{
 	'🏆': "*", '📁': "/", '💬': "\"", '🌍': "@", '🏋': "+", '😀': ":)", '🔤': "Aa",
 	'⏱': "~", '⏸': "|", '⌨': "#", '⏎': "<", '⬇': "v",
 }
+
+// noEmojiTerminal reports a terminal that cannot draw emoji at all: the
+// Linux virtual console, whose fonts have no emoji, so they would show as
+// blanks or wrong characters and push boxes out of line.
+func noEmojiTerminal() bool { return os.Getenv("TERM") == "linux" }
+
+// plainSymbolsOn is whether emoji are replaced: by choice in Settings, or
+// automatically where the terminal cannot draw them (the saved choice is
+// left as it is, for other terminals).
+func (s Settings) plainSymbolsOn() bool { return s.PlainSymbols || noEmojiTerminal() }
 
 // plainText replaces emoji with plain characters of the same width.
 func plainText(s string) string {
@@ -73,7 +84,7 @@ func (a *App) applySettings() {
 	if pw, ok := base.(plainWriter); ok {
 		base = pw.w
 	}
-	if st.PlainSymbols {
+	if st.plainSymbolsOn() {
 		a.con.out = plainWriter{base}
 	} else {
 		a.con.out = base
@@ -104,8 +115,11 @@ func (a *App) settingsScreen() error {
 			homeName = "simple"
 		}
 		symbols := "emoji 💡"
-		if st.PlainSymbols {
+		switch {
+		case st.PlainSymbols:
 			symbols = "plain characters"
+		case noEmojiTerminal():
+			symbols = "plain characters (this terminal has no emoji)"
 		}
 		a.println(heading("SETTINGS", sty.Cyan, a.cols()))
 		choice, err := a.con.promptChoice("Change which?", []string{

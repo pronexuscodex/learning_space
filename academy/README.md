@@ -503,7 +503,7 @@ The career center is woven into the rest of the academy:
 
 ## Menu
 
-**The home screen shows everything.** The full dashboard comes first: your streak, study hours, labs, stages, books read, concepts, exercises, mastery, campus progress, the 14-day activity line, weekly goals and the word of the day. Under it is every screen, grouped into the sections below:
+**The home screen shows everything.** The full dashboard comes first: study hours, labs, stages graduated, books read, concepts, exercises, concepts mastered, cards due, campus progress, the study hours of the last 14 days, your streak, weekly goals and the word of the day. Under it is every screen, grouped into the sections below. The one thing to do next, today's workout and then your best next step, is the last line, right above the prompt, so it stays in view even on a 24-row terminal where the dashboard has scrolled away:
 
 ![Home screen](docs/menu.png)
 
@@ -778,7 +778,7 @@ The layout follows your terminal's **live size**. It reads the size with an ioct
 
 Colour is turned on automatically when output goes to a terminal. It is turned off by `-no-color`, by setting `NO_COLOR`, by `TERM=dumb`, or when output is piped. Text follows the live terminal width (40–110 columns; `$COLUMNS` or 80 when it cannot be read).
 
-**Settings** (`o`) choose a colour theme: *Default*, *High contrast* (bright text, no faint grey), *Colour-blind friendly* (blue and orange carry the meaning instead of green and red) or *Monochrome* (no colour, only bold and layout). *Plain symbols* replaces emoji with ordinary characters of the same width, for terminals or fonts that draw emoji badly (some Windows consoles). Settings are saved in your registry.
+**Settings** (`o`) choose a colour theme: *Default*, *High contrast* (bright text, no grey; choose it if grey hints are hard to read, as in Solarized Dark, where grey is the background colour), *Colour-blind friendly* (blue and orange carry the meaning instead of green and red) or *Monochrome* (no colour, only bold and layout). *Plain symbols* replaces emoji with ordinary characters of the same width, for terminals or fonts that draw emoji badly (some Windows consoles); on the Linux text console (`TERM=linux`), which has no emoji at all, it switches on by itself. How to answer, cancel and move (the key bar and the hints in brackets) is always in your terminal's own text colour, never grey. Settings are saved in your registry.
 
 ![Settings](docs/settings.png)
 
